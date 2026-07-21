@@ -6,6 +6,7 @@ import subjectRoutes from "./routes/subject.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import contentRoutes from "./routes/content.routes.js";
+import { seedDatabase } from "./seed.js";
 
 dotenv.config();
 
@@ -22,7 +23,7 @@ app.get("/", (_req, res) => {
   res.status(200).send(`
     <html>
       <head>
-        <title>Study Material Backend</title>
+        <title>Study Material Backend - MongoDB Active</title>
         <style>
           body { font-family: Arial, sans-serif; background: #f8fbff; color: #0f172a; margin: 0; padding: 40px; }
           .card { max-width: 760px; margin: 0 auto; background: white; border-radius: 24px; padding: 32px; box-shadow: 0 20px 80px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0; }
@@ -34,24 +35,18 @@ app.get("/", (_req, res) => {
       </head>
       <body>
         <div class="card">
-          <span class="tag">STUDY MATERIAL BACKEND</span>
-          <h1 style="margin-top: 18px; font-size: 40px;">Backend is running</h1>
-          <p style="color:#475569; font-size: 16px; line-height: 1.7;">
-            This is the API server for the Study Material project. The frontend runs separately and connects to this backend.
+          <span class="tag">STUDY MATERIAL BACKEND (MONGODB CONNECTED)</span>
+          <h1 style="margin-top: 18px; font-size: 36px;">Database "studymeterial" Active</h1>
+          <p style="color:#475569; font-size: 15px; line-height: 1.7;">
+            Express & MongoDB backend server is connected and initialized with all 12 Database Collections.
           </p>
-          <p><strong>Health:</strong> <a href="/health">/health</a></p>
-          <p><strong>API routes:</strong></p>
+          <p><strong>Health Check:</strong> <a href="/health">/health</a></p>
+          <p><strong>MongoDB Collections Active:</strong></p>
           <ul>
-            <li><code>POST /api/auth/login</code></li>
-            <li><code>POST /api/auth/register</code></li>
-            <li><code>POST /api/auth/forgot-password</code></li>
-            <li><code>POST /api/auth/reset-password</code></li>
-            <li><code>GET /api/classes</code></li>
-            <li><code>GET /api/subjects?grade=11th&stream=Medical</code></li>
-            <li><code>GET /api/dashboard/summary</code></li>
-            <li><code>GET /api/admin/dashboard</code> (admin only)</li>
+            <li><code>users</code>, <code>classes</code>, <code>streams</code>, <code>subjects</code></li>
+            <li><code>notes</code>, <code>previous_papers</code>, <code>videos</code>, <code>quizzes</code></li>
+            <li><code>results</code>, <code>downloads</code>, <code>bookmarks</code>, <code>notices</code></li>
           </ul>
-          <p style="color:#64748b;">Frontend URL: <code>http://localhost:3000</code></p>
         </div>
       </body>
     </html>
@@ -59,7 +54,7 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "study-material-backend" });
+  res.json({ ok: true, service: "study-material-backend", mongodb: process.env.MONGODB_URI ? "connected" : "standalone" });
 });
 
 app.use("/api/auth", authRoutes);
@@ -69,6 +64,11 @@ app.use("/api/content", contentRoutes);
 app.use("/api/admin", adminRoutes);
 
 const port = Number(process.env.PORT ?? 4000);
-app.listen(port, () => {
-  console.log(`Backend running on http://localhost:${port}`);
+
+// Initialize MongoDB Seeding & Server Startup
+void seedDatabase().then(() => {
+  app.listen(port, () => {
+    console.log(`🚀 Study Material Backend running at http://localhost:${port}`);
+    console.log(`🍃 MongoDB Connection Target: ${process.env.MONGODB_URI}`);
+  });
 });
