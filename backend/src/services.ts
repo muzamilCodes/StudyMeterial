@@ -1,12 +1,13 @@
-import crypto from "crypto";
-import { ObjectId } from "mongodb";
+import crypto from "node:crypto";
 import { comparePassword, hashPassword, signToken } from "./auth.js";
 import { connectDb } from "./db.js";
-import type { Grade, Stream } from "./types.js";
+
+type Grade = "10th" | "11th" | "12th";
+type Stream = "General" | "Medical" | "Non-Medical" | "Commerce" | "Arts";
 
 type UserRecord = {
-  _id?: ObjectId;
-  username?: string;
+  _id?: unknown;
+  username: string;
   email: string;
   passwordHash: string;
   role: "student" | "admin";
@@ -24,7 +25,7 @@ type ResetTokenRecord = {
   createdAt: Date;
 };
 
-export async function getSubjectsForClass(grade: Grade, stream: Stream) {
+export async function getSubjectsByGradeStream(grade: Grade, stream: Stream) {
   const db = await connectDb();
   if (!db) return [];
 
@@ -74,35 +75,41 @@ export async function getDashboardSummary() {
 
 export async function loginStudent(input: { email: string; password: string }) {
   const db = await connectDb();
-  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@studymaterial.com";
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@studymaterial.com").trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD ?? "Admin@12345";
 
-  if (input.email === adminEmail && input.password === adminPassword) {
+  if (normalizedEmail === adminEmail && input.password === adminPassword) {
     return {
       mode: "admin" as const,
-      token: signToken({ userId: "admin_001", role: "admin", email: input.email }),
-      user: { id: "admin_001", email: input.email, role: "admin" as const }
+      token: signToken({ userId: "admin_001", role: "admin", email: normalizedEmail }),
+      user: {
+        id: "admin_001",
+        email: normalizedEmail,
+        username: "System Admin",
+        role: "admin" as const,
+        isAdmin: true,
+        grade: "11th" as const,
+        stream: "Medical" as const
+      }
     };
   }
 
   if (!db) {
-    if (input.email.endsWith("@example.com") && input.password.length >= 6) {
-      return {
-        mode: "mock" as const,
-        token: signToken({ userId: "mock_student", role: "student", email: input.email }),
-        user: { id: "mock_student", email: input.email, role: "student" as const }
-      };
-    }
-    throw new Error("Database not configured");
+    throw new Error("MongoDB database server not connected");
   }
 
-  const user = await db.collection<UserRecord>("users").findOne({ email: input.email });
-  if (!user) throw new Error("Invalid credentials");
+  const user = await db.collection<UserRecord>("users").findOne({ email: normalizedEmail });
+  if (!user) {
+    throw new Error("No account found with this email! Please register first.");
+  }
 
   const valid = await comparePassword(input.password, user.passwordHash);
-  if (!valid) throw new Error("Invalid credentials");
+  if (!valid) {
+    throw new Error("Incorrect password! Please check your credentials.");
+  }
 
-  const id = user._id?.toString() ?? input.email;
+  const id = user._id?.toString() ?? normalizedEmail;
   const isAdmin = user.role === "admin" || user.isAdmin === true;
   return {
     mode: (isAdmin ? "admin" : "db") as const,
@@ -127,32 +134,23 @@ export async function registerStudent(input: {
   stream: Stream;
 }) {
   const db = await connectDb();
-  const passwordHash = await hashPassword(input.password);
-
   if (!db) {
-    return {
-      mode: "mock" as const,
-      token: signToken({ userId: "mock_student", role: "student", email: input.email }),
-      user: {
-        id: "mock_student",
-        email: input.email,
-        username: input.username,
-        grade: input.grade,
-        stream: input.stream,
-        role: "student" as const,
-        isAdmin: false
-      }
-    };
+    throw new Error("MongoDB database server not connected");
   }
 
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const passwordHash = await hashPassword(input.password);
+
   const users = db.collection<UserRecord>("users");
-  const existing = await users.findOne({ email: input.email });
-  if (existing) throw new Error("User already exists");
+  const existing = await users.findOne({ email: normalizedEmail });
+  if (existing) {
+    throw new Error("This email is already registered! One email can only register once.");
+  }
 
   const now = new Date();
   const result = await users.insertOne({
     username: input.username,
-    email: input.email,
+    email: normalizedEmail,
     passwordHash,
     role: "student",
     isAdmin: false,
@@ -164,10 +162,10 @@ export async function registerStudent(input: {
 
   return {
     mode: "db" as const,
-    token: signToken({ userId: result.insertedId.toString(), role: "student", email: input.email }),
+    token: signToken({ userId: result.insertedId.toString(), role: "student", email: normalizedEmail }),
     user: {
       id: result.insertedId.toString(),
-      email: input.email,
+      email: normalizedEmail,
       username: input.username,
       grade: input.grade,
       stream: input.stream,
@@ -180,11 +178,11 @@ export async function registerStudent(input: {
 export async function createResetToken(email: string) {
   const db = await connectDb();
   const token = crypto.randomUUID();
-  if (!db) return { mode: "mock" as const, token };
+  if (!db) throw new Error("MongoDB database server not connected");
 
   const resets = db.collection<ResetTokenRecord>("password_resets");
   await resets.insertOne({
-    email,
+    email: email.trim().toLowerCase(),
     token,
     expiresAt: new Date(Date.now() + 1000 * 60 * 30),
     createdAt: new Date()
@@ -194,9 +192,9 @@ export async function createResetToken(email: string) {
 
 export async function resetPassword(input: { token: string; password: string }) {
   const db = await connectDb();
-  const passwordHash = await hashPassword(input.password);
-  if (!db) return { mode: "mock" as const };
+  if (!db) throw new Error("MongoDB database server not connected");
 
+  const passwordHash = await hashPassword(input.password);
   const resets = db.collection<ResetTokenRecord>("password_resets");
   const record = await resets.findOne({ token: input.token });
   if (!record || record.expiresAt < new Date()) throw new Error("Invalid or expired reset token");
@@ -261,5 +259,5 @@ export async function createContent(type: string, payload: ContentDoc) {
   };
 
   const result = await db.collection(collection).insertOne(doc);
-  return { id: result.insertedId.toString(), ...doc };
+  return { insertedId: result.insertedId.toString(), ...doc };
 }

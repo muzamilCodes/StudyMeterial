@@ -4,7 +4,7 @@ import { createResetToken, loginStudent, registerStudent, resetPassword } from "
 import type { Grade, Stream } from "../types.js";
 
 const gradeSchema = z.enum(["10th", "11th", "12th"]);
-const streamSchema = z.enum(["Medical", "Non-Medical", "Commerce", "Arts"]);
+const streamSchema = z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]);
 
 export async function login(req: Request, res: Response) {
   const schema = z.object({
@@ -13,7 +13,9 @@ export async function login(req: Request, res: Response) {
   });
 
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Invalid login payload" });
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid email or password format" });
+  }
 
   try {
     const result = await loginStudent(parsed.data);
@@ -28,14 +30,19 @@ export async function register(req: Request, res: Response) {
     username: z.string().min(2),
     email: z.string().email(),
     password: z.string().min(6),
-    confirmPassword: z.string().min(6),
+    confirmPassword: z.string().min(6).optional(),
     grade: gradeSchema,
     stream: streamSchema
   });
 
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success || parsed.data.password !== parsed.data.confirmPassword) {
-    return res.status(400).json({ message: "Invalid registration payload" });
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => i.message).join(", ");
+    return res.status(400).json({ message: `Validation error: ${issues}` });
+  }
+
+  if (parsed.data.confirmPassword && parsed.data.password !== parsed.data.confirmPassword) {
+    return res.status(400).json({ message: "Passwords do not match" });
   }
 
   try {
@@ -55,22 +62,22 @@ export async function register(req: Request, res: Response) {
 export async function forgotPassword(req: Request, res: Response) {
   const schema = z.object({ email: z.string().email() });
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Invalid email" });
+  if (!parsed.success) return res.status(400).json({ message: "Invalid email address" });
 
   const result = await createResetToken(parsed.data.email);
-  res.json({ message: "Reset link sent", email: parsed.data.email, ...result });
+  res.json({ message: "Reset link generated", email: parsed.data.email, ...result });
 }
 
 export async function resetPasswordHandler(req: Request, res: Response) {
   const schema = z.object({
-    token: z.string().min(10),
+    token: z.string().min(5),
     password: z.string().min(6),
-    confirmPassword: z.string().min(6)
+    confirmPassword: z.string().min(6).optional()
   });
 
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success || parsed.data.password !== parsed.data.confirmPassword) {
-    return res.status(400).json({ message: "Invalid reset payload" });
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid password reset payload" });
   }
 
   try {
@@ -78,7 +85,7 @@ export async function resetPasswordHandler(req: Request, res: Response) {
       token: parsed.data.token,
       password: parsed.data.password
     });
-    res.json({ message: "Password updated", ...result });
+    res.json({ message: "Password updated successfully", ...result });
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : "Reset failed" });
   }
