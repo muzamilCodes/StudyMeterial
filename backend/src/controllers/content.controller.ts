@@ -201,3 +201,23 @@ export async function deleteVideo(req: Request, res: Response) {
     res.status(500).json({ message: "Error deleting video" });
   }
 }
+
+export async function uploadFile(req: Request, res: Response) {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+    const fileSizeInMB = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+    res.status(200).json({
+      message: "File uploaded successfully",
+      url: fileUrl,
+      fileSize: fileSizeInMB,
+      filename: file.filename,
+      originalName: file.originalname
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error uploading file" });
+  }
+}

@@ -30,9 +30,14 @@ export default function NotesPage() {
   const stream = session?.stream ?? "Medical";
 
   const handleDownload = (note: RealNoteItem) => {
-    logDownload(note.title, note.subject, "PDF Note", note.fileSize);
+    logDownload(note.title, note.subject, "PDF Note", note.fileSize, note.pdfUrl || note.fileUrl);
     setDownloadMsg(`Downloaded "${note.title}" (${note.fileSize}). Recorded in Downloads history!`);
     setTimeout(() => setDownloadMsg(null), 3500);
+
+    // Actively trigger download in new tab
+    if (note.pdfUrl || note.fileUrl) {
+      window.open(note.pdfUrl || note.fileUrl, "_blank");
+    }
   };
 
   return (
@@ -128,14 +133,19 @@ export default function NotesPage() {
               </button>
             </div>
 
-            <div className="h-72 rounded-2xl bg-slate-900 p-6 text-white flex flex-col items-center justify-center text-center space-y-3">
-              <FileText className="h-14 w-14 text-blue-400 animate-pulse" />
-              <div>
-                <p className="text-base font-bold">PDF Reader Document Viewer</p>
-                <p className="text-xs text-slate-400 max-w-md mt-1">
-                  Previewing {previewNote.pages} pages of verified faculty notes for Class {previewNote.grade} ({previewNote.stream}).
-                </p>
-              </div>
+            <div className="h-[450px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+              {previewNote.pdfUrl || previewNote.fileUrl ? (
+                <iframe
+                  src={`${previewNote.pdfUrl || previewNote.fileUrl}#toolbar=0`}
+                  className="w-full h-full rounded-2xl"
+                  title={previewNote.title}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6 bg-slate-900 text-white space-y-3">
+                  <FileText className="h-14 w-14 text-blue-400 animate-pulse" />
+                  <p className="font-bold">No Preview URL Available</p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-2">

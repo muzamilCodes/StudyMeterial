@@ -29,9 +29,13 @@ export default function PreviousPapersPage() {
   const stream = session?.stream ?? "Medical";
 
   const handleDownload = (paper: RealPaperItem) => {
-    logDownload(paper.title, paper.subject, "Previous Paper", paper.fileSize);
+    logDownload(paper.title, paper.subject, "Previous Paper", paper.fileSize, paper.fileUrl);
     setDownloadMsg(`Downloaded "${paper.title}". Saved in Downloads history!`);
     setTimeout(() => setDownloadMsg(null), 3500);
+
+    if (paper.fileUrl) {
+      window.open(paper.fileUrl, "_blank");
+    }
   };
 
   return (

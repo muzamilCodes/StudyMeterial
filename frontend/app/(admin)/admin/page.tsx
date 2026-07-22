@@ -20,6 +20,7 @@ import {
   fetchBackendVideos,
   createBackendVideo,
   deleteBackendVideo,
+  uploadBackendFile,
   type RealNoteItem,
   type RealPaperItem,
   type RealVideoItem,
@@ -73,6 +74,12 @@ export default function AdminPage() {
   const [vidTitle, setVidTitle] = useState("");
   const [vidInstructor, setVidInstructor] = useState("Dr. Ananya Sharma");
   const [vidDuration, setVidDuration] = useState("25:00");
+
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [paperFile, setPaperFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoThumbnailFile, setVideoThumbnailFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Live arrays
   const [realNotes, setRealNotes] = useState<RealNoteItem[]>([]);
@@ -169,77 +176,158 @@ export default function AdminPage() {
   const handlePdfSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pdfTitle) return;
-
-    const ok = await createBackendNote({
-      subject: pdfSubject,
-      title: pdfTitle,
-      grade: pdfGrade,
-      stream: pdfGrade === "10th" ? "General" : pdfStream,
-      fileSize: pdfSize,
-      pages: Number(pdfPages),
-      pdfUrl: "http://localhost:4000/uploads/dummy.pdf"
-    });
-
-    if (ok) {
-      setUploadSuccess(`Successfully uploaded PDF Note: "${pdfTitle}" for Class ${pdfGrade}!`);
-      setPdfTitle("");
-      refreshData();
-    } else {
-      setUploadSuccess("❌ Failed to upload note to MongoDB database");
+    if (!pdfFile) {
+      alert("Please select a PDF file first");
+      return;
     }
-    setTimeout(() => setUploadSuccess(null), 4000);
+
+    setUploading(true);
+    setUploadSuccess("Uploading PDF file to server...");
+
+    try {
+      const uploadRes = await uploadBackendFile(pdfFile);
+      if (!uploadRes) {
+        setUploadSuccess("❌ Failed to upload PDF file.");
+        setUploading(false);
+        return;
+      }
+
+      const ok = await createBackendNote({
+        subject: pdfSubject,
+        title: pdfTitle,
+        grade: pdfGrade,
+        stream: pdfGrade === "10th" ? "General" : pdfStream,
+        fileSize: uploadRes.fileSize,
+        pages: Number(pdfPages),
+        pdfUrl: uploadRes.url
+      });
+
+      if (ok) {
+        setUploadSuccess(`Successfully uploaded PDF Note: "${pdfTitle}" for Class ${pdfGrade}!`);
+        setPdfTitle("");
+        setPdfFile(null);
+        const fileInput = document.getElementById("pdf-file-input") as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
+        refreshData();
+      } else {
+        setUploadSuccess("❌ Failed to upload note to MongoDB database");
+      }
+    } catch (err) {
+      setUploadSuccess("❌ Error uploading note");
+    } finally {
+      setUploading(false);
+      setTimeout(() => setUploadSuccess(null), 4000);
+    }
   };
 
   // Handle Paper Upload Form
   const handlePaperSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paperTitle) return;
-
-    const ok = await createBackendPaper({
-      subject: paperSubject,
-      title: paperTitle,
-      year: paperYear,
-      term: paperTerm,
-      grade: paperGrade,
-      stream: paperGrade === "10th" ? "General" : paperStream,
-      fileSize: "3.2 MB",
-      fileUrl: "http://localhost:4000/uploads/dummy.pdf"
-    });
-
-    if (ok) {
-      setUploadSuccess(`Successfully uploaded Previous Paper: "${paperTitle}" (${paperYear}) for Class ${paperGrade}!`);
-      setPaperTitle("");
-      refreshData();
-    } else {
-      setUploadSuccess("❌ Failed to upload board paper to MongoDB database");
+    if (!paperFile) {
+      alert("Please select a question paper PDF first");
+      return;
     }
-    setTimeout(() => setUploadSuccess(null), 4000);
+
+    setUploading(true);
+    setUploadSuccess("Uploading board question paper to server...");
+
+    try {
+      const uploadRes = await uploadBackendFile(paperFile);
+      if (!uploadRes) {
+        setUploadSuccess("❌ Failed to upload board paper file.");
+        setUploading(false);
+        return;
+      }
+
+      const ok = await createBackendPaper({
+        subject: paperSubject,
+        title: paperTitle,
+        year: paperYear,
+        term: paperTerm,
+        grade: paperGrade,
+        stream: paperGrade === "10th" ? "General" : paperStream,
+        fileSize: uploadRes.fileSize,
+        fileUrl: uploadRes.url
+      });
+
+      if (ok) {
+        setUploadSuccess(`Successfully uploaded Previous Paper: "${paperTitle}" (${paperYear}) for Class ${paperGrade}!`);
+        setPaperTitle("");
+        setPaperFile(null);
+        const fileInput = document.getElementById("paper-file-input") as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
+        refreshData();
+      } else {
+        setUploadSuccess("❌ Failed to upload board paper to MongoDB database");
+      }
+    } catch (err) {
+      setUploadSuccess("❌ Error uploading board paper");
+    } finally {
+      setUploading(false);
+      setTimeout(() => setUploadSuccess(null), 4000);
+    }
   };
 
   // Handle Video Upload Form
   const handleVideoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vidTitle) return;
-
-    const ok = await createBackendVideo({
-      subject: vidSubject,
-      title: vidTitle,
-      instructor: vidInstructor,
-      duration: vidDuration,
-      grade: vidGrade,
-      stream: vidGrade === "10th" ? "General" : vidStream,
-      thumbnail: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
-      videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4"
-    });
-
-    if (ok) {
-      setUploadSuccess(`Successfully uploaded Video Lecture: "${vidTitle}" for Class ${vidGrade}!`);
-      setVidTitle("");
-      refreshData();
-    } else {
-      setUploadSuccess("❌ Failed to upload video to MongoDB database");
+    if (!videoFile) {
+      alert("Please select a video file first");
+      return;
     }
-    setTimeout(() => setUploadSuccess(null), 4000);
+
+    setUploading(true);
+    setUploadSuccess("Uploading video file (this may take longer)...");
+
+    try {
+      const uploadRes = await uploadBackendFile(videoFile);
+      if (!uploadRes) {
+        setUploadSuccess("❌ Failed to upload video file.");
+        setUploading(false);
+        return;
+      }
+
+      let thumbnailUrl = "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80";
+      if (videoThumbnailFile) {
+        setUploadSuccess("Uploading video thumbnail image...");
+        const thumbRes = await uploadBackendFile(videoThumbnailFile);
+        if (thumbRes) {
+          thumbnailUrl = thumbRes.url;
+        }
+      }
+
+      const ok = await createBackendVideo({
+        subject: vidSubject,
+        title: vidTitle,
+        instructor: vidInstructor,
+        duration: vidDuration,
+        grade: vidGrade,
+        stream: vidGrade === "10th" ? "General" : vidStream,
+        thumbnail: thumbnailUrl,
+        videoUrl: uploadRes.url
+      });
+
+      if (ok) {
+        setUploadSuccess(`Successfully uploaded Video Lecture: "${vidTitle}" for Class ${vidGrade}!`);
+        setVidTitle("");
+        setVideoFile(null);
+        setVideoThumbnailFile(null);
+        const fileInput = document.getElementById("video-file-input") as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
+        const thumbInput = document.getElementById("thumb-file-input") as HTMLInputElement;
+        if (thumbInput) thumbInput.value = "";
+        refreshData();
+      } else {
+        setUploadSuccess("❌ Failed to upload video to MongoDB database");
+      }
+    } catch (err) {
+      setUploadSuccess("❌ Error uploading video");
+    } finally {
+      setUploading(false);
+      setTimeout(() => setUploadSuccess(null), 4000);
+    }
   };
 
   const adminCards = [
@@ -390,16 +478,25 @@ export default function AdminPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label className="font-bold text-slate-800 text-xs">File Size & Pages</Label>
-                <div className="flex gap-2">
-                  <Input value={pdfSize} onChange={(e) => setPdfSize(e.target.value)} placeholder="3.5 MB" className="h-11 rounded-xl text-xs" />
-                  <Input type="number" value={pdfPages} onChange={(e) => setPdfPages(Number(e.target.value))} placeholder="15" className="h-11 rounded-xl text-xs" />
-                </div>
+                <Label className="font-bold text-slate-800 text-xs">Pages Count</Label>
+                <Input type="number" value={pdfPages} onChange={(e) => setPdfPages(Number(e.target.value))} placeholder="15" className="h-11 rounded-xl text-xs" />
               </div>
             </div>
 
-            <Button type="submit" className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold text-white text-xs shadow-premium">
-              <Upload className="mr-2 h-4 w-4" /> Upload PDF Note to Platform
+            <div className="grid gap-2">
+              <Label className="font-bold text-slate-800 text-xs">Upload Note PDF File</Label>
+              <Input
+                id="pdf-file-input"
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                required
+                className="h-11 rounded-xl text-xs pt-2.5 bg-white border border-slate-200"
+              />
+            </div>
+
+            <Button type="submit" disabled={uploading} className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold text-white text-xs shadow-premium disabled:opacity-50">
+              <Upload className="mr-2 h-4 w-4" /> {uploading ? "Uploading note PDF..." : "Upload PDF Note to Platform"}
             </Button>
           </form>
         )}
@@ -408,28 +505,59 @@ export default function AdminPage() {
           <form onSubmit={handlePaperSubmit} className="space-y-4">
             <div className="border-b pb-3 mb-2">
               <h3 className="text-lg font-bold text-slate-900">Upload Board Question Paper</h3>
+              <p className="text-xs text-slate-500">Uploaded board papers will appear on the Student Previous Papers page for the selected class.</p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
                 <Label className="font-bold text-slate-800 text-xs">Class</Label>
-                <select value={paperGrade} onChange={(e) => setPaperGrade(e.target.value as Grade)} className="h-11 rounded-xl border bg-white px-3 text-xs font-semibold">
-                  <option value="10th">10th</option>
-                  <option value="11th">11th</option>
-                  <option value="12th">12th</option>
+                <select
+                  value={paperGrade}
+                  onChange={(e) => setPaperGrade(e.target.value as Grade)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="10th">10th Class</option>
+                  <option value="11th">11th Class</option>
+                  <option value="12th">12th Class</option>
                 </select>
               </div>
               <div className="grid gap-2">
                 <Label className="font-bold text-slate-800 text-xs">Stream</Label>
-                <select value={paperStream} onChange={(e) => setPaperStream(e.target.value as Stream)} className="h-11 rounded-xl border bg-white px-3 text-xs font-semibold">
+                <select
+                  value={paperStream}
+                  disabled={paperGrade === "10th"}
+                  onChange={(e) => setPaperStream(e.target.value as Stream)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900 disabled:opacity-50"
+                >
                   <option value="Medical">Medical</option>
                   <option value="Non-Medical">Non-Medical</option>
                   <option value="Commerce">Commerce</option>
                   <option value="Arts">Arts</option>
+                  <option value="General">General</option>
                 </select>
               </div>
               <div className="grid gap-2">
                 <Label className="font-bold text-slate-800 text-xs">Subject</Label>
-                <Input value={paperSubject} onChange={(e) => setPaperSubject(e.target.value)} className="h-11 rounded-xl text-xs" />
+                <select
+                  value={paperSubject}
+                  onChange={(e) => setPaperSubject(e.target.value)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="Biology">Biology</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Chemistry">Chemistry</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Accountancy">Accountancy</option>
+                  <option value="Business Studies">Business Studies</option>
+                  <option value="Economics">Economics</option>
+                  <option value="History">History</option>
+                  <option value="Political Science">Political Science</option>
+                  <option value="Sociology">Sociology</option>
+                  <option value="Geography">Geography</option>
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Science">Science</option>
+                  <option value="Social Science">Social Science</option>
+                </select>
               </div>
             </div>
 
@@ -447,8 +575,20 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 font-bold text-white text-xs shadow">
-              <Upload className="mr-2 h-4 w-4" /> Upload Board Paper
+            <div className="grid gap-2">
+              <Label className="font-bold text-slate-800 text-xs">Upload Question Paper PDF File</Label>
+              <Input
+                id="paper-file-input"
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setPaperFile(e.target.files?.[0] || null)}
+                required
+                className="h-11 rounded-xl text-xs pt-2.5 bg-white border border-slate-200"
+              />
+            </div>
+
+            <Button type="submit" disabled={uploading} className="w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 font-bold text-white text-xs shadow disabled:opacity-50">
+              <Upload className="mr-2 h-4 w-4" /> {uploading ? "Uploading board paper PDF..." : "Upload Board Paper"}
             </Button>
           </form>
         )}
@@ -457,7 +597,64 @@ export default function AdminPage() {
           <form onSubmit={handleVideoSubmit} className="space-y-4">
             <div className="border-b pb-3 mb-2">
               <h3 className="text-lg font-bold text-slate-900">Upload Video Lecture</h3>
+              <p className="text-xs text-slate-500">Uploaded videos will appear on the Student Videos page for the selected class.</p>
             </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Target Class</Label>
+                <select
+                  value={vidGrade}
+                  onChange={(e) => setVidGrade(e.target.value as Grade)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="10th">10th Class</option>
+                  <option value="11th">11th Class</option>
+                  <option value="12th">12th Class</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Target Stream</Label>
+                <select
+                  value={vidStream}
+                  disabled={vidGrade === "10th"}
+                  onChange={(e) => setVidStream(e.target.value as Stream)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900 disabled:opacity-50"
+                >
+                  <option value="Medical">Medical</option>
+                  <option value="Non-Medical">Non-Medical</option>
+                  <option value="Commerce">Commerce</option>
+                  <option value="Arts">Arts</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Subject</Label>
+                <select
+                  value={vidSubject}
+                  onChange={(e) => setVidSubject(e.target.value)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="Biology">Biology</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Chemistry">Chemistry</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Accountancy">Accountancy</option>
+                  <option value="Business Studies">Business Studies</option>
+                  <option value="Economics">Economics</option>
+                  <option value="History">History</option>
+                  <option value="Political Science">Political Science</option>
+                  <option value="Sociology">Sociology</option>
+                  <option value="Geography">Geography</option>
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Science">Science</option>
+                  <option value="Social Science">Social Science</option>
+                </select>
+              </div>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
                 <Label className="font-bold text-slate-800 text-xs">Video Title</Label>
@@ -471,8 +668,33 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 font-bold text-white text-xs shadow">
-              <Video className="mr-2 h-4 w-4" /> Upload Video Lecture
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Upload Video File (.mp4, etc.)</Label>
+                <Input
+                  id="video-file-input"
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+                  required
+                  className="h-11 rounded-xl text-xs pt-2.5 bg-white border border-slate-200"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Upload Thumbnail Image (Optional)</Label>
+                <Input
+                  id="thumb-file-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setVideoThumbnailFile(e.target.files?.[0] || null)}
+                  className="h-11 rounded-xl text-xs pt-2.5 bg-white border border-slate-200"
+                />
+              </div>
+            </div>
+
+            <Button type="submit" disabled={uploading} className="w-full h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 font-bold text-white text-xs shadow disabled:opacity-50">
+              <Video className="mr-2 h-4 w-4" /> {uploading ? "Uploading video lecture..." : "Upload Video Lecture"}
             </Button>
           </form>
         )}

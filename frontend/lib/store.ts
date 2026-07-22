@@ -55,6 +55,7 @@ export type DownloadRecord = {
   category: "PDF Note" | "Previous Paper";
   downloadedAt: string;
   fileSize: string;
+  fileUrl?: string;
 };
 
 export type QuizResultRecord = {
@@ -359,10 +360,17 @@ export async function createBackendNotice(notice: { title: string; body: string;
   }
 }
 
-// 6. DOWNLOADS STORE (Local Storage logging only)
+function getDownloadsKey(): string {
+  const session = getStoredSession();
+  const userId = session?.id || "guest";
+  return `${DOWNLOADS_KEY}-${userId}`;
+}
+
+// 6. DOWNLOADS STORE (User-specific Local Storage logging)
 export function getDownloadedFiles(): DownloadRecord[] {
   if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(DOWNLOADS_KEY);
+  const key = getDownloadsKey();
+  const raw = localStorage.getItem(key);
   if (!raw) return [];
   try {
     return JSON.parse(raw) as DownloadRecord[];
@@ -371,7 +379,7 @@ export function getDownloadedFiles(): DownloadRecord[] {
   }
 }
 
-export function logDownload(title: string, subject: string, category: "PDF Note" | "Previous Paper", fileSize: string): DownloadRecord[] {
+export function logDownload(title: string, subject: string, category: "PDF Note" | "Previous Paper", fileSize: string, fileUrl?: string): DownloadRecord[] {
   if (typeof window === "undefined") return [];
   const current = getDownloadedFiles();
   const newRecord: DownloadRecord = {
@@ -380,10 +388,21 @@ export function logDownload(title: string, subject: string, category: "PDF Note"
     subject,
     category,
     downloadedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }),
-    fileSize
+    fileSize,
+    fileUrl
   };
   const updated = [newRecord, ...current];
-  localStorage.setItem(DOWNLOADS_KEY, JSON.stringify(updated));
+  const key = getDownloadsKey();
+  localStorage.setItem(key, JSON.stringify(updated));
+  return updated;
+}
+
+export function deleteDownloadRecord(id: string): DownloadRecord[] {
+  if (typeof window === "undefined") return [];
+  const current = getDownloadedFiles();
+  const updated = current.filter(item => item.id !== id);
+  const key = getDownloadsKey();
+  localStorage.setItem(key, JSON.stringify(updated));
   return updated;
 }
 
@@ -466,6 +485,37 @@ export async function fetchBackendAdminDashboard() {
       },
       usersList: []
     };
+  }
+}
+
+export async function uploadBackendFile(file: File): Promise<{ url: string; fileSize: string } | null> {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("study-material-token") : null;
+    const headers: HeadersInit = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(apiUrl("/api/content/upload"), {
+      method: "POST",
+      headers,
+      body: formData
+    });
+
+    if (!res.ok) {
+      throw new Error(`Upload failed with status: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return {
+      url: data.url,
+      fileSize: data.fileSize
+    };
+  } catch (error) {
+    console.error("uploadBackendFile error:", error);
+    return null;
   }
 }
 

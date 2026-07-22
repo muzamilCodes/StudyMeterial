@@ -1,24 +1,33 @@
 "use client";
-
+ 
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getDownloadedFiles, type DownloadRecord, logDownload } from "@/lib/store";
-import { Download, FileText, ScrollText, CheckCircle2, Clock } from "lucide-react";
-
+import { getDownloadedFiles, type DownloadRecord, logDownload, deleteDownloadRecord } from "@/lib/store";
+import { Download, FileText, ScrollText, CheckCircle2, Clock, Trash2, Eye } from "lucide-react";
+ 
 export default function DownloadsPage() {
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
   const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
-
+ 
   useEffect(() => {
     setDownloads(getDownloadedFiles());
   }, []);
+ 
+  const handleViewFile = (item: DownloadRecord) => {
+    if (item.fileUrl) {
+      window.open(item.fileUrl, "_blank");
+    } else {
+      window.open("http://localhost:4000/uploads/dummy.pdf", "_blank");
+    }
+  };
 
-  const handleRedownload = (item: DownloadRecord) => {
-    logDownload(item.title, item.subject, item.category, item.fileSize);
-    setDownloads(getDownloadedFiles());
-    setDownloadMsg(`Re-downloaded "${item.title}".`);
+  const handleDelete = (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to remove "${title}" from your download history?`)) return;
+    const updated = deleteDownloadRecord(id);
+    setDownloads(updated);
+    setDownloadMsg(`Removed "${title}" from download history.`);
     setTimeout(() => setDownloadMsg(null), 3000);
   };
 
@@ -73,13 +82,23 @@ export default function DownloadsPage() {
                 </div>
               </div>
 
-              <Button
-                onClick={() => handleRedownload(item)}
-                variant="outline"
-                className="rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-semibold shrink-0"
-              >
-                <Download className="mr-2 h-4 w-4 text-emerald-600" /> Re-Download
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  onClick={() => handleViewFile(item)}
+                  variant="outline"
+                  className="rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-semibold"
+                >
+                  <Eye className="mr-2 h-4 w-4 text-blue-600" /> View
+                </Button>
+                <Button
+                  onClick={() => handleDelete(item.id, item.title)}
+                  variant="outline"
+                  className="rounded-xl border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-xs font-semibold text-rose-600"
+                  title="Remove from history"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </Card>
         ))}

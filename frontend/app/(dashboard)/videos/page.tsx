@@ -110,14 +110,20 @@ export default function VideosPage() {
               </button>
             </div>
 
-            <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center space-y-3">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600/90 text-white shadow-2xl animate-pulse">
-                <PlayCircle className="h-10 w-10" />
-              </div>
-              <div>
-                <p className="text-lg font-extrabold">{activeVideo.title}</p>
-                <p className="text-xs text-slate-400 mt-1">Streaming 1080p Full HD Video Lecture</p>
-              </div>
+            <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-slate-950">
+              {activeVideo.videoUrl ? (
+                <video
+                  src={activeVideo.videoUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-white p-6 text-center space-y-3">
+                  <PlayCircle className="h-14 w-14 text-rose-500 animate-pulse" />
+                  <p className="font-bold">No Video Stream Available</p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between items-center pt-2">
