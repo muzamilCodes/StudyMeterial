@@ -8,7 +8,16 @@ import adminRoutes from "./routes/admin.routes.js";
 import contentRoutes from "./routes/content.routes.js";
 import { seedDatabase } from "./seed.js";
 
+import path from "path";
+import fs from "fs";
+
 dotenv.config();
+
+// Ensure upload directory exists
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const app = express();
 app.use(express.json());
@@ -18,6 +27,8 @@ app.use(
     credentials: true
   })
 );
+
+app.use("/uploads", express.static(uploadDir));
 
 app.get("/", (_req, res) => {
   res.status(200).send(`

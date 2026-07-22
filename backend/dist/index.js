@@ -1,27 +1,27 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import path from "path";
-import fs from "fs";
 import authRoutes from "./routes/auth.routes.js";
 import subjectRoutes from "./routes/subject.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import contentRoutes from "./routes/content.routes.js";
 import { seedDatabase } from "./seed.js";
+import path from "path";
+import fs from "fs";
 dotenv.config();
-const app = express();
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
-const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+// Ensure upload directory exists
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
 }
-app.use("/uploads", express.static(uploadsDir));
+const app = express();
+app.use(express.json());
 app.use(cors({
     origin: process.env.CLIENT_ORIGIN ?? "http://localhost:3000",
     credentials: true
 }));
+app.use("/uploads", express.static(uploadDir));
 app.get("/", (_req, res) => {
     res.status(200).send(`
     <html>

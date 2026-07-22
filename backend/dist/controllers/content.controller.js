@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { createContent, listContent } from "../services.js";
-import fs from "fs";
-import path from "path";
+import { createContent, listContent, deleteContent } from "../services.js";
 const gradeSchema = z.enum(["10th", "11th", "12th"]);
 const streamSchema = z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]);
 function getQueryFilters(req) {
@@ -25,17 +23,14 @@ export async function createNote(req, res) {
         stream: streamSchema,
         subject: z.string().min(2),
         title: z.string().min(2),
-        fileUrl: z.string(),
-        uploadDate: z.string().optional(),
+        fileUrl: z.string().url(),
         fileSize: z.string().optional(),
-        pages: z.number().optional()
+        pages: z.number().int().optional(),
+        uploadDate: z.string().optional()
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({
-            message: "Invalid note payload: " + parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ")
-        });
-    }
+    if (!parsed.success)
+        return res.status(400).json({ message: "Invalid note payload" });
     const result = await createContent("notes", parsed.data);
     res.status(201).json({ message: "Note created", data: result });
 }
@@ -55,16 +50,13 @@ export async function createPaper(req, res) {
         subject: z.string().min(2),
         title: z.string().min(2),
         year: z.string().min(2),
-        fileUrl: z.string(),
+        term: z.string().optional(),
         fileSize: z.string().optional(),
-        term: z.string().optional()
+        fileUrl: z.string().url()
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({
-            message: "Invalid paper payload: " + parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ")
-        });
-    }
+    if (!parsed.success)
+        return res.status(400).json({ message: "Invalid paper payload" });
     const result = await createContent("papers", parsed.data);
     res.status(201).json({ message: "Paper created", data: result });
 }
@@ -83,17 +75,14 @@ export async function createVideo(req, res) {
         stream: streamSchema,
         subject: z.string().min(2),
         title: z.string().min(2),
-        videoUrl: z.string().url(),
         instructor: z.string().optional(),
         duration: z.string().optional(),
-        thumbnail: z.string().url().optional()
+        thumbnail: z.string().optional(),
+        videoUrl: z.string().url()
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({
-            message: "Invalid video payload: " + parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ")
-        });
-    }
+    if (!parsed.success)
+        return res.status(400).json({ message: "Invalid video payload" });
     const result = await createContent("videos", parsed.data);
     res.status(201).json({ message: "Video created", data: result });
 }
@@ -111,29 +100,18 @@ export async function createQuiz(req, res) {
         grade: gradeSchema,
         stream: streamSchema,
         subject: z.string().min(2),
-        topic: z.string().min(2),
         title: z.string().min(2),
         durationMinutes: z.number().int().positive(),
-        totalQuestions: z.number().int().positive().optional(),
         questions: z.array(z.object({
-            id: z.number().int().positive().optional(),
             question: z.string().min(2),
             options: z.array(z.string().min(1)).min(2),
-            correctIndex: z.number().int().nonnegative(),
-            explanation: z.string().optional()
+            answer: z.string().min(1)
         }))
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({
-            message: "Invalid quiz payload: " + parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ")
-        });
-    }
-    const doc = {
-        ...parsed.data,
-        totalQuestions: parsed.data.totalQuestions ?? parsed.data.questions.length
-    };
-    const result = await createContent("quizzes", doc);
+    if (!parsed.success)
+        return res.status(400).json({ message: "Invalid quiz payload" });
+    const result = await createContent("quizzes", parsed.data);
     res.status(201).json({ message: "Quiz created", data: result });
 }
 export async function listNotices(_req, res) {
@@ -147,11 +125,8 @@ export async function createNotice(req, res) {
         category: z.string().min(2)
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({
-            message: "Invalid notice payload: " + parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ")
-        });
-    }
+    if (!parsed.success)
+        return res.status(400).json({ message: "Invalid notice payload" });
     const result = await createContent("notices", parsed.data);
     res.status(201).json({ message: "Notice created", data: result });
 }
@@ -177,33 +152,59 @@ export async function listProgress(req, res) {
         }
     });
 }
-export async function uploadFile(req, res) {
-    const schema = z.object({
-        filename: z.string().min(1),
-        base64: z.string().min(10)
-    });
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid upload payload" });
-    }
+export async function deleteNote(req, res) {
     try {
-        const base64Data = parsed.data.base64.split(",")[1] ?? parsed.data.base64;
-        const buffer = Buffer.from(base64Data, "base64");
-        const uploadsDir = path.join(process.cwd(), "uploads");
-        if (!fs.existsSync(uploadsDir)) {
-            fs.mkdirSync(uploadsDir, { recursive: true });
+        const id = req.params.id;
+        const ok = await deleteContent("notes", id);
+        if (!ok)
+            return res.status(404).json({ message: "Note not found" });
+        res.json({ message: "Note deleted successfully" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Error deleting note" });
+    }
+}
+export async function deletePaper(req, res) {
+    try {
+        const id = req.params.id;
+        const ok = await deleteContent("papers", id);
+        if (!ok)
+            return res.status(404).json({ message: "Paper not found" });
+        res.json({ message: "Paper deleted successfully" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Error deleting paper" });
+    }
+}
+export async function deleteVideo(req, res) {
+    try {
+        const id = req.params.id;
+        const ok = await deleteContent("videos", id);
+        if (!ok)
+            return res.status(404).json({ message: "Video not found" });
+        res.json({ message: "Video deleted successfully" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Error deleting video" });
+    }
+}
+export async function uploadFile(req, res) {
+    try {
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ message: "No file uploaded" });
         }
-        const uniqueFilename = `${Date.now()}-${parsed.data.filename.replace(/\s+/g, "_")}`;
-        const filePath = path.join(uploadsDir, uniqueFilename);
-        await fs.promises.writeFile(filePath, buffer);
-        const fileUrl = `/uploads/${uniqueFilename}`;
+        const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+        const fileSizeInMB = (file.size / (1024 * 1024)).toFixed(1) + " MB";
         res.status(200).json({
             message: "File uploaded successfully",
-            fileUrl
+            url: fileUrl,
+            fileSize: fileSizeInMB,
+            filename: file.filename,
+            originalName: file.originalname
         });
     }
-    catch (err) {
-        console.error("File upload error:", err);
-        res.status(500).json({ message: "Failed to save file on server" });
+    catch (error) {
+        res.status(500).json({ message: "Error uploading file" });
     }
 }

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireRole, verifyToken } from "../middleware/auth.js";
+import { upload } from "../middleware/upload.js";
 import {
   createNote,
   createNotice,
@@ -13,7 +14,11 @@ import {
   listProgress,
   listQuizzes,
   listResults,
-  listVideos
+  listVideos,
+  deleteNote,
+  deletePaper,
+  deleteVideo,
+  uploadFile
 } from "../controllers/content.controller.js";
 
 const router = Router();
@@ -32,5 +37,10 @@ router.post("/papers", verifyToken, requireRole("admin"), createPaper);
 router.post("/videos", verifyToken, requireRole("admin"), createVideo);
 router.post("/quizzes", verifyToken, requireRole("admin"), createQuiz);
 router.post("/notices", verifyToken, requireRole("admin"), createNotice);
+router.post("/upload", verifyToken, requireRole("admin"), upload.single("file"), uploadFile);
+
+router.delete("/notes/:id", verifyToken, requireRole("admin"), deleteNote);
+router.delete("/papers/:id", verifyToken, requireRole("admin"), deletePaper);
+router.delete("/videos/:id", verifyToken, requireRole("admin"), deleteVideo);
 
 export default router;

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { ObjectId } from "mongodb";
 import { comparePassword, hashPassword, signToken } from "./auth.js";
 import { connectDb } from "./db.js";
 
@@ -73,6 +74,13 @@ export async function getDashboardSummary() {
   };
 }
 
+export async function getRegisteredUsers() {
+  const db = await connectDb();
+  if (!db) return [];
+  const users = await db.collection("users").find({}, { projection: { passwordHash: 0 } }).toArray();
+  return users;
+}
+
 export async function loginStudent(input: { email: string; password: string }) {
   const db = await connectDb();
   const normalizedEmail = input.email.trim().toLowerCase();
@@ -112,7 +120,7 @@ export async function loginStudent(input: { email: string; password: string }) {
   const id = user._id?.toString() ?? normalizedEmail;
   const isAdmin = user.role === "admin" || user.isAdmin === true;
   return {
-    mode: (isAdmin ? "admin" : "db") as const,
+    mode: isAdmin ? ("admin" as const) : ("db" as const),
     token: signToken({ userId: id, role: isAdmin ? "admin" : user.role, email: user.email }),
     user: {
       id,
@@ -260,4 +268,19 @@ export async function createContent(type: string, payload: ContentDoc) {
 
   const result = await db.collection(collection).insertOne(doc);
   return { insertedId: result.insertedId.toString(), ...doc };
+}
+
+export async function deleteContent(type: string, id: string) {
+  const db = await connectDb();
+  if (!db) throw new Error("Database not configured");
+  const collection = collectionName(type);
+  if (!collection) throw new Error("Invalid content type");
+
+  try {
+    const result = await db.collection(collection).deleteOne({ _id: new ObjectId(id) });
+    return result.deletedCount > 0;
+  } catch (error) {
+    console.error("deleteContent database error:", error);
+    return false;
+  }
 }
