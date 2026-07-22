@@ -10,18 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getStoredSession, type StudentSession } from "@/lib/session";
 import {
-  getRealAdminStats,
-  getRealNotes,
-  addRealNote,
-  getRealPapers,
-  addRealPaper,
-  getRealVideos,
-  addRealVideo,
-  getRealQuizzes,
-  addRealQuiz,
+  fetchBackendAdminDashboard,
+  fetchBackendNotes,
+  createBackendNote,
+  fetchBackendPapers,
+  createBackendPaper,
+  fetchBackendVideos,
+  createBackendVideo,
   type RealNoteItem,
   type RealPaperItem,
-  type RealVideoItem
+  type RealVideoItem,
+  type RegisteredUserItem
 } from "@/lib/store";
 import { type Grade, type Stream } from "@/lib/platform-data";
 import {
@@ -75,7 +74,16 @@ export default function AdminPage() {
   const [realNotes, setRealNotes] = useState<RealNoteItem[]>([]);
   const [realPapers, setRealPapers] = useState<RealPaperItem[]>([]);
   const [realVideos, setRealVideos] = useState<RealVideoItem[]>([]);
-  const [adminStats, setAdminStats] = useState(getRealAdminStats());
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUserItem[]>([]);
+  const [adminStats, setAdminStats] = useState({
+    totalUsers: 0,
+    totalNotes: 0,
+    totalPapers: 0,
+    totalVideos: 0,
+    totalQuizzes: 0,
+    totalDownloads: 0,
+    averageScore: "85%"
+  });
 
   useEffect(() => {
     const s = getStoredSession();
@@ -92,10 +100,13 @@ export default function AdminPage() {
   }, [router]);
 
   const refreshData = () => {
-    setRealNotes(getRealNotes());
-    setRealPapers(getRealPapers());
-    setRealVideos(getRealVideos());
-    setAdminStats(getRealAdminStats());
+    fetchBackendNotes().then(data => setRealNotes(data));
+    fetchBackendPapers().then(data => setRealPapers(data));
+    fetchBackendVideos().then(data => setRealVideos(data));
+    fetchBackendAdminDashboard().then(res => {
+      setAdminStats(res.stats);
+      setRegisteredUsers(res.usersList);
+    });
   };
 
   if (!authorized) {
@@ -114,64 +125,79 @@ export default function AdminPage() {
   }
 
   // Handle PDF Upload Form
-  const handlePdfSubmit = (e: React.FormEvent) => {
+  const handlePdfSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pdfTitle) return;
 
-    addRealNote({
+    const ok = await createBackendNote({
       subject: pdfSubject,
       title: pdfTitle,
       grade: pdfGrade,
       stream: pdfGrade === "10th" ? "General" : pdfStream,
       fileSize: pdfSize,
-      pages: Number(pdfPages)
+      pages: Number(pdfPages),
+      pdfUrl: "http://localhost:4000/uploads/dummy.pdf"
     });
 
-    setUploadSuccess(`Successfully uploaded PDF Note: "${pdfTitle}" for Class ${pdfGrade} (${pdfGrade === "10th" ? "General" : pdfStream})!`);
-    setPdfTitle("");
-    refreshData();
+    if (ok) {
+      setUploadSuccess(`Successfully uploaded PDF Note: "${pdfTitle}" for Class ${pdfGrade}!`);
+      setPdfTitle("");
+      refreshData();
+    } else {
+      setUploadSuccess("❌ Failed to upload note to MongoDB database");
+    }
     setTimeout(() => setUploadSuccess(null), 4000);
   };
 
   // Handle Paper Upload Form
-  const handlePaperSubmit = (e: React.FormEvent) => {
+  const handlePaperSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paperTitle) return;
 
-    addRealPaper({
+    const ok = await createBackendPaper({
       subject: paperSubject,
       title: paperTitle,
       year: paperYear,
       term: paperTerm,
       grade: paperGrade,
       stream: paperGrade === "10th" ? "General" : paperStream,
-      fileSize: "3.2 MB"
+      fileSize: "3.2 MB",
+      fileUrl: "http://localhost:4000/uploads/dummy.pdf"
     });
 
-    setUploadSuccess(`Successfully uploaded Previous Paper: "${paperTitle}" (${paperYear}) for Class ${paperGrade}!`);
-    setPaperTitle("");
-    refreshData();
+    if (ok) {
+      setUploadSuccess(`Successfully uploaded Previous Paper: "${paperTitle}" (${paperYear}) for Class ${paperGrade}!`);
+      setPaperTitle("");
+      refreshData();
+    } else {
+      setUploadSuccess("❌ Failed to upload board paper to MongoDB database");
+    }
     setTimeout(() => setUploadSuccess(null), 4000);
   };
 
   // Handle Video Upload Form
-  const handleVideoSubmit = (e: React.FormEvent) => {
+  const handleVideoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vidTitle) return;
 
-    addRealVideo({
+    const ok = await createBackendVideo({
       subject: vidSubject,
       title: vidTitle,
       instructor: vidInstructor,
       duration: vidDuration,
       grade: vidGrade,
       stream: vidGrade === "10th" ? "General" : vidStream,
-      thumbnail: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80"
+      thumbnail: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
+      videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4"
     });
 
-    setUploadSuccess(`Successfully uploaded Video Lecture: "${vidTitle}" for Class ${vidGrade}!`);
-    setVidTitle("");
-    refreshData();
+    if (ok) {
+      setUploadSuccess(`Successfully uploaded Video Lecture: "${vidTitle}" for Class ${vidGrade}!`);
+      setVidTitle("");
+      refreshData();
+    } else {
+      setUploadSuccess("❌ Failed to upload video to MongoDB database");
+    }
     setTimeout(() => setUploadSuccess(null), 4000);
   };
 
@@ -183,7 +209,7 @@ export default function AdminPage() {
     { label: "Total Downloads", value: String(adminStats.totalDownloads), icon: Download, color: "from-rose-600 to-pink-500" }
   ];
 
-  const tabs = ["Upload PDF", "Upload Previous Paper", "Upload Video", "Manage Notes", "Manage Papers", "Manage Videos", "Manage Quizzes"];
+  const tabs = ["Upload PDF", "Upload Previous Paper", "Upload Video", "Registered Users", "Manage Notes"];
 
   return (
     <div className="space-y-6">
@@ -199,12 +225,6 @@ export default function AdminPage() {
             <p className="mt-1 text-xs md:text-sm text-slate-400 max-w-2xl">
               Upload PDF notes, previous board papers, video lectures, and MCQ quizzes class-wise. Real data appears live on student dashboards.
             </p>
-          </div>
-
-          <div className="flex gap-3">
-            <Link href="/dashboard" className="inline-flex h-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 text-xs font-bold text-white hover:bg-white/20">
-              Student View
-            </Link>
           </div>
         </div>
       </div>
@@ -414,6 +434,79 @@ export default function AdminPage() {
               <Video className="mr-2 h-4 w-4" /> Upload Video Lecture
             </Button>
           </form>
+        )}
+
+        {activeTab === "Registered Users" && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Registered Students & Accounts</h3>
+                <p className="text-xs text-slate-500">List of all users registered on the platform with their grade and stream details.</p>
+              </div>
+              <Badge className="bg-blue-600 text-white font-bold px-3 py-1 text-xs">{registeredUsers.length} Users</Badge>
+            </div>
+
+            {/* Class & Stream Distribution Summary Cards */}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Class 10th Users</p>
+                <p className="text-2xl font-black text-slate-950 mt-1">
+                  {registeredUsers.filter(u => u.grade === "10th").length}
+                </p>
+              </Card>
+              <Card className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Class 11th Users</p>
+                <p className="text-2xl font-black text-slate-950 mt-1">
+                  {registeredUsers.filter(u => u.grade === "11th").length}
+                </p>
+              </Card>
+              <Card className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Class 12th Users</p>
+                <p className="text-2xl font-black text-slate-950 mt-1">
+                  {registeredUsers.filter(u => u.grade === "12th").length}
+                </p>
+              </Card>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 border-b font-bold uppercase tracking-wider">
+                    <th className="p-4 font-bold">User Name</th>
+                    <th className="p-4 font-bold">Email Address</th>
+                    <th className="p-4 font-bold">Role</th>
+                    <th className="p-4 font-bold">Class & Stream</th>
+                    <th className="p-4 font-bold">Joined On</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registeredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-400">
+                        No registered users found.
+                      </td>
+                    </tr>
+                  ) : (
+                    registeredUsers.map((u) => (
+                      <tr key={u.id} className="border-b hover:bg-slate-50/50 transition">
+                        <td className="p-4 font-bold text-slate-950">{u.username}</td>
+                        <td className="p-4 font-medium text-slate-600">{u.email}</td>
+                        <td className="p-4">
+                          <Badge className={u.role === "admin" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}>
+                            {u.role}
+                          </Badge>
+                        </td>
+                        <td className="p-4 font-bold text-slate-800">
+                          Class {u.grade} ({u.stream})
+                        </td>
+                        <td className="p-4 text-slate-500 font-medium">{u.createdAt}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {activeTab === "Manage Notes" && (

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getStoredSession, type StudentSession } from "@/lib/session";
 import { classSubjects } from "@/lib/platform-data";
-import { getRealNotes, getRealPapers, getRealVideos, getRealQuizzes, logDownload } from "@/lib/store";
+import { fetchBackendNotes, fetchBackendPapers, fetchBackendVideos, fetchBackendQuizzes, logDownload } from "@/lib/store";
 import { FileText, ScrollText, PlayCircle, NotebookTabs, Download, BookOpen, CheckCircle2 } from "lucide-react";
 
 export default function SubjectsPage() {
@@ -22,10 +22,13 @@ export default function SubjectsPage() {
     const s = getStoredSession();
     setSession(s);
 
-    setNotesList(getRealNotes());
-    setPapersList(getRealPapers());
-    setVideosList(getRealVideos());
-    setQuizzesList(getRealQuizzes());
+    const grade = s?.grade ?? "11th";
+    const stream = s?.stream ?? "Medical";
+
+    fetchBackendNotes(grade, stream).then(data => setNotesList(data));
+    fetchBackendPapers(grade, stream).then(data => setPapersList(data));
+    fetchBackendVideos(grade, stream).then(data => setVideosList(data));
+    fetchBackendQuizzes(grade, stream).then(data => setQuizzesList(data));
   }, []);
 
   const grade = session?.grade ?? "11th";

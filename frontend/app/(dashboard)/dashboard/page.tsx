@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-import { classSubjects, notices as sampleNotices } from "@/lib/platform-data";
-import { getRealNotes, getRealPapers, getRealQuizzes, getDownloadedFiles, getQuizResults } from "@/lib/store";
+import { classSubjects } from "@/lib/platform-data";
+import { fetchBackendNotes, fetchBackendPapers, fetchBackendQuizzes, getDownloadedFiles, getQuizResults, fetchBackendNotices } from "@/lib/store";
 import {
   FileText,
   ScrollText,
@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [realPapersCount, setRealPapersCount] = useState(0);
   const [realQuizzesCount, setRealQuizzesCount] = useState(0);
   const [avgScore, setAvgScore] = useState("0%");
+  const [latestNotice, setLatestNotice] = useState("Loading notice...");
 
   useEffect(() => {
     const s = getStoredSession();
@@ -41,15 +42,20 @@ export default function DashboardPage() {
     const grade = s?.grade ?? "11th";
     const stream = s?.stream ?? "Medical";
 
-    const allNotes = getRealNotes().filter(n => n.grade === grade && (grade === "10th" || n.stream === stream));
-    const allPapers = getRealPapers().filter(p => p.grade === grade && (grade === "10th" || p.stream === stream));
-    const allQuizzes = getRealQuizzes().filter(q => q.grade === grade && (grade === "10th" || q.stream === stream));
+    fetchBackendNotes(grade, stream).then(data => setRealNotesCount(data.length));
+    fetchBackendPapers(grade, stream).then(data => setRealPapersCount(data.length));
+    fetchBackendQuizzes(grade, stream).then(data => setRealQuizzesCount(data.length));
+    fetchBackendNotices().then(notices => {
+      if (notices.length > 0) {
+        setLatestNotice(notices[0].title);
+      } else {
+        setLatestNotice("No active announcements");
+      }
+    });
+
     const dls = getDownloadedFiles();
     const results = getQuizResults();
 
-    setRealNotesCount(allNotes.length);
-    setRealPapersCount(allPapers.length);
-    setRealQuizzesCount(allQuizzes.length);
     setDownloadCount(dls.length);
 
     if (results.length > 0) {
@@ -71,7 +77,7 @@ export default function DashboardPage() {
     { label: "Videos", count: `0 Lectures`, icon: PlayCircle, href: "/videos", color: "from-rose-500 to-pink-500" },
     { label: "Downloads", count: `${downloadCount} Saved`, icon: Download, href: "/downloads", color: "from-emerald-600 to-teal-500" },
     { label: "Results", count: `Quiz Scores`, icon: BarChart3, href: "/results", color: "from-cyan-600 to-blue-600" },
-    { label: "Notices", count: "3 Updates", icon: Sparkles, href: "/notices", color: "from-purple-600 to-indigo-600" },
+    { label: "Notices", count: "Updates Board", icon: Sparkles, href: "/notices", color: "from-purple-600 to-indigo-600" },
     { label: "Bookmarks", count: "0 Saved", icon: Bookmark, href: "#", color: "from-amber-500 to-orange-500" },
     { label: "My Progress", count: `${avgScore} Mastery`, icon: GraduationCap, href: "/progress", color: "from-blue-700 to-indigo-800" }
   ];
@@ -98,7 +104,7 @@ export default function DashboardPage() {
               <Bell className="h-5 w-5 text-orange-400" />
               <div>
                 <p className="text-xs font-bold">Latest Notice</p>
-                <p className="text-[11px] text-blue-100">Mid-Term Date Sheet Published</p>
+                <p className="text-[11px] text-blue-100 line-clamp-1 max-w-[200px]">{latestNotice}</p>
               </div>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-import { getRealPapers, logDownload, type RealPaperItem } from "@/lib/store";
+import { fetchBackendPapers, logDownload, type RealPaperItem } from "@/lib/store";
 import { ScrollText, Download, Calendar, HardDrive, CheckCircle2 } from "lucide-react";
 
 export default function PreviousPapersPage() {
@@ -20,11 +20,9 @@ export default function PreviousPapersPage() {
     const grade = s?.grade ?? "11th";
     const stream = s?.stream ?? "Medical";
 
-    const filtered = getRealPapers().filter(
-      (p) => p.grade === grade && (grade === "10th" || p.stream === stream)
-    );
-
-    setPapersList(filtered);
+    fetchBackendPapers(grade, stream).then((data) => {
+      setPapersList(data);
+    });
   }, []);
 
   const grade = session?.grade ?? "11th";

@@ -4,22 +4,26 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-import { notices as sampleNotices } from "@/lib/platform-data";
+import { fetchBackendNotices, type RealNoticeItem } from "@/lib/store";
 import { Sparkles, Calendar, Bell, Tag } from "lucide-react";
 
 export default function NoticesPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
   const [selectedTag, setSelectedTag] = useState<string>("All");
+  const [noticesList, setNoticesList] = useState<RealNoticeItem[]>([]);
 
   useEffect(() => {
     setSession(getStoredSession());
+    fetchBackendNotices().then((data) => {
+      setNoticesList(data);
+    });
   }, []);
 
   const tags = ["All", "Latest Announcements", "Exam Updates", "Holiday Notices"];
 
   const filteredNotices = selectedTag === "All"
-    ? sampleNotices
-    : sampleNotices.filter((n) => n.tag === selectedTag);
+    ? noticesList
+    : noticesList.filter((n) => n.category === selectedTag || n.category.toLowerCase().includes(selectedTag.toLowerCase().split(" ")[0]));
 
   return (
     <div className="space-y-6">
@@ -35,7 +39,7 @@ export default function NoticesPage() {
           </div>
           <div className="rounded-2xl bg-white/10 p-4 text-center backdrop-blur-md">
             <p className="text-xs uppercase tracking-wider text-purple-200 font-bold">Total Notices</p>
-            <p className="text-3xl font-extrabold text-white mt-1">{sampleNotices.length}</p>
+            <p className="text-3xl font-extrabold text-white mt-1">{noticesList.length}</p>
           </div>
         </div>
       </div>
@@ -63,14 +67,14 @@ export default function NoticesPage() {
           <Card key={notice.id} className="rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl hover:shadow-xl transition flex flex-col justify-between space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Badge className="bg-purple-100 text-purple-700 font-bold">{notice.tag}</Badge>
+                <Badge className="bg-purple-100 text-purple-700 font-bold">{notice.category}</Badge>
                 <span className="flex items-center gap-1 text-xs text-slate-400 font-medium">
                   <Calendar className="h-3.5 w-3.5" /> {notice.date}
                 </span>
               </div>
 
               <h3 className="text-lg font-bold text-slate-950 leading-snug">{notice.title}</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">{notice.content}</p>
+              <p className="text-xs text-slate-600 leading-relaxed">{notice.body}</p>
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">

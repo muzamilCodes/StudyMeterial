@@ -202,19 +202,7 @@ export function SiteShell({
           {nav.map((item) => {
             const isActive = pathname === item.href;
             if (item.adminOnly && !isAdmin) {
-              return (
-                <div
-                  key={item.href}
-                  className="flex items-center justify-between rounded-2xl px-4 py-2 text-xs font-semibold text-slate-400 opacity-60 cursor-not-allowed"
-                  title="Admin Access Required"
-                >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="h-4 w-4 text-slate-400" />
-                    <span>{item.label}</span>
-                  </div>
-                  <Lock className="h-3 w-3" />
-                </div>
-              );
+              return null;
             }
 
             return (

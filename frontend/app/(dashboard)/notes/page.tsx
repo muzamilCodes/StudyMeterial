@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-import { getRealNotes, logDownload, type RealNoteItem } from "@/lib/store";
+import { fetchBackendNotes, logDownload, type RealNoteItem } from "@/lib/store";
 import { FileText, Download, Eye, Calendar, HardDrive, CheckCircle2, X, PlusCircle } from "lucide-react";
 
 export default function NotesPage() {
@@ -21,11 +21,9 @@ export default function NotesPage() {
     const grade = s?.grade ?? "11th";
     const stream = s?.stream ?? "Medical";
 
-    const realNotes = getRealNotes().filter(
-      (n) => n.grade === grade && (grade === "10th" || n.stream === stream)
-    );
-
-    setNotesList(realNotes);
+    fetchBackendNotes(grade, stream).then((realNotes) => {
+      setNotesList(realNotes);
+    });
   }, []);
 
   const grade = session?.grade ?? "11th";

@@ -73,6 +73,13 @@ export async function getDashboardSummary() {
   };
 }
 
+export async function getRegisteredUsers() {
+  const db = await connectDb();
+  if (!db) return [];
+  const users = await db.collection("users").find({}, { projection: { passwordHash: 0 } }).toArray();
+  return users;
+}
+
 export async function loginStudent(input: { email: string; password: string }) {
   const db = await connectDb();
   const normalizedEmail = input.email.trim().toLowerCase();

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-import { getRealQuizzes, recordQuizResult } from "@/lib/store";
+import { fetchBackendQuizzes, recordQuizResult } from "@/lib/store";
 import { type QuizItem } from "@/lib/platform-data";
 import { Clock, Award, RefreshCw, AlertCircle, CheckCircle2, BookOpen } from "lucide-react";
 
@@ -28,15 +28,13 @@ export default function QuizzesPage() {
     const grade = s?.grade ?? "11th";
     const stream = s?.stream ?? "Medical";
 
-    // Get quizzes for this class and stream
-    const allQ = getRealQuizzes();
-    const classQ = allQ.filter(q => q.grade === grade && (grade === "10th" || q.stream === stream));
-
-    const finalQuizzes = classQ.length > 0 ? classQ : allQ.slice(0, 10);
-    setAvailableQuizzes(finalQuizzes);
-    if (finalQuizzes.length > 0) {
-      setActiveQuiz(finalQuizzes[0]);
-    }
+    // Get quizzes for this class and stream from backend
+    fetchBackendQuizzes(grade, stream).then((classQ) => {
+      setAvailableQuizzes(classQ);
+      if (classQ.length > 0) {
+        setActiveQuiz(classQ[0]);
+      }
+    });
   }, []);
 
   // Timer countdown

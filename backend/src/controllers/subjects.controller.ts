@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { getSubjectsForClass } from "../services.js";
+import { getSubjectsByGradeStream } from "../services.js";
 
 const gradeSchema = z.enum(["10th", "11th", "12th"]);
 const streamSchema = z.enum(["Medical", "Non-Medical", "Commerce", "Arts"]);
@@ -30,6 +30,6 @@ export async function listSubjects(req: Request, res: Response) {
     return res.status(400).json({ message: "Invalid class selection" });
   }
 
-  const data = await getSubjectsForClass(parsed.data.grade, parsed.data.stream);
+  const data = await getSubjectsByGradeStream(parsed.data.grade, parsed.data.stream);
   res.json({ grade: parsed.data.grade, stream: parsed.data.stream, data });
 }

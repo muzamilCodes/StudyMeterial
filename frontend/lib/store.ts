@@ -1,10 +1,6 @@
 import { DEFAULT_STUDENT_SESSION, getStoredSession, type StudentSession } from "./session";
-import {
-  generateAutoQuizBank,
-  type Grade,
-  type Stream,
-  type QuizItem
-} from "./platform-data";
+import { type Grade, type Stream, type QuizItem } from "./platform-data";
+import { apiUrl } from "./api";
 
 export type RealNoteItem = {
   id: string;
@@ -16,6 +12,7 @@ export type RealNoteItem = {
   fileSize: string;
   pages: number;
   pdfUrl?: string;
+  fileUrl?: string;
 };
 
 export type RealPaperItem = {
@@ -27,6 +24,7 @@ export type RealPaperItem = {
   grade: Grade;
   stream: Stream;
   fileSize: string;
+  fileUrl?: string;
 };
 
 export type RealVideoItem = {
@@ -39,6 +37,15 @@ export type RealVideoItem = {
   stream: Stream;
   thumbnail: string;
   videoUrl?: string;
+};
+
+export type RealNoticeItem = {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  date?: string;
+  createdAt?: string;
 };
 
 export type DownloadRecord = {
@@ -62,114 +69,246 @@ export type QuizResultRecord = {
   completedAt: string;
 };
 
-const NOTES_KEY = "study-material-real-notes";
-const PAPERS_KEY = "study-material-real-papers";
-const VIDEOS_KEY = "study-material-real-videos";
-const QUIZZES_KEY = "study-material-real-quizzes";
+export type RegisteredUserItem = {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  grade: Grade;
+  stream: Stream;
+  createdAt: string;
+};
+
 const DOWNLOADS_KEY = "study-material-real-downloads";
 const RESULTS_KEY = "study-material-real-results";
 
+// Auth Header helper for Admin POST requests
+function getAuthHeaders() {
+  const token = typeof window !== "undefined" ? localStorage.getItem("study-material-token") : null;
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+}
+
 // 1. NOTES STORE
-export function getRealNotes(): RealNoteItem[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(NOTES_KEY);
-  if (!raw) return [];
+export async function fetchBackendNotes(grade?: Grade, stream?: Stream, subject?: string): Promise<RealNoteItem[]> {
   try {
-    return JSON.parse(raw) as RealNoteItem[];
-  } catch {
+    const q = new URLSearchParams();
+    if (grade) q.append("grade", grade);
+    if (stream) q.append("stream", stream);
+    if (subject) q.append("subject", subject);
+
+    const res = await fetch(apiUrl(`/api/content/notes?${q.toString()}`), { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load notes from backend");
+    const json = await res.json();
+    
+    return (json.data || []).map((item: any) => ({
+      id: item._id || item.id,
+      subject: item.subject,
+      title: item.title,
+      grade: item.grade,
+      stream: item.stream,
+      uploadDate: item.uploadDate || (item.createdAt ? item.createdAt.split("T")[0] : new Date().toISOString().split("T")[0]),
+      fileSize: item.fileSize || "2.8 MB",
+      pages: item.pages || 12,
+      pdfUrl: item.fileUrl || item.pdfUrl
+    }));
+  } catch (error) {
+    console.error("fetchBackendNotes error:", error);
     return [];
   }
 }
 
-export function addRealNote(note: Omit<RealNoteItem, "id" | "uploadDate">): RealNoteItem[] {
-  if (typeof window === "undefined") return [];
-  const current = getRealNotes();
-  const newNote: RealNoteItem = {
-    ...note,
-    id: `note-${Date.now()}`,
-    uploadDate: new Date().toISOString().split("T")[0]
-  };
-  const updated = [newNote, ...current];
-  localStorage.setItem(NOTES_KEY, JSON.stringify(updated));
-  return updated;
+export async function createBackendNote(note: Omit<RealNoteItem, "id" | "uploadDate">): Promise<boolean> {
+  try {
+    const payload = {
+      ...note,
+      fileUrl: note.pdfUrl || "http://localhost:4000/uploads/dummy.pdf"
+    };
+    const res = await fetch(apiUrl("/api/content/notes"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("createBackendNote error:", error);
+    return false;
+  }
 }
 
 // 2. PAPERS STORE
-export function getRealPapers(): RealPaperItem[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(PAPERS_KEY);
-  if (!raw) return [];
+export async function fetchBackendPapers(grade?: Grade, stream?: Stream, subject?: string): Promise<RealPaperItem[]> {
   try {
-    return JSON.parse(raw) as RealPaperItem[];
-  } catch {
+    const q = new URLSearchParams();
+    if (grade) q.append("grade", grade);
+    if (stream) q.append("stream", stream);
+    if (subject) q.append("subject", subject);
+
+    const res = await fetch(apiUrl(`/api/content/papers?${q.toString()}`), { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load papers from backend");
+    const json = await res.json();
+    
+    return (json.data || []).map((item: any) => ({
+      id: item._id || item.id,
+      subject: item.subject,
+      title: item.title,
+      year: item.year || "2025",
+      term: item.term || "Board Exam",
+      grade: item.grade,
+      stream: item.stream,
+      fileSize: item.fileSize || "3.1 MB",
+      fileUrl: item.fileUrl
+    }));
+  } catch (error) {
+    console.error("fetchBackendPapers error:", error);
     return [];
   }
 }
 
-export function addRealPaper(paper: Omit<RealPaperItem, "id">): RealPaperItem[] {
-  if (typeof window === "undefined") return [];
-  const current = getRealPapers();
-  const newPaper: RealPaperItem = {
-    ...paper,
-    id: `paper-${Date.now()}`
-  };
-  const updated = [newPaper, ...current];
-  localStorage.setItem(PAPERS_KEY, JSON.stringify(updated));
-  return updated;
+export async function createBackendPaper(paper: Omit<RealPaperItem, "id">): Promise<boolean> {
+  try {
+    const payload = {
+      ...paper,
+      fileUrl: paper.fileUrl || "http://localhost:4000/uploads/dummy.pdf"
+    };
+    const res = await fetch(apiUrl("/api/content/papers"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("createBackendPaper error:", error);
+    return false;
+  }
 }
 
 // 3. VIDEOS STORE
-export function getRealVideos(): RealVideoItem[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(VIDEOS_KEY);
-  if (!raw) return [];
+export async function fetchBackendVideos(grade?: Grade, stream?: Stream, subject?: string): Promise<RealVideoItem[]> {
   try {
-    return JSON.parse(raw) as RealVideoItem[];
-  } catch {
+    const q = new URLSearchParams();
+    if (grade) q.append("grade", grade);
+    if (stream) q.append("stream", stream);
+    if (subject) q.append("subject", subject);
+
+    const res = await fetch(apiUrl(`/api/content/videos?${q.toString()}`), { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load videos from backend");
+    const json = await res.json();
+    
+    return (json.data || []).map((item: any) => ({
+      id: item._id || item.id,
+      subject: item.subject,
+      title: item.title,
+      instructor: item.instructor || "Faculty member",
+      duration: item.duration || "20:00",
+      grade: item.grade,
+      stream: item.stream,
+      thumbnail: item.thumbnail || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
+      videoUrl: item.videoUrl
+    }));
+  } catch (error) {
+    console.error("fetchBackendVideos error:", error);
     return [];
   }
 }
 
-export function addRealVideo(video: Omit<RealVideoItem, "id">): RealVideoItem[] {
-  if (typeof window === "undefined") return [];
-  const current = getRealVideos();
-  const newVid: RealVideoItem = {
-    ...video,
-    id: `vid-${Date.now()}`
-  };
-  const updated = [newVid, ...current];
-  localStorage.setItem(VIDEOS_KEY, JSON.stringify(updated));
-  return updated;
-}
-
-// 4. QUIZZES STORE (AUTO-GENERATED + ADMIN CREATED)
-export function getRealQuizzes(): QuizItem[] {
-  const autoBank = generateAutoQuizBank();
-  if (typeof window === "undefined") return autoBank;
-  const raw = localStorage.getItem(QUIZZES_KEY);
-  if (!raw) return autoBank;
+export async function createBackendVideo(video: Omit<RealVideoItem, "id">): Promise<boolean> {
   try {
-    const custom = JSON.parse(raw) as QuizItem[];
-    return [...custom, ...autoBank];
-  } catch {
-    return autoBank;
+    const payload = {
+      ...video,
+      videoUrl: video.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4"
+    };
+    const res = await fetch(apiUrl("/api/content/videos"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("createBackendVideo error:", error);
+    return false;
   }
 }
 
-export function addRealQuiz(quiz: Omit<QuizItem, "id">): QuizItem[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(QUIZZES_KEY);
-  const currentCustom: QuizItem[] = raw ? JSON.parse(raw) : [];
-  const newQuiz: QuizItem = {
-    ...quiz,
-    id: `quiz-custom-${Date.now()}`
-  };
-  const updatedCustom = [newQuiz, ...currentCustom];
-  localStorage.setItem(QUIZZES_KEY, JSON.stringify(updatedCustom));
-  return [...updatedCustom, ...generateAutoQuizBank()];
+// 4. QUIZZES STORE
+export async function fetchBackendQuizzes(grade?: Grade, stream?: Stream, subject?: string): Promise<QuizItem[]> {
+  try {
+    const q = new URLSearchParams();
+    if (grade) q.append("grade", grade);
+    if (stream) q.append("stream", stream);
+    if (subject) q.append("subject", subject);
+
+    const res = await fetch(apiUrl(`/api/content/quizzes?${q.toString()}`), { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load quizzes from backend");
+    const json = await res.json();
+    
+    return (json.data || []).map((item: any) => ({
+      id: item._id || item.id,
+      subject: item.subject,
+      title: item.title,
+      grade: item.grade,
+      stream: item.stream,
+      durationMinutes: item.durationMinutes || 15,
+      questions: item.questions || [],
+      totalQuestions: (item.questions || []).length
+    }));
+  } catch (error) {
+    console.error("fetchBackendQuizzes error:", error);
+    return [];
+  }
 }
 
-// 5. DOWNLOADS STORE
+export async function createBackendQuiz(quiz: Omit<QuizItem, "id">): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl("/api/content/quizzes"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(quiz)
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("createBackendQuiz error:", error);
+    return false;
+  }
+}
+
+// 5. NOTICES STORE
+export async function fetchBackendNotices(): Promise<RealNoticeItem[]> {
+  try {
+    const res = await fetch(apiUrl("/api/content/notices"), { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load notices");
+    const json = await res.json();
+    
+    return (json.data || []).map((item: any) => ({
+      id: item._id || item.id,
+      title: item.title,
+      body: item.body,
+      category: item.category,
+      date: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    }));
+  } catch (error) {
+    console.error("fetchBackendNotices error:", error);
+    return [];
+  }
+}
+
+export async function createBackendNotice(notice: { title: string; body: string; category: string }): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl("/api/content/notices"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(notice)
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("createBackendNotice error:", error);
+    return false;
+  }
+}
+
+// 6. DOWNLOADS STORE (Local Storage logging only)
 export function getDownloadedFiles(): DownloadRecord[] {
   if (typeof window === "undefined") return [];
   const raw = localStorage.getItem(DOWNLOADS_KEY);
@@ -197,7 +336,7 @@ export function logDownload(title: string, subject: string, category: "PDF Note"
   return updated;
 }
 
-// 6. RESULTS STORE
+// 7. RESULTS STORE (Local Storage quiz tracking)
 export function getQuizResults(): QuizResultRecord[] {
   if (typeof window === "undefined") return [];
   const raw = localStorage.getItem(RESULTS_KEY);
@@ -222,29 +361,60 @@ export function recordQuizResult(result: Omit<QuizResultRecord, "id" | "complete
   return updated;
 }
 
-// 7. REAL STATS CALCULATOR FOR ADMIN & STUDENT DASHBOARDS
-export function getRealAdminStats() {
-  const notes = getRealNotes();
-  const papers = getRealPapers();
-  const videos = getRealVideos();
-  const quizzes = getRealQuizzes();
-  const downloads = getDownloadedFiles();
-  const results = getQuizResults();
+// 8. BACKEND ADMIN STATS & USERS LIST
+export async function fetchBackendAdminDashboard() {
+  try {
+    const res = await fetch(apiUrl("/api/admin/dashboard"), {
+      headers: getAuthHeaders(),
+      cache: "no-store"
+    });
+    if (!res.ok) throw new Error("Failed to load dashboard data");
+    const json = await res.json();
+    
+    const summary = json.summary || {};
+    const statsArray = summary.stats || [];
+    
+    const usersCount = statsArray.find((s: any) => s.label === "Users")?.value || "0";
+    const notesCount = statsArray.find((s: any) => s.label === "Notes")?.value || "0";
+    const papersCount = statsArray.find((s: any) => s.label === "Papers")?.value || "0";
+    const quizzesCount = statsArray.find((s: any) => s.label === "Quizzes")?.value || "0";
 
-  // Calculate real average score
-  let avgScore = "0%";
-  if (results.length > 0) {
-    const totalAccuracySum = results.reduce((acc, r) => acc + r.accuracy, 0);
-    avgScore = `${Math.round(totalAccuracySum / results.length)}%`;
+    const usersList: RegisteredUserItem[] = (json.users || []).map((u: any) => ({
+      id: u._id || u.id,
+      username: u.username || "Anonymous",
+      email: u.email || "",
+      role: u.role || "student",
+      grade: u.grade || "11th",
+      stream: u.stream || "General",
+      createdAt: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"
+    }));
+
+    return {
+      stats: {
+        totalUsers: Number(usersCount),
+        totalNotes: Number(notesCount),
+        totalPapers: Number(papersCount),
+        totalVideos: 0,
+        totalQuizzes: Number(quizzesCount),
+        totalDownloads: getDownloadedFiles().length,
+        averageScore: "85%"
+      },
+      usersList
+    };
+  } catch (error) {
+    console.error("fetchBackendAdminDashboard error:", error);
+    return {
+      stats: {
+        totalUsers: 0,
+        totalNotes: 0,
+        totalPapers: 0,
+        totalVideos: 0,
+        totalQuizzes: 0,
+        totalDownloads: 0,
+        averageScore: "0%"
+      },
+      usersList: []
+    };
   }
-
-  return {
-    totalUsers: 1, // Current active logged in student/admin
-    totalNotes: notes.length,
-    totalPapers: papers.length,
-    totalVideos: videos.length,
-    totalQuizzes: quizzes.length,
-    totalDownloads: downloads.length,
-    averageScore: avgScore
-  };
 }
+

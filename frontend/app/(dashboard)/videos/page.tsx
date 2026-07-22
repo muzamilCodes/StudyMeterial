@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-import { getRealVideos, type RealVideoItem } from "@/lib/store";
+import { fetchBackendVideos, type RealVideoItem } from "@/lib/store";
 import { PlayCircle, Clock, User, X, Video } from "lucide-react";
 
 export default function VideosPage() {
@@ -20,11 +20,9 @@ export default function VideosPage() {
     const grade = s?.grade ?? "11th";
     const stream = s?.stream ?? "Medical";
 
-    const filtered = getRealVideos().filter(
-      (v) => v.grade === grade && (grade === "10th" || v.stream === stream)
-    );
-
-    setVideosList(filtered);
+    fetchBackendVideos(grade, stream).then((data) => {
+      setVideosList(data);
+    });
   }, []);
 
   const grade = session?.grade ?? "11th";
