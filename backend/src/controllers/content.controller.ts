@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { createContent, listContent } from "../services.js";
+import { createContent, listContent, deleteContent } from "../services.js";
 import type { Grade, Stream } from "../types.js";
 
 const gradeSchema = z.enum(["10th", "11th", "12th"]);
@@ -31,6 +31,8 @@ export async function createNote(req: Request, res: Response) {
     subject: z.string().min(2),
     title: z.string().min(2),
     fileUrl: z.string().url(),
+    fileSize: z.string().optional(),
+    pages: z.number().int().optional(),
     uploadDate: z.string().optional()
   });
   const parsed = schema.safeParse(req.body);
@@ -56,6 +58,8 @@ export async function createPaper(req: Request, res: Response) {
     subject: z.string().min(2),
     title: z.string().min(2),
     year: z.string().min(2),
+    term: z.string().optional(),
+    fileSize: z.string().optional(),
     fileUrl: z.string().url()
   });
   const parsed = schema.safeParse(req.body);
@@ -80,6 +84,9 @@ export async function createVideo(req: Request, res: Response) {
     stream: streamSchema,
     subject: z.string().min(2),
     title: z.string().min(2),
+    instructor: z.string().optional(),
+    duration: z.string().optional(),
+    thumbnail: z.string().optional(),
     videoUrl: z.string().url()
   });
   const parsed = schema.safeParse(req.body);
@@ -160,4 +167,37 @@ export async function listProgress(req: Request, res: Response) {
       downloadedPapers: papers.length
     }
   });
+}
+
+export async function deleteNote(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const ok = await deleteContent("notes", id);
+    if (!ok) return res.status(404).json({ message: "Note not found" });
+    res.json({ message: "Note deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting note" });
+  }
+}
+
+export async function deletePaper(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const ok = await deleteContent("papers", id);
+    if (!ok) return res.status(404).json({ message: "Paper not found" });
+    res.json({ message: "Paper deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting paper" });
+  }
+}
+
+export async function deleteVideo(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const ok = await deleteContent("videos", id);
+    if (!ok) return res.status(404).json({ message: "Video not found" });
+    res.json({ message: "Video deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting video" });
+  }
 }

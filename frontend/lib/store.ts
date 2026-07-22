@@ -131,9 +131,26 @@ export async function createBackendNote(note: Omit<RealNoteItem, "id" | "uploadD
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("createBackendNote failed:", res.status, err);
+    }
     return res.ok;
   } catch (error) {
     console.error("createBackendNote error:", error);
+    return false;
+  }
+}
+
+export async function deleteBackendNote(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl(`/api/content/notes/${id}`), {
+      method: "DELETE",
+      headers: getAuthHeaders()
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("deleteBackendNote error:", error);
     return false;
   }
 }
@@ -178,9 +195,26 @@ export async function createBackendPaper(paper: Omit<RealPaperItem, "id">): Prom
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("createBackendPaper failed:", res.status, err);
+    }
     return res.ok;
   } catch (error) {
     console.error("createBackendPaper error:", error);
+    return false;
+  }
+}
+
+export async function deleteBackendPaper(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl(`/api/content/papers/${id}`), {
+      method: "DELETE",
+      headers: getAuthHeaders()
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("deleteBackendPaper error:", error);
     return false;
   }
 }
@@ -225,9 +259,26 @@ export async function createBackendVideo(video: Omit<RealVideoItem, "id">): Prom
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("createBackendVideo failed:", res.status, err);
+    }
     return res.ok;
   } catch (error) {
     console.error("createBackendVideo error:", error);
+    return false;
+  }
+}
+
+export async function deleteBackendVideo(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl(`/api/content/videos/${id}`), {
+      method: "DELETE",
+      headers: getAuthHeaders()
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("deleteBackendVideo error:", error);
     return false;
   }
 }

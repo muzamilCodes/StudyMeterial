@@ -1,10 +1,6 @@
 import { Router } from "express";
-import { listClasses, listSubjects, createSubject } from "../controllers/subjects.controller.js";
-import { requireRole, verifyToken } from "../middleware/auth.js";
+import { listClasses, listSubjects } from "../controllers/subjects.controller.js";
 const router = Router();
 router.get("/classes", listClasses);
-router.get("/subjects", listSubjects);
-router.post("/subjects", verifyToken, requireRole("admin"), createSubject);
 router.get("/", listSubjects);
-router.post("/", verifyToken, requireRole("admin"), createSubject);
 export default router;

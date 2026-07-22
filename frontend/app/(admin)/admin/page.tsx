@@ -13,10 +13,13 @@ import {
   fetchBackendAdminDashboard,
   fetchBackendNotes,
   createBackendNote,
+  deleteBackendNote,
   fetchBackendPapers,
   createBackendPaper,
+  deleteBackendPaper,
   fetchBackendVideos,
   createBackendVideo,
+  deleteBackendVideo,
   type RealNoteItem,
   type RealPaperItem,
   type RealVideoItem,
@@ -36,7 +39,8 @@ import {
   Video,
   ShieldCheck,
   Plus,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -124,6 +128,43 @@ export default function AdminPage() {
     );
   }
 
+  // Handle Deletion Actions
+  const handleDeleteNote = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this note?")) return;
+    const ok = await deleteBackendNote(id);
+    if (ok) {
+      setUploadSuccess("PDF Note deleted successfully!");
+      refreshData();
+    } else {
+      setUploadSuccess("❌ Failed to delete PDF Note.");
+    }
+    setTimeout(() => setUploadSuccess(null), 3000);
+  };
+
+  const handleDeletePaper = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this previous year paper?")) return;
+    const ok = await deleteBackendPaper(id);
+    if (ok) {
+      setUploadSuccess("Previous Paper deleted successfully!");
+      refreshData();
+    } else {
+      setUploadSuccess("❌ Failed to delete Previous Paper.");
+    }
+    setTimeout(() => setUploadSuccess(null), 3000);
+  };
+
+  const handleDeleteVideo = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this video lecture?")) return;
+    const ok = await deleteBackendVideo(id);
+    if (ok) {
+      setUploadSuccess("Video Lecture deleted successfully!");
+      refreshData();
+    } else {
+      setUploadSuccess("❌ Failed to delete Video Lecture.");
+    }
+    setTimeout(() => setUploadSuccess(null), 3000);
+  };
+
   // Handle PDF Upload Form
   const handlePdfSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,7 +250,7 @@ export default function AdminPage() {
     { label: "Total Downloads", value: String(adminStats.totalDownloads), icon: Download, color: "from-rose-600 to-pink-500" }
   ];
 
-  const tabs = ["Upload PDF", "Upload Previous Paper", "Upload Video", "Registered Users", "Manage Notes"];
+  const tabs = ["Upload PDF", "Upload Previous Paper", "Upload Video", "Registered Users", "Manage Notes", "Manage Papers", "Manage Videos"];
 
   return (
     <div className="space-y-6">
@@ -525,7 +566,76 @@ export default function AdminPage() {
                       <p className="font-bold text-slate-900">{n.title}</p>
                       <p className="text-[10px] text-slate-500">Class {n.grade} ({n.stream}) • {n.subject} • {n.fileSize}</p>
                     </div>
-                    <Badge className="bg-emerald-100 text-emerald-700">Uploaded</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteNote(n.id)}
+                      className="rounded-lg h-8 text-[11px] font-bold flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "Manage Papers" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Uploaded Previous Papers ({realPapers.length})</h3>
+              <Badge className="bg-blue-100 text-blue-700 font-bold">{realPapers.length} Items</Badge>
+            </div>
+            {realPapers.length === 0 ? (
+              <p className="text-xs text-slate-500 py-6 text-center">No previous papers uploaded yet. Use "Upload Previous Paper" tab above to add papers!</p>
+            ) : (
+              <div className="space-y-2">
+                {realPapers.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-800 border border-slate-100">
+                    <div>
+                      <p className="font-bold text-slate-900">{p.title}</p>
+                      <p className="text-[10px] text-slate-500">Class {p.grade} ({p.stream}) • {p.subject} • {p.year} ({p.term})</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeletePaper(p.id)}
+                      className="rounded-lg h-8 text-[11px] font-bold flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "Manage Videos" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Uploaded Videos ({realVideos.length})</h3>
+              <Badge className="bg-blue-100 text-blue-700 font-bold">{realVideos.length} Items</Badge>
+            </div>
+            {realVideos.length === 0 ? (
+              <p className="text-xs text-slate-500 py-6 text-center">No videos uploaded yet. Use "Upload Video" tab above to add videos!</p>
+            ) : (
+              <div className="space-y-2">
+                {realVideos.map((v) => (
+                  <div key={v.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-800 border border-slate-100">
+                    <div>
+                      <p className="font-bold text-slate-900">{v.title}</p>
+                      <p className="text-[10px] text-slate-500">Class {v.grade} ({v.stream}) • {v.subject} • {v.instructor} ({v.duration})</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteVideo(v.id)}
+                      className="rounded-lg h-8 text-[11px] font-bold flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </Button>
                   </div>
                 ))}
               </div>

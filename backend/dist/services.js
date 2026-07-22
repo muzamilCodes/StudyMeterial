@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
+import { ObjectId } from "mongodb";
 import { comparePassword, hashPassword, signToken } from "./auth.js";
 import { connectDb } from "./db.js";
-import { ObjectId } from "mongodb";
 export async function getSubjectsByGradeStream(grade, stream) {
     const db = await connectDb();
     if (!db)
@@ -45,6 +45,13 @@ export async function getDashboardSummary() {
             { label: "Downloaded Papers", value: String(papers) }
         ]
     };
+}
+export async function getRegisteredUsers() {
+    const db = await connectDb();
+    if (!db)
+        return [];
+    const users = await db.collection("users").find({}, { projection: { passwordHash: 0 } }).toArray();
+    return users;
 }
 export async function loginStudent(input) {
     const db = await connectDb();
@@ -166,8 +173,7 @@ function collectionName(type) {
         quizzes: "quizzes",
         notices: "notices",
         downloads: "downloads",
-        results: "results",
-        subjects: "subjects"
+        results: "results"
     }[type];
 }
 export async function listContent(type, filter = {}) {
@@ -202,32 +208,12 @@ export async function deleteContent(type, id) {
     const collection = collectionName(type);
     if (!collection)
         throw new Error("Invalid content type");
-    let query;
     try {
-        query = { _id: new ObjectId(id) };
+        const result = await db.collection(collection).deleteOne({ _id: new ObjectId(id) });
+        return result.deletedCount > 0;
     }
-    catch {
-        query = { id: id };
+    catch (error) {
+        console.error("deleteContent database error:", error);
+        return false;
     }
-    const result = await db.collection(collection).deleteOne(query);
-    return result.deletedCount > 0;
-}
-export async function updateContent(type, id, payload) {
-    const db = await connectDb();
-    if (!db)
-        throw new Error("Database not configured");
-    const collection = collectionName(type);
-    if (!collection)
-        throw new Error("Invalid content type");
-    let query;
-    try {
-        query = { _id: new ObjectId(id) };
-    }
-    catch {
-        query = { id: id };
-    }
-    const cleanPayload = { ...payload };
-    delete cleanPayload._id;
-    const result = await db.collection(collection).updateOne(query, { $set: { ...cleanPayload, updatedAt: new Date() } });
-    return result.modifiedCount > 0;
 }

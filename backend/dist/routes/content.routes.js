@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireRole, verifyToken } from "../middleware/auth.js";
-import { createNote, createNotice, createPaper, createQuiz, createVideo, listDownloads, listNotes, listNotices, listPapers, listProgress, listQuizzes, listResults, listVideos, uploadFile } from "../controllers/content.controller.js";
+import { createNote, createNotice, createPaper, createQuiz, createVideo, listDownloads, listNotes, listNotices, listPapers, listProgress, listQuizzes, listResults, listVideos, deleteNote, deletePaper, deleteVideo } from "../controllers/content.controller.js";
 const router = Router();
 router.get("/notes", listNotes);
 router.get("/papers", listPapers);
@@ -15,5 +15,7 @@ router.post("/papers", verifyToken, requireRole("admin"), createPaper);
 router.post("/videos", verifyToken, requireRole("admin"), createVideo);
 router.post("/quizzes", verifyToken, requireRole("admin"), createQuiz);
 router.post("/notices", verifyToken, requireRole("admin"), createNotice);
-router.post("/upload", verifyToken, requireRole("admin"), uploadFile);
+router.delete("/notes/:id", verifyToken, requireRole("admin"), deleteNote);
+router.delete("/papers/:id", verifyToken, requireRole("admin"), deletePaper);
+router.delete("/videos/:id", verifyToken, requireRole("admin"), deleteVideo);
 export default router;
