@@ -93,37 +93,49 @@ export default function SubjectsPage() {
 
                 {/* Real Counts Grid */}
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                  <Link
+                    href="/notes"
+                    className="flex items-center gap-2 rounded-xl bg-slate-50 hover:bg-blue-50/50 hover:border-blue-200 border border-transparent p-2.5 transition cursor-pointer hover:shadow-sm"
+                  >
                     <FileText className="h-4 w-4 text-blue-600 shrink-0" />
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">Total Notes</p>
                       <p className="text-xs font-extrabold text-slate-900">{realSubjectNotes} PDFs</p>
                     </div>
-                  </div>
+                  </Link>
 
-                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                  <Link
+                    href="/previous-papers"
+                    className="flex items-center gap-2 rounded-xl bg-slate-50 hover:bg-orange-50/50 hover:border-orange-200 border border-transparent p-2.5 transition cursor-pointer hover:shadow-sm"
+                  >
                     <ScrollText className="h-4 w-4 text-orange-500 shrink-0" />
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">Prev Papers</p>
                       <p className="text-xs font-extrabold text-slate-900">{realSubjectPapers} Papers</p>
                     </div>
-                  </div>
+                  </Link>
 
-                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                  <Link
+                    href="/videos"
+                    className="flex items-center gap-2 rounded-xl bg-slate-50 hover:bg-rose-50/50 hover:border-rose-200 border border-transparent p-2.5 transition cursor-pointer hover:shadow-sm"
+                  >
                     <PlayCircle className="h-4 w-4 text-rose-500 shrink-0" />
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">Videos</p>
                       <p className="text-xs font-extrabold text-slate-900">{realSubjectVideos} Vids</p>
                     </div>
-                  </div>
+                  </Link>
 
-                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                  <Link
+                    href="/quizzes"
+                    className="flex items-center gap-2 rounded-xl bg-slate-50 hover:bg-indigo-50/50 hover:border-indigo-200 border border-transparent p-2.5 transition cursor-pointer hover:shadow-sm"
+                  >
                     <NotebookTabs className="h-4 w-4 text-indigo-600 shrink-0" />
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">MCQ Quiz</p>
                       <p className="text-xs font-extrabold text-slate-900">{realSubjectQuizzes} Tests</p>
                     </div>
-                  </div>
+                  </Link>
                 </div>
               </div>
 

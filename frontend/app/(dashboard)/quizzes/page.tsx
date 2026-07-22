@@ -205,7 +205,7 @@ export default function QuizzesPage() {
 
                 return (
                   <button
-                    key={opt}
+                    key={optionIdx}
                     onClick={() => handleOptionSelect(optionIdx)}
                     disabled={submitted}
                     className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left text-xs font-medium transition ${btnStyle}`}
