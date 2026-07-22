@@ -1,435 +1,445 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { StatCard } from "@/components/stat-card";
-import { SectionHeading } from "@/components/section-heading";
-import { apiUrl } from "@/lib/api";
-import { EmptyState } from "@/components/empty-state";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-
-type UploadType = "note" | "paper" | "video" | "quiz" | "notice";
-
-type AdminSummary = {
-  summary?: {
-    stats?: Array<{ label: string; value: string; accent: "blue" | "orange" | "indigo" | "emerald" }>;
-    notices?: Array<{ title: string; date?: string; tag?: string }>;
-  };
-  admin?: { email: string; role: string };
-};
-
-type UploadState = {
-  grade: "10th" | "11th" | "12th";
-  stream: "Medical" | "Non-Medical" | "Commerce" | "Arts";
-  subject: string;
-  title: string;
-  fileUrl: string;
-  videoUrl: string;
-  year: string;
-  category: string;
-  body: string;
-  durationMinutes: string;
-  questionsJson: string;
-};
-
-const uploadLabels: Record<UploadType, string> = {
-  note: "Notes",
-  paper: "Previous Papers",
-  video: "Videos",
-  quiz: "Quizzes",
-  notice: "Notices"
-};
-
-const initialForm: UploadState = {
-  grade: "11th",
-  stream: "Medical",
-  subject: "",
-  title: "",
-  fileUrl: "",
-  videoUrl: "",
-  year: "",
-  category: "Exam Update",
-  body: "",
-  durationMinutes: "15",
-  questionsJson: '[{"question":"Sample question","options":["A","B"],"answer":"A"}]'
-};
+import { getStoredSession, type StudentSession } from "@/lib/session";
+import {
+  getRealAdminStats,
+  getRealNotes,
+  addRealNote,
+  getRealPapers,
+  addRealPaper,
+  getRealVideos,
+  addRealVideo,
+  getRealQuizzes,
+  addRealQuiz,
+  type RealNoteItem,
+  type RealPaperItem,
+  type RealVideoItem
+} from "@/lib/store";
+import { type Grade, type Stream } from "@/lib/platform-data";
+import {
+  Users,
+  FileText,
+  ScrollText,
+  NotebookTabs,
+  Download,
+  Upload,
+  BarChart3,
+  Sparkles,
+  CheckCircle2,
+  Video,
+  ShieldCheck,
+  Plus,
+  AlertTriangle
+} from "lucide-react";
 
 export default function AdminPage() {
-  const [data, setData] = useState<AdminSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [uploadType, setUploadType] = useState<UploadType>("note");
-  const [form, setForm] = useState<UploadState>(initialForm);
+  const router = useRouter();
+  const [session, setSession] = useState<StudentSession | null>(null);
+  const [authorized, setAuthorized] = useState(false);
+  const [activeTab, setActiveTab] = useState("Upload PDF");
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+
+  // Form states for Upload PDF
+  const [pdfGrade, setPdfGrade] = useState<Grade>("11th");
+  const [pdfStream, setPdfStream] = useState<Stream>("Medical");
+  const [pdfSubject, setPdfSubject] = useState("Biology");
+  const [pdfTitle, setPdfTitle] = useState("");
+  const [pdfPages, setPdfPages] = useState(15);
+  const [pdfSize, setPdfSize] = useState("3.5 MB");
+
+  // Form states for Upload Paper
+  const [paperGrade, setPaperGrade] = useState<Grade>("11th");
+  const [paperStream, setPaperStream] = useState<Stream>("Medical");
+  const [paperSubject, setPaperSubject] = useState("Biology");
+  const [paperTitle, setPaperTitle] = useState("");
+  const [paperYear, setPaperYear] = useState("2025");
+  const [paperTerm, setPaperTerm] = useState("Board Exam");
+
+  // Form states for Upload Video
+  const [vidGrade, setVidGrade] = useState<Grade>("11th");
+  const [vidStream, setVidStream] = useState<Stream>("Medical");
+  const [vidSubject, setVidSubject] = useState("Biology");
+  const [vidTitle, setVidTitle] = useState("");
+  const [vidInstructor, setVidInstructor] = useState("Dr. Ananya Sharma");
+  const [vidDuration, setVidDuration] = useState("25:00");
+
+  // Live arrays
+  const [realNotes, setRealNotes] = useState<RealNoteItem[]>([]);
+  const [realPapers, setRealPapers] = useState<RealPaperItem[]>([]);
+  const [realVideos, setRealVideos] = useState<RealVideoItem[]>([]);
+  const [adminStats, setAdminStats] = useState(getRealAdminStats());
 
   useEffect(() => {
-    const token = localStorage.getItem("study-material-token");
+    const s = getStoredSession();
+    setSession(s);
 
-    if (!token) {
-      setError("Admin token not found. Please login as admin first.");
+    // STRICT ADMIN AUTHORIZATION CHECK
+    if (!s || (!s.isAdmin && s.role !== "admin")) {
+      router.replace("/dashboard");
       return;
     }
 
-    fetch(apiUrl("/api/admin/dashboard"), {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    })
-      .then(async (response) => {
-        const json = await response.json();
-        if (!response.ok) throw new Error(json.message ?? "Unable to load admin dashboard");
-        setData(json);
-      })
-      .catch((err: Error) => setError(err.message));
-  }, []);
+    setAuthorized(true);
+    refreshData();
+  }, [router]);
 
-  async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-    setMessage(null);
+  const refreshData = () => {
+    setRealNotes(getRealNotes());
+    setRealPapers(getRealPapers());
+    setRealVideos(getRealVideos());
+    setAdminStats(getRealAdminStats());
+  };
 
-    try {
-      const token = localStorage.getItem("study-material-token");
-      if (!token) throw new Error("Admin token not found.");
-
-      const endpoint = {
-        note: "/api/content/notes",
-        paper: "/api/content/papers",
-        video: "/api/content/videos",
-        quiz: "/api/content/quizzes",
-        notice: "/api/content/notices"
-      }[uploadType];
-
-      const payload =
-        uploadType === "note"
-          ? {
-              grade: form.grade,
-              stream: form.stream,
-              subject: form.subject,
-              title: form.title,
-              fileUrl: form.fileUrl
-            }
-          : uploadType === "paper"
-            ? {
-                grade: form.grade,
-                stream: form.stream,
-                subject: form.subject,
-                title: form.title,
-                year: form.year,
-                fileUrl: form.fileUrl
-              }
-            : uploadType === "video"
-              ? {
-                  grade: form.grade,
-                  stream: form.stream,
-                  subject: form.subject,
-                  title: form.title,
-                  videoUrl: form.videoUrl
-                }
-              : uploadType === "quiz"
-                ? {
-                    grade: form.grade,
-                    stream: form.stream,
-                    subject: form.subject,
-                    title: form.title,
-                    durationMinutes: Number(form.durationMinutes),
-                    questions: JSON.parse(form.questionsJson)
-                  }
-                : {
-                    title: form.title,
-                    body: form.body,
-                    category: form.category
-                  };
-
-      const response = await fetch(apiUrl(endpoint), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.message ?? "Upload failed");
-
-      setMessage(`${uploadLabels[uploadType]} uploaded successfully.`);
-      setForm((current) => ({
-        ...current,
-        title: "",
-        subject: uploadType === "notice" ? current.subject : "",
-        fileUrl: "",
-        videoUrl: "",
-        year: "",
-        body: "",
-        questionsJson: current.questionsJson
-      }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (error && !data) {
+  if (!authorized) {
     return (
-      <EmptyState
-        title="Admin access required"
-        description={error}
-        action="Login as Admin"
-      />
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <AlertTriangle className="h-12 w-12 text-rose-500 animate-pulse" />
+        <h2 className="text-2xl font-extrabold text-slate-900">Access Denied – Admin Authorization Required</h2>
+        <p className="text-sm text-slate-600 max-w-md">
+          Only users with <code className="bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-800">isAdmin: true</code> can view this page. Redirecting to Student Dashboard...
+        </p>
+        <Button onClick={() => router.push("/dashboard")} className="rounded-xl bg-blue-600 text-white">
+          Go to Student Dashboard
+        </Button>
+      </div>
     );
   }
 
-  const summary = data?.summary;
-  const adminEmail = data?.admin?.email ?? "admin";
+  // Handle PDF Upload Form
+  const handlePdfSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pdfTitle) return;
+
+    addRealNote({
+      subject: pdfSubject,
+      title: pdfTitle,
+      grade: pdfGrade,
+      stream: pdfGrade === "10th" ? "General" : pdfStream,
+      fileSize: pdfSize,
+      pages: Number(pdfPages)
+    });
+
+    setUploadSuccess(`Successfully uploaded PDF Note: "${pdfTitle}" for Class ${pdfGrade} (${pdfGrade === "10th" ? "General" : pdfStream})!`);
+    setPdfTitle("");
+    refreshData();
+    setTimeout(() => setUploadSuccess(null), 4000);
+  };
+
+  // Handle Paper Upload Form
+  const handlePaperSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paperTitle) return;
+
+    addRealPaper({
+      subject: paperSubject,
+      title: paperTitle,
+      year: paperYear,
+      term: paperTerm,
+      grade: paperGrade,
+      stream: paperGrade === "10th" ? "General" : paperStream,
+      fileSize: "3.2 MB"
+    });
+
+    setUploadSuccess(`Successfully uploaded Previous Paper: "${paperTitle}" (${paperYear}) for Class ${paperGrade}!`);
+    setPaperTitle("");
+    refreshData();
+    setTimeout(() => setUploadSuccess(null), 4000);
+  };
+
+  // Handle Video Upload Form
+  const handleVideoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vidTitle) return;
+
+    addRealVideo({
+      subject: vidSubject,
+      title: vidTitle,
+      instructor: vidInstructor,
+      duration: vidDuration,
+      grade: vidGrade,
+      stream: vidGrade === "10th" ? "General" : vidStream,
+      thumbnail: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80"
+    });
+
+    setUploadSuccess(`Successfully uploaded Video Lecture: "${vidTitle}" for Class ${vidGrade}!`);
+    setVidTitle("");
+    refreshData();
+    setTimeout(() => setUploadSuccess(null), 4000);
+  };
+
+  const adminCards = [
+    { label: "Total Users", value: String(adminStats.totalUsers), icon: Users, color: "from-blue-600 to-blue-500" },
+    { label: "Total Notes", value: String(adminStats.totalNotes), icon: FileText, color: "from-emerald-600 to-teal-500" },
+    { label: "Total Papers", value: String(adminStats.totalPapers), icon: ScrollText, color: "from-orange-500 to-amber-500" },
+    { label: "Total Quizzes", value: String(adminStats.totalQuizzes), icon: NotebookTabs, color: "from-indigo-600 to-purple-500" },
+    { label: "Total Downloads", value: String(adminStats.totalDownloads), icon: Download, color: "from-rose-600 to-pink-500" }
+  ];
+
+  const tabs = ["Upload PDF", "Upload Previous Paper", "Upload Video", "Manage Notes", "Manage Papers", "Manage Videos", "Manage Quizzes"];
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      {/* Header Banner */}
+      <div className="rounded-[2.5rem] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 md:p-8 text-white shadow-premium relative overflow-hidden border border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <p className="text-sm text-blue-600">Admin Dashboard</p>
-            <h2 className="text-2xl font-semibold">Welcome, {adminEmail}</h2>
-            <p className="text-sm text-slate-600">Manage uploads for notes, papers, videos, quizzes and notices.</p>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Badge className="bg-emerald-600 text-white font-bold text-xs">Admin Access Verified</Badge>
+              <Badge className="bg-white/10 text-slate-300 text-xs">Class-Wise Upload Controller</Badge>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Admin Dashboard & CMS</h1>
+            <p className="mt-1 text-xs md:text-sm text-slate-400 max-w-2xl">
+              Upload PDF notes, previous board papers, video lectures, and MCQ quizzes class-wise. Real data appears live on student dashboards.
+            </p>
           </div>
-          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            Protected by JWT middleware
+
+          <div className="flex gap-3">
+            <Link href="/dashboard" className="inline-flex h-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 text-xs font-bold text-white hover:bg-white/20">
+              Student View
+            </Link>
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {(summary?.stats ?? []).length > 0 ? (
-          summary?.stats?.map((item) => <StatCard key={item.label} {...item} />)
-        ) : (
-          <Card className="md:col-span-2 xl:col-span-4">
-            <CardContent className="py-10 text-center text-sm text-slate-600">
-              No admin data yet. Upload content from the API or connected admin forms.
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
-        <Card>
-          <CardContent className="space-y-5">
-            <SectionHeading eyebrow="Upload Center" title="Admin can upload real content" />
-
-            <form className="space-y-5" onSubmit={handleUpload}>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Content Type</Label>
-                  <Select value={uploadType} onChange={(event) => setUploadType(event.target.value as UploadType)}>
-                    <option value="note">Notes</option>
-                    <option value="paper">Previous Papers</option>
-                    <option value="video">Videos</option>
-                    <option value="quiz">Quizzes</option>
-                    <option value="notice">Notices</option>
-                  </Select>
-                </div>
-
-                {uploadType !== "notice" ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Grade</Label>
-                      <Select value={form.grade} onChange={(event) => setForm((current) => ({ ...current, grade: event.target.value as UploadState["grade"] }))}>
-                        <option value="10th">10th</option>
-                        <option value="11th">11th</option>
-                        <option value="12th">12th</option>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Stream</Label>
-                      <Select value={form.stream} onChange={(event) => setForm((current) => ({ ...current, stream: event.target.value as UploadState["stream"] }))}>
-                        <option value="Medical">Medical</option>
-                        <option value="Non-Medical">Non-Medical</option>
-                        <option value="Commerce">Commerce</option>
-                        <option value="Arts">Arts</option>
-                      </Select>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-
-              {uploadType !== "notice" ? (
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <Input
-                    value={form.subject}
-                    onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))}
-                    placeholder="Biology / Mathematics / Economics"
-                  />
-                </div>
-              ) : null}
-
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input
-                  value={form.title}
-                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                  placeholder="Upload title"
-                />
-              </div>
-
-              {uploadType === "note" || uploadType === "paper" ? (
-                <div className="space-y-2">
-                  <Label>PDF URL</Label>
-                  <Input
-                    value={form.fileUrl}
-                    onChange={(event) => setForm((current) => ({ ...current, fileUrl: event.target.value }))}
-                    placeholder="https://..."
-                  />
-                </div>
-              ) : null}
-
-              {uploadType === "paper" ? (
-                <div className="space-y-2">
-                  <Label>Year</Label>
-                  <Input
-                    value={form.year}
-                    onChange={(event) => setForm((current) => ({ ...current, year: event.target.value }))}
-                    placeholder="2025 / 2026"
-                  />
-                </div>
-              ) : null}
-
-              {uploadType === "video" ? (
-                <div className="space-y-2">
-                  <Label>Video URL</Label>
-                  <Input
-                    value={form.videoUrl}
-                    onChange={(event) => setForm((current) => ({ ...current, videoUrl: event.target.value }))}
-                    placeholder="https://..."
-                  />
-                </div>
-              ) : null}
-
-              {uploadType === "quiz" ? (
-                <>
-                  <div className="space-y-2">
-                    <Label>Duration Minutes</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={form.durationMinutes}
-                      onChange={(event) => setForm((current) => ({ ...current, durationMinutes: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Questions JSON</Label>
-                    <Textarea
-                      value={form.questionsJson}
-                      onChange={(event) => setForm((current) => ({ ...current, questionsJson: event.target.value }))}
-                    />
-                  </div>
-                </>
-              ) : null}
-
-              {uploadType === "notice" ? (
-                <>
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Input
-                      value={form.category}
-                      onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-                      placeholder="Exam Update / Holiday Notice / Announcement"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Notice Body</Label>
-                    <Textarea
-                      value={form.body}
-                      onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))}
-                      placeholder="Notice text"
-                    />
-                  </div>
-                </>
-              ) : null}
-
-              <div className="flex flex-wrap gap-3">
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Uploading..." : `Upload ${uploadLabels[uploadType]}`}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setMessage(null);
-                    setError(null);
-                    setForm(initialForm);
-                    setUploadType("note");
-                  }}
-                >
-                  Reset Form
-                </Button>
-              </div>
-
-              {message ? <p className="text-sm font-medium text-emerald-600">{message}</p> : null}
-              {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="space-y-3">
-              <SectionHeading eyebrow="Admin Features" title="Management tools" />
-              {[
-                "Manage Users",
-                "Manage Subjects",
-                "Manage Notes",
-                "Manage Previous Papers",
-                "Manage Videos",
-                "Manage Quizzes",
-                "Manage Results",
-                "Manage Notices",
-                "Upload PDF",
-                "Upload Videos",
-                "Reports",
-                "Settings"
-              ].map((item) => (
-                <div key={item} className="rounded-2xl bg-slate-50 p-3 text-sm">{item}</div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="space-y-4">
-              <SectionHeading eyebrow="Recent Activities Panel" title="Live admin feed" />
-              {(summary?.notices ?? []).length > 0 ? (
-                summary?.notices?.map((item) => (
-                  <div key={item.title} className="rounded-2xl bg-slate-50 p-4 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-medium">{item.title}</span>
-                      <span className="text-xs text-slate-500">{item.tag ?? "Notice"}</span>
-                    </div>
-                    <p className="mt-1 text-slate-600">{item.date ?? ""}</p>
-                  </div>
-                ))
-              ) : (
-                <EmptyState
-                  title="No admin activity yet"
-                  description="Recent uploads and actions will appear here after you start managing content."
-                />
-              )}
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-3xl bg-gradient-to-br from-blue-600 to-blue-800 p-5 text-white">
-                  Monthly Analytics Charts
-                </div>
-                <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 text-white">
-                  Student Performance Charts
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
+
+      {/* REAL ADMIN STATS CARDS (CALCULATED FROM STORE) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {adminCards.map((card) => (
+          <Card key={card.label} className="rounded-[2rem] border-white/60 bg-white/80 p-5 shadow-glass backdrop-blur-xl hover:shadow-xl transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{card.label}</p>
+                <p className="mt-2 text-2xl md:text-3xl font-extrabold text-slate-900">{card.value}</p>
+                <p className="text-[10px] text-slate-500 font-medium">Real Store Metric</p>
+              </div>
+              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${card.color} text-white shadow-md`}>
+                <card.icon className="h-5 w-5" />
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {uploadSuccess && (
+        <div className="flex items-center gap-3 rounded-2xl bg-emerald-500 p-4 text-white font-medium shadow-lg animate-in fade-in">
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+          <p className="text-sm font-bold">{uploadSuccess}</p>
+        </div>
+      )}
+
+      {/* Admin Action Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {tabs.map((t) => (
+          <button
+            key={t}
+            onClick={() => setActiveTab(t)}
+            className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition shrink-0 ${
+              activeTab === t
+                ? "bg-slate-950 text-white shadow-md"
+                : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Panels */}
+      <Card className="rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl">
+        {activeTab === "Upload PDF" && (
+          <form onSubmit={handlePdfSubmit} className="space-y-4">
+            <div className="border-b pb-3 mb-2">
+              <h3 className="text-lg font-bold text-slate-900">Upload Class-Wise PDF Study Notes</h3>
+              <p className="text-xs text-slate-500">Uploaded notes will appear on the Student Notes page for the selected class.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Target Class</Label>
+                <select
+                  value={pdfGrade}
+                  onChange={(e) => setPdfGrade(e.target.value as Grade)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="10th">10th Class</option>
+                  <option value="11th">11th Class</option>
+                  <option value="12th">12th Class</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Target Stream</Label>
+                <select
+                  value={pdfStream}
+                  disabled={pdfGrade === "10th"}
+                  onChange={(e) => setPdfStream(e.target.value as Stream)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900 disabled:opacity-50"
+                >
+                  <option value="Medical">Medical</option>
+                  <option value="Non-Medical">Non-Medical</option>
+                  <option value="Commerce">Commerce</option>
+                  <option value="Arts">Arts</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Subject</Label>
+                <select
+                  value={pdfSubject}
+                  onChange={(e) => setPdfSubject(e.target.value)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="Biology">Biology</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Chemistry">Chemistry</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Accountancy">Accountancy</option>
+                  <option value="Business Studies">Business Studies</option>
+                  <option value="Economics">Economics</option>
+                  <option value="History">History</option>
+                  <option value="Political Science">Political Science</option>
+                  <option value="Sociology">Sociology</option>
+                  <option value="Geography">Geography</option>
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Science">Science</option>
+                  <option value="Social Science">Social Science</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2 md:col-span-2">
+                <Label className="font-bold text-slate-800 text-xs">PDF Document Title</Label>
+                <Input
+                  value={pdfTitle}
+                  onChange={(e) => setPdfTitle(e.target.value)}
+                  placeholder="e.g. Chapter 4 Cell Cycle & Division Detailed Revision Notes"
+                  required
+                  className="h-11 rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">File Size & Pages</Label>
+                <div className="flex gap-2">
+                  <Input value={pdfSize} onChange={(e) => setPdfSize(e.target.value)} placeholder="3.5 MB" className="h-11 rounded-xl text-xs" />
+                  <Input type="number" value={pdfPages} onChange={(e) => setPdfPages(Number(e.target.value))} placeholder="15" className="h-11 rounded-xl text-xs" />
+                </div>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold text-white text-xs shadow-premium">
+              <Upload className="mr-2 h-4 w-4" /> Upload PDF Note to Platform
+            </Button>
+          </form>
+        )}
+
+        {activeTab === "Upload Previous Paper" && (
+          <form onSubmit={handlePaperSubmit} className="space-y-4">
+            <div className="border-b pb-3 mb-2">
+              <h3 className="text-lg font-bold text-slate-900">Upload Board Question Paper</h3>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Class</Label>
+                <select value={paperGrade} onChange={(e) => setPaperGrade(e.target.value as Grade)} className="h-11 rounded-xl border bg-white px-3 text-xs font-semibold">
+                  <option value="10th">10th</option>
+                  <option value="11th">11th</option>
+                  <option value="12th">12th</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Stream</Label>
+                <select value={paperStream} onChange={(e) => setPaperStream(e.target.value as Stream)} className="h-11 rounded-xl border bg-white px-3 text-xs font-semibold">
+                  <option value="Medical">Medical</option>
+                  <option value="Non-Medical">Non-Medical</option>
+                  <option value="Commerce">Commerce</option>
+                  <option value="Arts">Arts</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Subject</Label>
+                <Input value={paperSubject} onChange={(e) => setPaperSubject(e.target.value)} className="h-11 rounded-xl text-xs" />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2 md:col-span-2">
+                <Label className="font-bold text-slate-800 text-xs">Paper Title</Label>
+                <Input value={paperTitle} onChange={(e) => setPaperTitle(e.target.value)} placeholder="e.g. 2025 Annual Board Exam Model Question Paper with Solutions" required className="h-11 rounded-xl text-xs" />
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Year & Term</Label>
+                <div className="flex gap-2">
+                  <Input value={paperYear} onChange={(e) => setPaperYear(e.target.value)} placeholder="2025" className="h-11 rounded-xl text-xs" />
+                  <Input value={paperTerm} onChange={(e) => setPaperTerm(e.target.value)} placeholder="Board Exam" className="h-11 rounded-xl text-xs" />
+                </div>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 font-bold text-white text-xs shadow">
+              <Upload className="mr-2 h-4 w-4" /> Upload Board Paper
+            </Button>
+          </form>
+        )}
+
+        {activeTab === "Upload Video" && (
+          <form onSubmit={handleVideoSubmit} className="space-y-4">
+            <div className="border-b pb-3 mb-2">
+              <h3 className="text-lg font-bold text-slate-900">Upload Video Lecture</h3>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Video Title</Label>
+                <Input value={vidTitle} onChange={(e) => setVidTitle(e.target.value)} placeholder="e.g. Cell Division Mitosis Masterclass 1080p" required className="h-11 rounded-xl text-xs" />
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Instructor & Duration</Label>
+                <div className="flex gap-2">
+                  <Input value={vidInstructor} onChange={(e) => setVidInstructor(e.target.value)} placeholder="Dr. Ananya" className="h-11 rounded-xl text-xs" />
+                  <Input value={vidDuration} onChange={(e) => setVidDuration(e.target.value)} placeholder="25:00" className="h-11 rounded-xl text-xs" />
+                </div>
+              </div>
+            </div>
+            <Button type="submit" className="w-full h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 font-bold text-white text-xs shadow">
+              <Video className="mr-2 h-4 w-4" /> Upload Video Lecture
+            </Button>
+          </form>
+        )}
+
+        {activeTab === "Manage Notes" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Uploaded PDF Notes ({realNotes.length})</h3>
+              <Badge className="bg-blue-100 text-blue-700 font-bold">{realNotes.length} Items</Badge>
+            </div>
+            {realNotes.length === 0 ? (
+              <p className="text-xs text-slate-500 py-6 text-center">No PDF notes uploaded yet. Use "Upload PDF" tab above to add notes for any class!</p>
+            ) : (
+              <div className="space-y-2">
+                {realNotes.map((n) => (
+                  <div key={n.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-800 border border-slate-100">
+                    <div>
+                      <p className="font-bold text-slate-900">{n.title}</p>
+                      <p className="text-[10px] text-slate-500">Class {n.grade} ({n.stream}) • {n.subject} • {n.fileSize}</p>
+                    </div>
+                    <Badge className="bg-emerald-100 text-emerald-700">Uploaded</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

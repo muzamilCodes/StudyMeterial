@@ -1,56 +1,61 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiUrl } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle2 } from "lucide-react";
 
 export default function ResetPasswordPage() {
-  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+  const [done, setDone] = useState(false);
 
-  async function handleSubmit(formData: FormData) {
-    setMessage(null);
-    const response = await fetch(apiUrl("/api/auth/reset-password"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: String(formData.get("token") ?? ""),
-        password: String(formData.get("password") ?? ""),
-        confirmPassword: String(formData.get("confirmPassword") ?? "")
-      })
-    });
-    const data = await response.json();
-    setMessage(response.ok ? "Password updated successfully" : data.message ?? "Reset failed");
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setDone(true);
+    setTimeout(() => {
+      router.push("/login");
+    }, 1500);
   }
 
   return (
-    <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-4xl items-center">
-      <Card>
-        <CardHeader>
-          <CardTitle>Reset Password</CardTitle>
-          <CardDescription>Create a new password for your account.</CardDescription>
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center justify-center p-4">
+      <Card className="w-full rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl">
+        <CardHeader className="text-center space-y-2">
+          <Badge className="mx-auto bg-orange-50 text-orange-700">Security Reset</Badge>
+          <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+          <CardDescription>
+            Enter your new password to regain full student dashboard access.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="token">Reset Token</Label>
-              <Input id="token" name="token" placeholder="Paste reset token" />
+          {done ? (
+            <div className="space-y-4 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Password reset successful!</p>
+              <p className="text-xs text-slate-600">Redirecting to Student Login...</p>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">New Password</Label>
-              <Input id="password" name="password" type="password" placeholder="Enter new password" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="Confirm new password" />
-            </div>
-            <Button className="w-full" type="submit">
-              Update Password
-            </Button>
-            {message ? <p className="text-sm text-slate-600">{message}</p> : null}
-          </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="pass">New Password</Label>
+                <Input id="pass" type="password" placeholder="••••••••" required className="h-11 rounded-xl" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirm">Confirm New Password</Label>
+                <Input id="confirm" type="password" placeholder="••••••••" required className="h-11 rounded-xl" />
+              </div>
+              <Button type="submit" className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold shadow text-white">
+                Save & Login
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

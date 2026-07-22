@@ -1,45 +1,89 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { apiUrl } from "@/lib/api";
-import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { getDownloadedFiles, type DownloadRecord, logDownload } from "@/lib/store";
+import { Download, FileText, ScrollText, CheckCircle2, Clock } from "lucide-react";
 
-async function getDownloads() {
-  try {
-    const response = await fetch(apiUrl("/api/content/downloads?grade=11th"), { cache: "no-store" });
-    if (!response.ok) throw new Error("Backend unavailable");
-    const json = await response.json();
-    return json.data ?? [];
-  } catch {
-    return [];
-  }
-}
+export default function DownloadsPage() {
+  const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
+  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
 
-export default async function DownloadsPage() {
-  const downloads = await getDownloads();
+  useEffect(() => {
+    setDownloads(getDownloadedFiles());
+  }, []);
 
-  if (downloads.length === 0) {
-    return (
-      <EmptyState
-        title="No downloads yet"
-        description="Downloaded file history will show here once students start downloading uploaded content."
-        action="Go to Dashboard"
-      />
-    );
-  }
+  const handleRedownload = (item: DownloadRecord) => {
+    logDownload(item.title, item.subject, item.category, item.fileSize);
+    setDownloads(getDownloadedFiles());
+    setDownloadMsg(`Re-downloaded "${item.title}".`);
+    setTimeout(() => setDownloadMsg(null), 3000);
+  };
 
   return (
-    <div className="grid gap-4">
-      {downloads.map((file: any) => (
-        <Card key={file._id ?? file.title}>
-          <CardContent className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm text-blue-600">Downloaded Files History</p>
-              <h3 className="text-xl font-semibold">{file.title ?? file.name}</h3>
-              <p className="text-sm text-slate-600">{file.createdAt ?? file.date ?? "-"}</p>
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="rounded-[2.5rem] bg-gradient-to-br from-emerald-600 via-teal-600 to-slate-900 p-6 md:p-8 text-white shadow-premium">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <Badge className="bg-white/20 text-white border-white/30 mb-2">Saved History</Badge>
+            <h2 className="text-3xl font-extrabold">Downloaded Files History</h2>
+            <p className="mt-1 text-sm text-emerald-100/90 max-w-2xl">
+              Track all your downloaded PDF study notes and previous year question papers.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/10 p-4 text-center backdrop-blur-md">
+            <p className="text-xs uppercase tracking-wider text-emerald-200 font-bold">Total Saved Files</p>
+            <p className="text-3xl font-extrabold text-white mt-1">{downloads.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {downloadMsg && (
+        <div className="flex items-center gap-3 rounded-2xl bg-emerald-500 p-4 text-white font-medium shadow-lg animate-in fade-in">
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+          <p className="text-sm">{downloadMsg}</p>
+        </div>
+      )}
+
+      {/* Downloads Table / Cards */}
+      <div className="space-y-4">
+        {downloads.map((item) => (
+          <Card key={item.id} className="rounded-[2rem] border-white/60 bg-white/80 p-5 shadow-glass backdrop-blur-xl hover:shadow-lg transition">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-md ${item.category === "PDF Note" ? "bg-blue-600" : "bg-orange-500"}`}>
+                  {item.category === "PDF Note" ? <FileText className="h-6 w-6" /> : <ScrollText className="h-6 w-6" />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge className={item.category === "PDF Note" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}>
+                      {item.category}
+                    </Badge>
+                    <Badge className="border border-slate-200 bg-slate-100 text-slate-700">{item.subject}</Badge>
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-base">{item.title}</h3>
+                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Downloaded: {item.downloadedAt}</span>
+                    <span>•</span>
+                    <span>Size: {item.fileSize}</span>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => handleRedownload(item)}
+                variant="outline"
+                className="rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-semibold shrink-0"
+              >
+                <Download className="mr-2 h-4 w-4 text-emerald-600" /> Re-Download
+              </Button>
             </div>
-            <div className="rounded-2xl bg-slate-100 px-4 py-2 text-sm">Downloaded</div>
-          </CardContent>
-        </Card>
-      ))}
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

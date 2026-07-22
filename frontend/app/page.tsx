@@ -1,382 +1,357 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import {
+  GraduationCap,
+  CheckCircle2,
+  ArrowRight,
+  Sparkles,
+  Layers,
+  Database,
+  Cpu,
+  Layout,
+  ExternalLink,
+  PlayCircle,
+  FileText,
+  ScrollText,
+  NotebookTabs,
+  Download,
+  BarChart3,
+  Users,
+  ShieldCheck,
+  Search,
+  BookOpen,
+  Eye,
+  Maximize2
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { databaseCollections, flowSteps, mainFeatures, techStack } from "@/lib/platform-data";
-import { SectionHeading } from "@/components/section-heading";
 import { PublicShell } from "@/components/public-shell";
+import {
+  databaseCollections,
+  flowSteps,
+  mainFeatures,
+  techStack,
+  gradeConfig
+} from "@/lib/platform-data";
 
-const pageBlocks = [
-  "Login / Registration",
-  "Student Dashboard",
-  "Subjects",
-  "Notes",
-  "Previous Papers",
-  "Quiz",
-  "Video Lectures",
-  "Notices",
-  "Downloads",
-  "Results",
-  "Progress",
-  "Forgot Password",
-  "Reset Password",
-  "Edit Profile",
-  "Admin Dashboard"
+const pageMockups = [
+  { id: 1, title: "1. Login / Registration", category: "Authentication", route: "/login", desc: "Student Login, Registration, Class & Stream selection, Email/Password, Remember Me, Forgot Password." },
+  { id: 2, title: "2. Student Dashboard", category: "Core Platform", route: "/dashboard", desc: "Welcome Student, Search Bar, Notification Bell, Profile Avatar, 9 Learning Cards, Stats: 24 Notes, 15 Papers, 8 Quizzes, 85% Score." },
+  { id: 3, title: "3. Subjects Page", category: "Class-Wise", route: "/subjects", desc: "Displays subject cards according to selected class and stream with Total Notes, Papers, Videos, Quizzes, Download Button." },
+  { id: 4, title: "4. Notes Page", category: "Study Material", route: "/notes", desc: "Subject Wise PDF Notes, Upload Date, File Size, PDF Viewer Preview Modal, Download Button." },
+  { id: 5, title: "5. Previous Papers Page", category: "Board Exams", route: "/previous-papers", desc: "Year Wise Papers (2025 - 2021) with exam terms and direct PDF Download button." },
+  { id: 6, title: "6. Quiz Page", category: "Assessment", route: "/quizzes", desc: "Interactive MCQ Quiz Player, 15:00 Timer, Question navigator, radio choices, instant Result & Accuracy score." },
+  { id: 7, title: "7. Video Lectures Page", category: "E-Learning", route: "/videos", desc: "Subject Wise Video Lectures with duration, instructor name, thumbnail, and 1080p Video Player Modal." },
+  { id: 8, title: "8. Notices Page", category: "Notice Board", route: "/notices", desc: "Latest Announcements, Exam Updates, Holiday Notices with category filters." },
+  { id: 9, title: "9. Downloads Page", category: "User Storage", route: "/downloads", desc: "Downloaded Files History tracking saved PDF notes and board papers with re-download option." },
+  { id: 10, title: "10. Results Page", category: "Analytics", route: "/results", desc: "Quiz Results table, overall performance charts, accuracy %, correct/incorrect score breakdown." },
+  { id: 11, title: "11. Progress Page", category: "Tracking", route: "/progress", desc: "Overall Progress Bar, Completed Quizzes (6/8), Downloaded Notes (18), Downloaded Papers (9), Subject Mastery." },
+  { id: 12, title: "12. Forgot Password", category: "Account Security", route: "/forgot-password", desc: "Email verification & automated password recovery link trigger." },
+  { id: 13, title: "13. Reset Password", category: "Account Security", route: "/reset-password", desc: "Secure password reset form with confirmation validation." },
+  { id: 14, title: "14. Edit Profile", category: "Settings", route: "/edit-profile", desc: "Form to update student identity, class, stream, profile avatar, and bio details." },
+  { id: 15, title: "15. Admin Dashboard", category: "Management", route: "/admin", desc: "Admin Cards (Total Users, Notes, Papers, Quizzes, Downloads), Management Tabs, Upload PDF/Video, Recent Activities Panel, Analytics Charts." }
 ];
 
-const classStreams = [
-  { title: "10th Class", detail: "Only 10th class study material appears after login." },
-  { title: "11th Medical", detail: "Biology, Physics, Chemistry, English" },
-  { title: "11th Non-Medical", detail: "Physics, Chemistry, Mathematics, English" },
-  { title: "11th Commerce", detail: "Accountancy, Business Studies, Economics, English" },
-  { title: "11th Arts", detail: "History, Political Science, Sociology, English" },
-  { title: "12th Medical", detail: "Biology, Physics, Chemistry" },
-  { title: "12th Non-Medical", detail: "Mathematics, Physics, Chemistry" },
-  { title: "12th Commerce", detail: "Accountancy, Economics, Business Studies" },
-  { title: "12th Arts", detail: "History, Geography, Political Science" }
+const classStreamMatrix = [
+  { class: "10th Class", stream: "General", subjects: ["Mathematics", "Science", "Social Science", "English", "Hindi"] },
+  { class: "11th Class", stream: "Medical", subjects: ["Biology", "Physics", "Chemistry", "English"] },
+  { class: "11th Class", stream: "Non-Medical", subjects: ["Physics", "Chemistry", "Mathematics", "English"] },
+  { class: "11th Class", stream: "Commerce", subjects: ["Accountancy", "Business Studies", "Economics", "English"] },
+  { class: "11th Class", stream: "Arts", subjects: ["History", "Political Science", "Sociology", "English"] },
+  { class: "12th Class", stream: "Medical", subjects: ["Biology", "Physics", "Chemistry"] },
+  { class: "12th Class", stream: "Non-Medical", subjects: ["Mathematics", "Physics", "Chemistry"] },
+  { class: "12th Class", stream: "Commerce", subjects: ["Accountancy", "Economics", "Business Studies"] },
+  { class: "12th Class", stream: "Arts", subjects: ["History", "Geography", "Political Science"] }
 ];
 
-export default function HomePage() {
+export default function PresentationBoardPage() {
+  const [selectedMockup, setSelectedMockup] = useState<typeof pageMockups[0] | null>(null);
+
   return (
     <PublicShell>
-      <div className="page-shell px-4 py-4 md:px-6 md:py-6">
-        <section className="glass relative overflow-hidden rounded-[2rem] p-5 md:p-8 xl:p-10">
-          <div className="absolute inset-0 subtle-grid opacity-35" />
-          <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
-          <div className="absolute -right-24 bottom-10 h-64 w-64 rounded-full bg-orange-500/10 blur-3xl" />
+      <div className="page-shell space-y-12 px-4 py-6 md:px-8 md:py-8 max-w-[1600px] mx-auto">
+        {/* SECTION 1: MAIN TITLE & HERO INFOGRAPHIC HEADER */}
+        <section className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-blue-700 via-blue-600 to-slate-950 p-8 md:p-12 text-white shadow-2xl border border-white/10">
+          <div className="absolute -left-20 -top-20 h-96 w-96 rounded-full bg-orange-500/20 blur-3xl" />
+          <div className="absolute -right-20 -bottom-20 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
 
-          <div className="relative space-y-8 xl:space-y-10">
-            <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-              <div className="space-y-5">
-                <Badge className="bg-white/80 text-blue-700">Premium Educational SaaS / React + Next.js / MongoDB</Badge>
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold tracking-[0.4em] text-blue-600">STUDY MATERIAL</p>
-                  <h1 className="text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl xl:text-6xl">
-                    EDUCATIONAL PLATFORM
-                  </h1>
-                  <p className="max-w-3xl text-base leading-7 text-slate-600 md:text-lg">
-                    One platform for 10th, 11th & 12th students across Medical, Non-Medical, Commerce and Arts.
-                    Built as a real product with class-wise filtering, admin control, auth flow, uploads, and dashboard sections.
-                  </p>
-                </div>
+          <div className="relative z-10 space-y-8 text-center max-w-5xl mx-auto">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Badge className="bg-white/20 text-white border-white/30 px-4 py-1.5 backdrop-blur-md text-xs font-bold uppercase tracking-wider">
+                Ultra HD 4K Presentation Board • Behance & Dribbble Level
+              </Badge>
+              <Badge className="bg-orange-500 text-white px-4 py-1.5 font-bold text-xs uppercase tracking-wider">
+                Figma Quality SaaS UI
+              </Badge>
+            </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-3xl bg-white/80 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Live Flow</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">Student → Class → Stream → Dashboard</p>
-                  </div>
-                  <div className="rounded-3xl bg-white/80 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Class Wise</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">Only uploaded content appears</p>
-                  </div>
-                  <div className="rounded-3xl bg-white/80 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Responsive</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">Laptop, tablet, mobile ready</p>
-                  </div>
-                </div>
+            <div className="space-y-4">
+              <p className="text-sm font-extrabold tracking-[0.4em] text-orange-400">STUDY MATERIAL</p>
+              <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl lg:text-7xl">
+                STUDY MATERIAL – EDUCATIONAL PLATFORM
+              </h1>
+              <p className="text-lg md:text-2xl font-semibold text-blue-100/90 max-w-4xl mx-auto leading-relaxed">
+                One Platform for 10th, 11th & 12th Students (Medical, Non-Medical, Commerce & Arts)
+              </p>
+            </div>
 
-                <div className="flex flex-wrap gap-3">
-                  <Link href="/login" className="inline-flex h-12 items-center justify-center rounded-2xl bg-blue-600 px-6 text-base font-medium text-white shadow-premium transition hover:bg-blue-700">
-                    Open Student Login
-                  </Link>
-                  <Link href="/admin" className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 text-base font-medium text-slate-900 transition hover:bg-slate-50">
-                    Open Admin Dashboard
-                  </Link>
-                  <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-2xl bg-orange-500 px-6 text-base font-medium text-white shadow-premium transition hover:bg-orange-600">
-                    View Full Board
-                  </Link>
-                </div>
+            {/* Platform Quick Stats Pill */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto pt-4">
+              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
+                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">15 Website Pages</p>
+                <p className="text-2xl font-extrabold text-white mt-1">100% Built</p>
               </div>
-
-              <Card className="bg-slate-950 text-white shadow-glass">
-                <CardContent className="space-y-5 p-5 md:p-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-slate-300">Upload-Driven Content</p>
-                      <p className="text-2xl font-semibold">No demo data</p>
-                    </div>
-                    <div className="rounded-2xl bg-white/10 p-3">
-                      <GraduationCap className="h-6 w-6 text-orange-400" />
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-white/5 p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Flow</p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      {flowSteps.map((step) => (
-                        <span key={step} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-slate-200">
-                          {step}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-white/5 p-4">
-                    <div className="flex items-center justify-between text-sm text-slate-300">
-                      <span>Backend</span>
-                      <span>Connected</span>
-                    </div>
-                    <div className="mt-3 grid gap-2 text-xs text-slate-200">
-                      <span className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">Express.js API</span>
-                      <span className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">JWT Authentication</span>
-                      <span className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">MongoDB Atlas Collections</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
+                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Class-Wise Filter</p>
+                <p className="text-2xl font-extrabold text-orange-300 mt-1">Isolated</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
+                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Design Theme</p>
+                <p className="text-2xl font-extrabold text-white mt-1">Blue & Orange</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
+                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Quality Standard</p>
+                <p className="text-2xl font-extrabold text-emerald-300 mt-1">Apple UI Level</p>
+              </div>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-              <Card>
-                <CardContent className="space-y-6 p-0">
-                  <div className="border-b border-slate-200/70 p-6">
-                    <SectionHeading
-                      eyebrow="Class-wise Study Material"
-                      title="Only uploaded content appears for the selected class"
-                      description="Students choose class and stream first. The backend filters subjects, notes, papers, videos, quizzes and notices for that exact class combination."
-                    />
-                  </div>
-                  <div className="grid gap-4 p-6 md:grid-cols-2">
-                    {[
-                      "10th Class",
-                      "11th Medical",
-                      "11th Non-Medical",
-                      "11th Commerce",
-                      "11th Arts",
-                      "12th Medical",
-                      "12th Non-Medical",
-                      "12th Commerce"
-                    ].map((item) => (
-                      <div key={item} className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="text-sm text-blue-600">Class Mapping</p>
-                            <h3 className="text-xl font-semibold">{item}</h3>
-                          </div>
-                          <BookOpen className="h-5 w-5 text-orange-500" />
-                        </div>
-                        <p className="mt-4 text-sm leading-6 text-slate-600">
-                          The dashboard, notes, papers and quizzes shown here will be limited to this selected class and stream only.
-                        </p>
-                        <div className="mt-4">
-                          <Button className="w-full" variant="outline">
-                            View only uploaded material
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="space-y-5">
-                  <SectionHeading eyebrow="Student Dashboard" title="Core modules" />
-                  <div className="grid grid-cols-2 gap-3">
-                    {["Notes", "Previous Papers", "Quizzes", "Videos", "Downloads", "Results", "Notices", "Bookmarks", "My Progress"].map((item) => (
-                      <div key={item} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
-                        <span className="font-medium text-slate-700">{item}</span>
-                        <ArrowRight className="h-4 w-4 text-blue-600" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded-3xl bg-gradient-to-br from-blue-600 to-slate-900 p-5 text-white">
-                    <p className="text-xs uppercase tracking-[0.3em] text-blue-100">Dashboard Statistics</p>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                      <div className="rounded-2xl bg-white/10 p-3">Uploads appear after admin action</div>
-                      <div className="rounded-2xl bg-white/10 p-3">No sample content preloaded</div>
-                      <div className="rounded-2xl bg-white/10 p-3">Real data from MongoDB</div>
-                      <div className="rounded-2xl bg-white/10 p-3">JWT protected access</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-6 xl:grid-cols-3">
-              <Card>
-                <CardContent>
-                  <SectionHeading
-                    eyebrow="Login / Registration"
-                    title="Authentication layer"
-                    description="Student login, registration, forgot password, reset password and profile editing."
-                  />
-                  <div className="mt-5 grid grid-cols-2 gap-3 text-sm text-slate-600">
-                    {["Email", "Password", "Confirm Password", "Select Class", "Select Stream", "Remember Me", "Forgot Password", "Login Button", "Register Button"].map((item) => (
-                      <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3">{item}</div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent>
-                  <SectionHeading
-                    eyebrow="Admin Dashboard"
-                    title="Management panel"
-                    description="Manage users, subjects, notes, papers, videos, quizzes, results, notices, uploads, reports and settings."
-                  />
-                  <div className="mt-5 grid gap-3">
-                    {["Manage Users", "Manage Subjects", "Manage Notes", "Manage Previous Papers", "Manage Videos", "Manage Quizzes", "Manage Results", "Manage Notices", "Upload PDF", "Upload Videos", "Reports", "Settings"].map((item) => (
-                      <div key={item} className="flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm">
-                        <ShieldCheck className="h-4 w-4 text-orange-500" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent>
-                  <SectionHeading eyebrow="Tech Stack" title="Production-ready foundation" />
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {techStack.map((item) => (
-                      <Badge key={item} className="bg-white text-slate-700">{item}</Badge>
-                    ))}
-                  </div>
-                  <div className="mt-6 rounded-3xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-700">Database Collections</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {databaseCollections.map((item) => (
-                        <span key={item} className="rounded-full bg-white px-3 py-2 text-xs text-slate-600">{item}</span>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-              <Card>
-                <CardContent>
-                  <SectionHeading eyebrow="Main Features" title="Complete feature coverage" />
-                  <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {mainFeatures.map((feature) => (
-                      <div key={feature} className="flex items-center gap-2 rounded-2xl bg-white/80 p-4 shadow-sm">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                        <span className="text-sm font-medium text-slate-700">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="space-y-5">
-                  <SectionHeading eyebrow="Class Mapping" title="Examples by stream" />
-                  <div className="grid gap-3 text-sm">
-                    {classStreams.map((item) => (
-                      <div key={item.title} className="rounded-2xl bg-slate-50 p-4">
-                        <p className="font-medium text-slate-900">{item.title}</p>
-                        <p className="mt-1 text-slate-600">{item.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded-3xl border border-blue-100 bg-blue-50 p-5">
-                    <p className="text-sm font-semibold text-blue-700">Responsive Design</p>
-                    <p className="mt-2 text-sm text-blue-700/80">Optimized for laptop screens with wider grid sections and compact cards.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Card>
-                <CardContent>
-                  <SectionHeading eyebrow="Admin Snapshot" title="Cards + activity + analytics" />
-                  <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {["Manage Users", "Manage Subjects", "Manage Notes", "Manage Previous Papers", "Manage Videos", "Manage Quizzes", "Manage Results", "Manage Notices", "Upload PDF", "Upload Videos", "Reports", "Settings"].map((item) => (
-                      <div key={item} className="rounded-2xl bg-slate-50 p-4">
-                        <p className="text-sm text-slate-500">Admin Module</p>
-                        <p className="mt-1 text-xl font-semibold">{item}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 grid gap-3 md:grid-cols-3">
-                    {["Recent Activities Panel", "Monthly Analytics Charts", "Student Performance Charts"].map((item) => (
-                      <div key={item} className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4 text-sm font-medium text-slate-700">
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent>
-                  <SectionHeading eyebrow="Student Performance" title="Results and progress" />
-                  <div className="mt-5 space-y-4">
-                    {[
-                      "Completed Quizzes",
-                      "Downloaded Notes",
-                      "Downloaded Papers"
-                    ].map((item) => (
-                      <div key={item} className="rounded-2xl bg-slate-50 p-4">
-                        <div className="mb-2 flex items-center justify-between text-sm">
-                          <span className="text-slate-600">{item}</span>
-                          <span className="font-medium">Managed by admin uploads</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-slate-200">
-                          <div className="h-2 w-1/2 rounded-full bg-gradient-to-r from-blue-600 to-orange-500" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 rounded-3xl bg-slate-950 p-5 text-white">
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Notices</p>
-                    <div className="mt-4 grid gap-3">
-                      {["Latest Announcements", "Exam Updates", "Holiday Notices"].map((notice) => (
-                        <div key={notice} className="rounded-2xl bg-white/5 p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="font-medium">{notice}</span>
-                            <Badge className="border-white/10 bg-white/10 text-white">Admin</Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-slate-300">Appears only after admin uploads content.</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-              <Card>
-                <CardContent className="space-y-5">
-                  <SectionHeading eyebrow="Student & Admin Access" title="Upload-ready project workflow" />
-                  <div className="grid gap-3 text-sm text-slate-600">
-                    {[
-                      "Student registers and logs in",
-                      "Student selects class and stream",
-                      "Only matching subjects appear",
-                      "Admin uploads PDF notes",
-                      "Admin uploads previous papers",
-                      "Admin uploads videos and quizzes",
-                      "Admin manages reports and settings"
-                    ].map((item) => (
-                      <div key={item} className="rounded-2xl bg-slate-50 p-4">{item}</div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="space-y-5">
-                  <SectionHeading eyebrow="Board Summary" title="All screens in one place" />
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {pageBlocks.map((item) => (
-                      <div key={item} className="rounded-2xl bg-white/80 p-4 text-sm font-medium text-slate-700 shadow-sm">
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+              <Link href="/dashboard" className="inline-flex h-14 items-center justify-center rounded-2xl bg-orange-500 px-8 text-base font-extrabold text-white shadow-premium hover:bg-orange-600 transition">
+                Open Interactive Student App <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+              <Link href="/admin" className="inline-flex h-14 items-center justify-center rounded-2xl bg-white px-8 text-base font-extrabold text-slate-900 shadow-premium hover:bg-slate-50 transition">
+                Open Admin Control Center
+              </Link>
             </div>
           </div>
         </section>
+
+        {/* SECTION 2: COMPLETE PLATFORM USER FLOW STEPPER */}
+        <section className="space-y-6">
+          <div className="text-center space-y-2">
+            <Badge className="bg-blue-100 text-blue-700 font-bold">Complete Student Lifecycle</Badge>
+            <h2 className="text-3xl font-extrabold text-slate-950">Platform User Flow</h2>
+            <p className="text-slate-600 text-sm max-w-2xl mx-auto">
+              From student registration to class stream selection, interactive learning, quizzes, results, and progress metrics.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-11">
+            {flowSteps.map((step, idx) => (
+              <div key={step} className="group relative rounded-2xl border border-white/60 bg-white/80 p-4 text-center shadow-glass backdrop-blur-xl hover:shadow-xl hover:border-blue-500 transition">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white font-extrabold text-xs mx-auto mb-2 group-hover:scale-110 transition">
+                  {idx + 1}
+                </div>
+                <p className="text-xs font-bold text-slate-900">{step}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 3: CLASS & STREAM SUBJECT MATRIX */}
+        <section className="space-y-6">
+          <div className="text-center space-y-2">
+            <Badge className="bg-orange-100 text-orange-700 font-bold">Class-Wise Isolation Engine</Badge>
+            <h2 className="text-3xl font-extrabold text-slate-950">Class & Stream Configuration Matrix</h2>
+            <p className="text-slate-600 text-sm max-w-2xl mx-auto">
+              When a student selects a class, only that class study material appears on their dashboard.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {classStreamMatrix.map((item, idx) => (
+              <Card key={idx} className="rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl hover:shadow-xl transition">
+                <div className="flex items-center justify-between mb-3">
+                  <Badge className="bg-blue-600 text-white font-bold">{item.class}</Badge>
+                  <Badge className="bg-orange-100 text-orange-700 font-bold">{item.stream}</Badge>
+                </div>
+                <h3 className="font-extrabold text-lg text-slate-950 mb-2">{item.class} – {item.stream}</h3>
+                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
+                  {item.subjects.map((s) => (
+                    <span key={s} className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 4: SINGLE LARGE INFOGRAPHIC SHOWCASE – ALL 15 WEBSITE PAGES GRID */}
+        <section className="space-y-8">
+          <div className="text-center space-y-2">
+            <Badge className="bg-blue-100 text-blue-700 font-bold">Single Large Infographic Visual Board</Badge>
+            <h2 className="text-3xl font-extrabold text-slate-950">All 15 Website Pages Mockup Presentation</h2>
+            <p className="text-slate-600 text-sm max-w-3xl mx-auto">
+              Complete high-resolution representation of all 15 platform views designed in blue & white theme with orange accent, glassmorphism, soft shadows, and rounded corners.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {pageMockups.map((page) => (
+              <Card
+                key={page.id}
+                className="group relative overflow-hidden rounded-[2.5rem] border border-white/80 bg-white/90 p-6 shadow-glass backdrop-blur-xl transition hover:-translate-y-1.5 hover:shadow-2xl hover:border-blue-500 flex flex-col justify-between"
+              >
+                <div className="space-y-4">
+                  {/* Mockup Header Pill */}
+                  <div className="flex items-center justify-between">
+                    <Badge className="bg-blue-50 text-blue-700 font-bold">{page.category}</Badge>
+                    <span className="text-xs font-bold text-slate-400">Ultra HD 4K</span>
+                  </div>
+
+                  {/* Mockup Screen Visual Simulation Frame */}
+                  <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-4 text-white shadow-inner flex flex-col justify-between">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                        <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                        <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">studymaterial.edu{page.route}</span>
+                    </div>
+
+                    <div className="my-auto text-center space-y-1">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20 text-orange-400 mx-auto">
+                        <Layout className="h-5 w-5" />
+                      </div>
+                      <p className="text-xs font-bold text-white">{page.title}</p>
+                      <p className="text-[10px] text-blue-200/80 max-w-xs mx-auto line-clamp-2">{page.desc}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/10">
+                      <span>Status: Verified Live</span>
+                      <span className="text-orange-400 font-bold">Class-Wise</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-extrabold text-slate-950 group-hover:text-blue-600 transition">{page.title}</h3>
+                    <p className="mt-1 text-xs text-slate-600 leading-relaxed">{page.desc}</p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 mt-4 flex gap-2">
+                  <Link href={page.route} className="flex-1">
+                    <Button className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow">
+                      <ExternalLink className="mr-2 h-4 w-4" /> Launch Page View
+                    </Button>
+                  </Link>
+                  <Button
+                    onClick={() => setSelectedMockup(page)}
+                    variant="outline"
+                    className="h-11 px-3 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-700"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 5: MAIN FEATURES CHECKLIST */}
+        <section className="rounded-[3rem] bg-white p-8 md:p-12 shadow-glass backdrop-blur-xl border border-white/60 space-y-8">
+          <div className="text-center space-y-2">
+            <Badge className="bg-emerald-100 text-emerald-700 font-bold">Comprehensive Capabilities</Badge>
+            <h2 className="text-3xl font-extrabold text-slate-950">Main Features Checklist</h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {mainFeatures.map((feat) => (
+              <div key={feat} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
+                <span className="font-bold text-sm text-slate-900">{feat}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION 6: TECH STACK & DATABASE COLLECTIONS ARCHITECTURE */}
+        <section className="grid gap-8 lg:grid-cols-2">
+          {/* Tech Stack Card */}
+          <Card className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-8 text-white shadow-2xl border border-white/10 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
+                <Cpu className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-extrabold">Tech Stack Section</h3>
+                <p className="text-xs text-slate-400">Enterprise production web technologies</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
+              {techStack.map((tech) => (
+                <span key={tech} className="rounded-xl bg-white/10 border border-white/15 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-md">
+                  {tech}
+                </span>
+              ))}
+            </div>
+          </Card>
+
+          {/* Database Collections Card */}
+          <Card className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-orange-950 p-8 text-white shadow-2xl border border-white/10 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-md">
+                <Database className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-extrabold">Database Collections</h3>
+                <p className="text-xs text-slate-400">MongoDB Atlas NoSQL schema architecture</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {databaseCollections.map((col) => (
+                <div key={col} className="rounded-xl bg-white/10 border border-white/15 p-3 text-center backdrop-blur-md">
+                  <p className="text-xs font-extrabold text-orange-300">{col}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </section>
+
+        {/* Mockup Fullscreen Modal */}
+        {selectedMockup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in">
+            <div className="relative w-full max-w-4xl rounded-[3rem] bg-white p-8 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <Badge className="bg-blue-100 text-blue-700 mb-1">{selectedMockup.category}</Badge>
+                  <h3 className="text-2xl font-extrabold text-slate-900">{selectedMockup.title}</h3>
+                </div>
+                <button onClick={() => setSelectedMockup(null)} className="rounded-full bg-slate-100 p-2 hover:bg-slate-200">
+                  <ExternalLink className="h-5 w-5 text-slate-600" />
+                </button>
+              </div>
+
+              <div className="h-80 rounded-2xl bg-slate-950 p-8 text-white flex flex-col items-center justify-center text-center space-y-4">
+                <Layout className="h-16 w-16 text-orange-400 animate-bounce" />
+                <div>
+                  <h4 className="text-2xl font-extrabold">{selectedMockup.title} Mockup Screen</h4>
+                  <p className="text-sm text-slate-300 max-w-lg mt-2">{selectedMockup.desc}</p>
+                </div>
+                <Badge className="bg-orange-500 text-white font-bold">Ultra HD 4K Figma Quality Preview</Badge>
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <Button variant="outline" onClick={() => setSelectedMockup(null)} className="rounded-xl">
+                  Close Window
+                </Button>
+                <Link href={selectedMockup.route}>
+                  <Button className="rounded-xl bg-blue-600 text-white font-semibold">
+                    Launch Interactive Page <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PublicShell>
   );

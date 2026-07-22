@@ -1,100 +1,144 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SubjectCard } from "@/components/subject-card";
-import { apiUrl } from "@/lib/api";
-import { EmptyState } from "@/components/empty-state";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-
-type SubjectItem = {
-  name: string;
-  notes: number;
-  papers: number;
-  videos: number;
-  quizzes: number;
-};
+import { classSubjects } from "@/lib/platform-data";
+import { getRealNotes, getRealPapers, getRealVideos, getRealQuizzes, logDownload } from "@/lib/store";
+import { FileText, ScrollText, PlayCircle, NotebookTabs, Download, BookOpen, CheckCircle2 } from "lucide-react";
 
 export default function SubjectsPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
-  const [subjects, setSubjects] = useState<SubjectItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
+  const [notesList, setNotesList] = useState<any[]>([]);
+  const [papersList, setPapersList] = useState<any[]>([]);
+  const [videosList, setVideosList] = useState<any[]>([]);
+  const [quizzesList, setQuizzesList] = useState<any[]>([]);
 
   useEffect(() => {
-    setSession(getStoredSession());
+    const s = getStoredSession();
+    setSession(s);
+
+    setNotesList(getRealNotes());
+    setPapersList(getRealPapers());
+    setVideosList(getRealVideos());
+    setQuizzesList(getRealQuizzes());
   }, []);
 
-  useEffect(() => {
-    if (!session) return;
+  const grade = session?.grade ?? "11th";
+  const stream = session?.stream ?? "Medical";
+  const subjects = classSubjects[grade]?.[stream] || [];
 
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams();
-        if (session.grade) params.set("grade", session.grade);
-        if (session.stream) params.set("stream", session.stream);
-
-        const response = await fetch(apiUrl(`/api/subjects?${params.toString()}`), {
-          cache: "no-store",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("study-material-token") ?? ""}`
-          }
-        });
-        if (!response.ok) throw new Error("Backend unavailable");
-        const json = (await response.json()) as { data?: SubjectItem[] };
-        setSubjects(json.data ?? []);
-      } catch {
-        setError("No subjects uploaded yet");
-        setSubjects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void load();
-  }, [session]);
-
-  if (!session) {
-    return (
-      <EmptyState
-        title="Login required"
-        description="Please login as a student to see class-wise subjects and notes."
-        action="Go to Login"
-      />
-    );
-  }
-
-  const classLabel = `${session.grade ?? "Class"} - ${session.stream ?? "Stream"}`;
+  const handleDownload = (subjectName: string) => {
+    logDownload(`${subjectName} Class ${grade} Study Notes PDF`, subjectName, "PDF Note", "3.5 MB");
+    setDownloadMsg(`Downloaded ${subjectName} study notes PDF! Saved in Downloads history.`);
+    setTimeout(() => setDownloadMsg(null), 3500);
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-[2rem] border border-white/60 bg-white/75 p-6 shadow-glass backdrop-blur-xl">
-        <p className="text-sm font-medium text-blue-600">Selected Class</p>
-        <h2 className="mt-2 text-2xl font-semibold">{classLabel}</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Only this student's uploaded class material appears here.
-        </p>
+    <div className="space-y-6 text-slate-900">
+      {/* Header Banner */}
+      <div className="rounded-[2.5rem] bg-gradient-to-br from-blue-700 via-blue-600 to-slate-900 p-6 md:p-8 text-white shadow-premium">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <Badge className="bg-white/20 text-white border-white/30 mb-1.5 text-xs font-bold">Class-Wise Subjects</Badge>
+            <h2 className="text-2xl md:text-3xl font-extrabold">Class {grade} – {stream} Stream Subjects</h2>
+            <p className="mt-1 text-xs md:text-sm text-blue-100/90 max-w-2xl">
+              Subject modules loaded for your active class and stream. Below metrics reflect real uploaded materials and quizzes.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/10 p-4 text-center backdrop-blur-md">
+            <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">Active Subjects</p>
+            <p className="text-2xl md:text-3xl font-extrabold text-white mt-1">{subjects.length}</p>
+          </div>
+        </div>
       </div>
 
-      {loading ? (
-        <EmptyState
-          title="Loading subjects"
-          description="Fetching class-wise content from backend..."
-        />
-      ) : subjects.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {subjects.map((subject) => (
-            <SubjectCard key={subject.name} {...subject} />
-          ))}
+      {downloadMsg && (
+        <div className="flex items-center gap-3 rounded-2xl bg-emerald-500 p-4 text-white font-bold text-xs shadow-lg animate-in fade-in">
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
+          <p>{downloadMsg}</p>
         </div>
-      ) : (
-        <EmptyState
-          title={error ?? "No subjects uploaded yet"}
-          description="Admin must upload subjects for this exact class and stream before they appear here."
-          action="Open Admin"
-        />
       )}
+
+      {/* Subject Cards Grid */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
+        {subjects.map((sub) => {
+          // Calculate REAL counts per subject
+          const realSubjectNotes = notesList.filter(n => n.grade === grade && (grade === "10th" || n.stream === stream) && n.subject === sub.name).length;
+          const realSubjectPapers = papersList.filter(p => p.grade === grade && (grade === "10th" || p.stream === stream) && p.subject === sub.name).length;
+          const realSubjectVideos = videosList.filter(v => v.grade === grade && (grade === "10th" || v.stream === stream) && v.subject === sub.name).length;
+          const realSubjectQuizzes = quizzesList.filter(q => q.grade === grade && (grade === "10th" || q.stream === stream) && q.subject === sub.name).length;
+
+          return (
+            <Card key={sub.name} className="group overflow-hidden rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl transition hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-orange-500 text-white shadow-md">
+                    <BookOpen className="h-6 w-6" />
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-700 font-bold text-xs">{grade}</Badge>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-extrabold text-slate-950 group-hover:text-blue-600 transition">{sub.name}</h3>
+                  <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">{sub.description}</p>
+                </div>
+
+                {/* Real Counts Grid */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                    <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Total Notes</p>
+                      <p className="text-xs font-extrabold text-slate-900">{realSubjectNotes} PDFs</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                    <ScrollText className="h-4 w-4 text-orange-500 shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Prev Papers</p>
+                      <p className="text-xs font-extrabold text-slate-900">{realSubjectPapers} Papers</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                    <PlayCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Videos</p>
+                      <p className="text-xs font-extrabold text-slate-900">{realSubjectVideos} Vids</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5">
+                    <NotebookTabs className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">MCQ Quiz</p>
+                      <p className="text-xs font-extrabold text-slate-900">{realSubjectQuizzes} Tests</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 mt-3 border-t border-slate-100 flex gap-2">
+                <Button
+                  onClick={() => handleDownload(sub.name)}
+                  className="flex-1 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow"
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download Notes
+                </Button>
+                <Link href="/quizzes" className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 hover:bg-orange-600 px-3 text-xs font-bold text-white shadow">
+                  Quiz
+                </Link>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
