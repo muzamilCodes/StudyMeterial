@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getDownloadedFiles, type DownloadRecord, logDownload, deleteDownloadRecord } from "@/lib/store";
-import { Download, FileText, ScrollText, CheckCircle2, Clock, Trash2, Eye } from "lucide-react";
+import { Download, FileText, ScrollText, CheckCircle2, Clock, Trash2, Eye, Video } from "lucide-react";
  
 export default function DownloadsPage() {
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
@@ -63,12 +63,30 @@ export default function DownloadsPage() {
           <Card key={item.id} className="rounded-[2rem] border-white/60 bg-white/80 p-5 shadow-glass backdrop-blur-xl hover:shadow-lg transition">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-md ${item.category === "PDF Note" ? "bg-blue-600" : "bg-orange-500"}`}>
-                  {item.category === "PDF Note" ? <FileText className="h-6 w-6" /> : <ScrollText className="h-6 w-6" />}
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-md ${
+                  item.category === "PDF Note" 
+                    ? "bg-blue-600" 
+                    : item.category === "Video Lecture" 
+                    ? "bg-rose-600" 
+                    : "bg-orange-500"
+                }`}>
+                  {item.category === "PDF Note" ? (
+                    <FileText className="h-6 w-6" />
+                  ) : item.category === "Video Lecture" ? (
+                    <Video className="h-6 w-6" />
+                  ) : (
+                    <ScrollText className="h-6 w-6" />
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge className={item.category === "PDF Note" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}>
+                    <Badge className={
+                      item.category === "PDF Note" 
+                        ? "bg-blue-100 text-blue-700" 
+                        : item.category === "Video Lecture" 
+                        ? "bg-rose-100 text-rose-700" 
+                        : "bg-orange-100 text-orange-700"
+                    }>
                       {item.category}
                     </Badge>
                     <Badge className="border border-slate-200 bg-slate-100 text-slate-700">{item.subject}</Badge>

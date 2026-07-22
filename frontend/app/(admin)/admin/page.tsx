@@ -21,6 +21,7 @@ import {
   createBackendVideo,
   deleteBackendVideo,
   uploadBackendFile,
+  createBackendQuiz,
   type RealNoteItem,
   type RealPaperItem,
   type RealVideoItem,
@@ -75,11 +76,99 @@ export default function AdminPage() {
   const [vidInstructor, setVidInstructor] = useState("Dr. Ananya Sharma");
   const [vidDuration, setVidDuration] = useState("25:00");
 
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [paperFile, setPaperFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoThumbnailFile, setVideoThumbnailFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [paperFile, setPaperFile] = useState<File | null>(null);
+
+  // Form states for Create Quiz
+  const [quizGrade, setQuizGrade] = useState<Grade>("11th");
+  const [quizStream, setQuizStream] = useState<Stream>("Medical");
+  const [quizSubject, setQuizSubject] = useState("Biology");
+  const [quizTitle, setQuizTitle] = useState("");
+  const [quizTopic, setQuizTopic] = useState("");
+  const [quizDuration, setQuizDuration] = useState(15);
+  const [quizQuestions, setQuizQuestions] = useState([
+    { question: "", options: ["", "", "", ""], correctIndex: 0 }
+  ]);
+
+  const handleAddQuestionField = () => {
+    setQuizQuestions([...quizQuestions, { question: "", options: ["", "", "", ""], correctIndex: 0 }]);
+  };
+
+  const handleRemoveQuestionField = (idx: number) => {
+    if (quizQuestions.length === 1) return;
+    setQuizQuestions(quizQuestions.filter((_, i) => i !== idx));
+  };
+
+  const handleQuestionTextChange = (idx: number, text: string) => {
+    const updated = [...quizQuestions];
+    updated[idx].question = text;
+    setQuizQuestions(updated);
+  };
+
+  const handleOptionTextChange = (qIdx: number, optIdx: number, text: string) => {
+    const updated = [...quizQuestions];
+    updated[qIdx].options[optIdx] = text;
+    setQuizQuestions(updated);
+  };
+
+  const handleCorrectAnswerChange = (qIdx: number, val: string) => {
+    const updated = [...quizQuestions];
+    updated[qIdx].correctIndex = parseInt(val, 10);
+    setQuizQuestions(updated);
+  };
+
+  const handleQuizSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quizTitle || !quizTopic) {
+      alert("Please fill in the Quiz Title and Quiz Topic");
+      return;
+    }
+
+    // Validation: make sure all questions have text and options
+    for (let i = 0; i < quizQuestions.length; i++) {
+      const q = quizQuestions[i];
+      if (!q.question.trim()) {
+        alert(`Please fill in the text for Question ${i + 1}`);
+        return;
+      }
+      for (let j = 0; j < q.options.length; j++) {
+        if (!q.options[j].trim()) {
+          alert(`Please fill in Option ${j + 1} for Question ${i + 1}`);
+          return;
+        }
+      }
+    }
+
+    setUploading(true);
+    try {
+      const ok = await createBackendQuiz({
+        grade: quizGrade,
+        stream: quizStream,
+        subject: quizSubject,
+        title: quizTitle,
+        topic: quizTopic,
+        durationMinutes: Number(quizDuration),
+        questions: quizQuestions
+      });
+
+      if (ok) {
+        setUploadSuccess("🎉 MCQ Quiz created successfully on the database!");
+        setQuizTitle("");
+        setQuizTopic("");
+        setQuizQuestions([{ question: "", options: ["", "", "", ""], correctIndex: 0 }]);
+      } else {
+        setUploadSuccess("❌ Failed to create Quiz.");
+      }
+    } catch (err) {
+      setUploadSuccess("❌ Error creating Quiz.");
+    } finally {
+      setUploading(false);
+      setTimeout(() => setUploadSuccess(null), 4000);
+    }
+  };
 
   // Live arrays
   const [realNotes, setRealNotes] = useState<RealNoteItem[]>([]);
@@ -338,7 +427,7 @@ export default function AdminPage() {
     { label: "Total Downloads", value: String(adminStats.totalDownloads), icon: Download, color: "from-rose-600 to-pink-500" }
   ];
 
-  const tabs = ["Upload PDF", "Upload Previous Paper", "Upload Video", "Registered Users", "Manage Notes", "Manage Papers", "Manage Videos"];
+  const tabs = ["Upload PDF", "Upload Previous Paper", "Upload Video", "Create Quiz", "Registered Users", "Manage Notes", "Manage Papers", "Manage Videos"];
 
   return (
     <div className="space-y-6">
@@ -695,6 +784,194 @@ export default function AdminPage() {
 
             <Button type="submit" disabled={uploading} className="w-full h-12 rounded-2xl bg-rose-600 hover:bg-rose-700 font-bold text-white text-xs shadow disabled:opacity-50">
               <Video className="mr-2 h-4 w-4" /> {uploading ? "Uploading video lecture..." : "Upload Video Lecture"}
+            </Button>
+          </form>
+        )}
+
+        {activeTab === "Create Quiz" && (
+          <form onSubmit={handleQuizSubmit} className="space-y-6">
+            <div className="border-b pb-3 mb-2 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Create MCQ Quiz Test</h3>
+                <p className="text-xs text-slate-500">Create an interactive quiz for students of a specific class and subject.</p>
+              </div>
+              <Badge className="bg-indigo-600 text-white font-bold text-xs">{quizQuestions.length} Questions</Badge>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Target Class</Label>
+                <select
+                  value={quizGrade}
+                  onChange={(e) => setQuizGrade(e.target.value as Grade)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="10th">10th Class</option>
+                  <option value="11th">11th Class</option>
+                  <option value="12th">12th Class</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Target Stream</Label>
+                <select
+                  value={quizStream}
+                  disabled={quizGrade === "10th"}
+                  onChange={(e) => setQuizStream(e.target.value as Stream)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900 disabled:opacity-50"
+                >
+                  <option value="Medical">Medical</option>
+                  <option value="Non-Medical">Non-Medical</option>
+                  <option value="Commerce">Commerce</option>
+                  <option value="Arts">Arts</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Subject</Label>
+                <select
+                  value={quizSubject}
+                  onChange={(e) => setQuizSubject(e.target.value)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                >
+                  <option value="Biology">Biology</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Chemistry">Chemistry</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Accountancy">Accountancy</option>
+                  <option value="Business Studies">Business Studies</option>
+                  <option value="Economics">Economics</option>
+                  <option value="History">History</option>
+                  <option value="Political Science">Political Science</option>
+                  <option value="Sociology">Sociology</option>
+                  <option value="Geography">Geography</option>
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Science">Science</option>
+                  <option value="Social Science">Social Science</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2 md:col-span-2">
+                <Label className="font-bold text-slate-800 text-xs">Quiz Title / Chapter Name</Label>
+                <Input
+                  value={quizTitle}
+                  onChange={(e) => setQuizTitle(e.target.value)}
+                  placeholder="e.g. Chapter 3: Trigonometric Functions Mini Mock Test"
+                  required
+                  className="h-11 rounded-xl text-xs"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Topic Focus</Label>
+                <Input
+                  value={quizTopic}
+                  onChange={(e) => setQuizTopic(e.target.value)}
+                  placeholder="e.g. Trigonometric Ratios"
+                  required
+                  className="h-11 rounded-xl text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2">
+                <Label className="font-bold text-slate-800 text-xs">Duration (Minutes)</Label>
+                <Input
+                  type="number"
+                  value={quizDuration}
+                  onChange={(e) => setQuizDuration(Number(e.target.value))}
+                  placeholder="15"
+                  required
+                  className="h-11 rounded-xl text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Questions Section */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center border-t pt-4">
+                <h4 className="text-sm font-bold text-slate-900">Questions List</h4>
+                <Button
+                  type="button"
+                  onClick={handleAddQuestionField}
+                  variant="outline"
+                  className="h-9 rounded-xl border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-xs font-semibold"
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Question
+                </Button>
+              </div>
+
+              {quizQuestions.map((q, qIdx) => (
+                <div key={qIdx} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4 relative">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-extrabold text-indigo-600">Question {qIdx + 1}</span>
+                    {quizQuestions.length > 1 && (
+                      <Button
+                        type="button"
+                        onClick={() => handleRemoveQuestionField(qIdx)}
+                        variant="outline"
+                        className="h-8 rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 text-[10px] px-2.5 font-bold"
+                      >
+                        <Trash2 className="mr-1 h-3 w-3" /> Remove
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label className="font-semibold text-slate-700 text-xs">Question Text</Label>
+                    <Input
+                      value={q.question}
+                      onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
+                      placeholder={`Enter question ${qIdx + 1} statement...`}
+                      required
+                      className="h-10 rounded-xl text-xs bg-white"
+                    />
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {q.options.map((opt, optIdx) => (
+                      <div key={optIdx} className="grid gap-1.5">
+                        <Label className="text-slate-600 text-[11px] font-medium">Option {optIdx + 1}</Label>
+                        <Input
+                          value={opt}
+                          onChange={(e) => handleOptionTextChange(qIdx, optIdx, e.target.value)}
+                          placeholder={`Option ${optIdx + 1} text...`}
+                          required
+                          className="h-10 rounded-xl text-xs bg-white"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <div className="grid gap-1.5">
+                      <Label className="font-semibold text-slate-700 text-xs">Select Correct Answer Option</Label>
+                      <select
+                        value={q.correctIndex}
+                        onChange={(e) => handleCorrectAnswerChange(qIdx, e.target.value)}
+                        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                      >
+                        <option value={0}>Option 1</option>
+                        <option value={1}>Option 2</option>
+                        <option value={2}>Option 3</option>
+                        <option value={3}>Option 4</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={uploading}
+              className="w-full h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 font-bold text-white text-xs shadow disabled:opacity-50 mt-4"
+            >
+              <NotebookTabs className="mr-2 h-4 w-4" /> {uploading ? "Saving quiz test..." : "Publish Quiz Test Arena"}
             </Button>
           </form>
         )}

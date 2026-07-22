@@ -5,13 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getStoredSession, type StudentSession } from "@/lib/session";
-import { fetchBackendVideos, type RealVideoItem } from "@/lib/store";
-import { PlayCircle, Clock, User, X, Video } from "lucide-react";
+import { fetchBackendVideos, logDownload, type RealVideoItem } from "@/lib/store";
+import { PlayCircle, Clock, User, X, Video, Download, CheckCircle2 } from "lucide-react";
 
 export default function VideosPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
   const [activeVideo, setActiveVideo] = useState<RealVideoItem | null>(null);
   const [videosList, setVideosList] = useState<RealVideoItem[]>([]);
+  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getStoredSession();
@@ -27,6 +28,16 @@ export default function VideosPage() {
 
   const grade = session?.grade ?? "11th";
   const stream = session?.stream ?? "Medical";
+
+  const handleDownloadVideo = (vid: RealVideoItem) => {
+    logDownload(vid.title, vid.subject, "Video Lecture", "12.4 MB", vid.videoUrl);
+    setDownloadMsg(`Downloaded "${vid.title}" successfully. Recorded in Saved History!`);
+    setTimeout(() => setDownloadMsg(null), 3500);
+
+    if (vid.videoUrl) {
+      window.open(vid.videoUrl, "_blank");
+    }
+  };
 
   return (
     <div className="space-y-6 text-slate-900">
@@ -46,6 +57,13 @@ export default function VideosPage() {
           </div>
         </div>
       </div>
+
+      {downloadMsg && (
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 flex items-center gap-3 animate-in slide-in-from-top-4">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+          <p>{downloadMsg}</p>
+        </div>
+      )}
 
       {/* Videos Grid */}
       {videosList.length === 0 ? (
@@ -82,12 +100,19 @@ export default function VideosPage() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 mt-3">
+              <div className="flex gap-3 pt-4 border-t border-slate-100 mt-3">
                 <Button
                   onClick={() => setActiveVideo(vid)}
-                  className="w-full h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow"
+                  className="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow"
                 >
-                  <PlayCircle className="mr-1.5 h-3.5 w-3.5" /> Watch Lecture
+                  <PlayCircle className="mr-1.5 h-3.5 w-3.5" /> Watch
+                </Button>
+                <Button
+                  onClick={() => handleDownloadVideo(vid)}
+                  variant="outline"
+                  className="flex-1 h-10 rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-bold"
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5 text-rose-600" /> Download
                 </Button>
               </div>
             </Card>

@@ -52,7 +52,7 @@ export type DownloadRecord = {
   id: string;
   title: string;
   subject: string;
-  category: "PDF Note" | "Previous Paper";
+  category: "PDF Note" | "Previous Paper" | "Video Lecture";
   downloadedAt: string;
   fileSize: string;
   fileUrl?: string;
@@ -296,29 +296,81 @@ export async function fetchBackendQuizzes(grade?: Grade, stream?: Stream, subjec
     if (!res.ok) throw new Error("Failed to load quizzes from backend");
     const json = await res.json();
     
-    return (json.data || []).map((item: any) => ({
-      id: item._id || item.id,
-      subject: item.subject,
-      title: item.title,
-      grade: item.grade,
-      stream: item.stream,
-      durationMinutes: item.durationMinutes || 15,
-      questions: item.questions || [],
-      totalQuestions: (item.questions || []).length
-    }));
+    return (json.data || []).map((item: any) => {
+      const mappedQuestions = (item.questions || []).map((q: any, qIdx: number) => {
+        let correctIndex = typeof q.correctIndex === "number" ? q.correctIndex : 0;
+        if (typeof q.answer === "string" && Array.isArray(q.options)) {
+          const idx = q.options.indexOf(q.answer);
+          if (idx !== -1) {
+            correctIndex = idx;
+          }
+        }
+        return {
+          id: qIdx + 1,
+          question: q.question,
+          options: q.options || [],
+          correctIndex: correctIndex,
+          explanation: q.explanation || `The correct option is option ${correctIndex + 1}.`
+        };
+      });
+
+      return {
+        id: item._id || item.id,
+        subject: item.subject,
+        topic: item.topic || item.title || "Subject Test",
+        title: item.title,
+        grade: item.grade,
+        stream: item.stream,
+        durationMinutes: item.durationMinutes || 15,
+        questions: mappedQuestions,
+        totalQuestions: mappedQuestions.length
+      };
+    });
   } catch (error) {
     console.error("fetchBackendQuizzes error:", error);
     return [];
   }
 }
 
-export async function createBackendQuiz(quiz: Omit<QuizItem, "id">): Promise<boolean> {
+export async function createBackendQuiz(quiz: {
+  subject: string;
+  topic?: string;
+  title: string;
+  grade: Grade;
+  stream: Stream;
+  durationMinutes: number;
+  questions: Array<{
+    question: string;
+    options: string[];
+    correctIndex: number;
+  }>;
+}): Promise<boolean> {
   try {
+    const backendQuestions = quiz.questions.map((q) => ({
+      question: q.question,
+      options: q.options,
+      answer: q.options[q.correctIndex] || q.options[0]
+    }));
+
+    const payload = {
+      subject: quiz.subject,
+      topic: quiz.topic || quiz.title,
+      title: quiz.title,
+      grade: quiz.grade,
+      stream: quiz.stream,
+      durationMinutes: quiz.durationMinutes,
+      questions: backendQuestions
+    };
+
     const res = await fetch(apiUrl("/api/content/quizzes"), {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify(quiz)
+      body: JSON.stringify(payload)
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("createBackendQuiz failed:", res.status, err);
+    }
     return res.ok;
   } catch (error) {
     console.error("createBackendQuiz error:", error);
@@ -379,7 +431,7 @@ export function getDownloadedFiles(): DownloadRecord[] {
   }
 }
 
-export function logDownload(title: string, subject: string, category: "PDF Note" | "Previous Paper", fileSize: string, fileUrl?: string): DownloadRecord[] {
+export function logDownload(title: string, subject: string, category: "PDF Note" | "Previous Paper" | "Video Lecture", fileSize: string, fileUrl?: string): DownloadRecord[] {
   if (typeof window === "undefined") return [];
   const current = getDownloadedFiles();
   const newRecord: DownloadRecord = {
