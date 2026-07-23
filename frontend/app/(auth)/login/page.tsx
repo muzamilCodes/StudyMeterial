@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { apiUrl } from "@/lib/api";
-import { saveSession, type StudentSession } from "@/lib/session";
+import { saveSession, isAccountDeleted, type StudentSession } from "@/lib/session";
 import { GraduationCap, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
@@ -25,8 +25,15 @@ export default function LoginPage() {
     setSuccessMsg(null);
 
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "");
+    const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+
+    // Check if account was deleted locally
+    if (isAccountDeleted(email)) {
+      setErrorMsg("🚫 This account has been permanently deleted. Access is revoked and you cannot log into this account again. Please register a new account.");
+      setLoading(false);
+      return;
+    }
 
     try {
       // Send REAL HTTP POST request to Express & MongoDB backend
@@ -59,7 +66,7 @@ export default function LoginPage() {
         isAdmin: isAdmin,
         grade: data.user?.grade ?? "11th",
         stream: data.user?.stream ?? "Medical",
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        avatar: data.user?.avatar ?? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
         bio: isAdmin ? "System Administrator" : `Student - Class ${data.user?.grade ?? "11th"} (${data.user?.stream ?? "Medical"})`
       };
 

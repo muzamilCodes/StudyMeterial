@@ -22,11 +22,12 @@ import {
   X,
   User,
   Home,
-  LogOut
+  LogOut,
+  UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getStoredSession, saveSession, type StudentSession } from "@/lib/session";
+import { getStoredSession, saveSession, clearSession, type StudentSession } from "@/lib/session";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
@@ -55,14 +56,23 @@ export function SiteShell({
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<StudentSession | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showClassSelector, setShowClassSelector] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const s = getStoredSession();
-    setSession(s);
+    if (!s) {
+      // User is NOT registered or logged in! Redirect immediately to register
+      setIsCheckingAuth(false);
+      router.replace("/register?access_denied=true");
+      return;
+    }
 
-    if (pathname === "/admin" && !s?.isAdmin && s?.role !== "admin") {
+    setSession(s);
+    setIsCheckingAuth(false);
+
+    if (pathname === "/admin" && !s.isAdmin && s.role !== "admin") {
       router.replace("/dashboard");
     }
   }, [pathname, router]);
@@ -77,7 +87,42 @@ export function SiteShell({
     window.location.reload();
   };
 
+  const handleLogout = () => {
+    clearSession();
+    router.push("/register");
+  };
+
   const isAdmin = session?.isAdmin === true || session?.role === "admin";
+
+  // ROUTE GUARD: If unauthenticated, show strict registration requirement screen
+  if (isCheckingAuth || !session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-white text-center">
+        <div className="space-y-4 max-w-sm rounded-[2.5rem] bg-slate-900 border border-white/10 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 animate-pulse text-white shadow-lg">
+            <Lock className="h-8 w-8" />
+          </div>
+          <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs font-extrabold uppercase">Access Blocked</Badge>
+          <h3 className="text-2xl font-black text-white">Registration Required</h3>
+          <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            You are not registered or logged in. You cannot view the student dashboard or profile until you create an account.
+          </p>
+          <div className="pt-2 space-y-2">
+            <Link href="/register">
+              <Button className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2">
+                <UserPlus className="h-4 w-4" /> Go to Register Page
+              </Button>
+            </Link>
+            <Link href="/login">
+              <Button variant="outline" className="w-full h-12 rounded-2xl border-white/20 text-slate-200 hover:bg-white/10 font-bold text-xs">
+                Already Have Account? Login
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-shell grid min-h-screen gap-4 p-2.5 sm:p-4 md:grid-cols-[280px_1fr] md:p-6 text-slate-900 pb-20 md:pb-6 overflow-x-hidden w-full max-w-full">
@@ -99,6 +144,12 @@ export function SiteShell({
             className="rounded-lg bg-white/10 px-2 py-1 text-[11px] font-bold text-blue-200 border border-white/15"
           >
             {session?.grade ?? "11th"} ▾
+          </button>
+          <button
+            onClick={handleLogout}
+            className="rounded-lg bg-rose-500/20 p-1.5 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1"
+          >
+            <LogOut className="h-4 w-4" />
           </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -136,10 +187,19 @@ export function SiteShell({
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-40 bg-slate-950/90 backdrop-blur-md pt-16 p-4 overflow-y-auto">
           <div className="space-y-2 pb-8">
-            <div className="rounded-2xl bg-gradient-to-br from-blue-700 to-slate-900 p-4 text-white mb-3 shadow-lg border border-white/10">
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Active Student</p>
-              <p className="text-base font-extrabold">{session?.name ?? "Muzamil Ahmad"}</p>
-              <p className="text-xs text-blue-100 font-semibold">{session?.grade} ({session?.stream})</p>
+            <div className="rounded-2xl bg-gradient-to-br from-blue-700 to-slate-900 p-4 text-white mb-3 shadow-lg border border-white/10 flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl overflow-hidden border border-white/30 shrink-0 bg-blue-600 flex items-center justify-center font-bold">
+                {session.avatar ? (
+                  <img src={session.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                ) : (
+                  <span>{session.name ? session.name[0] : "M"}</span>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Active Student</p>
+                <p className="text-base font-extrabold">{session.name ?? "Student"}</p>
+                <p className="text-xs text-blue-100 font-semibold">{session.grade} ({session.stream})</p>
+              </div>
             </div>
 
             <div className="grid gap-1">
@@ -160,67 +220,88 @@ export function SiteShell({
                   </Link>
                 );
               })}
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-bold bg-rose-600/30 text-rose-300 border border-rose-500/30 hover:bg-rose-600 hover:text-white transition mt-2"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Logout Session</span>
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Desktop Sidebar */}
-      <aside className="glass sticky top-4 hidden h-[calc(100vh-2rem)] flex-col overflow-y-auto rounded-[2rem] p-5 md:flex border border-white/60 shadow-glass backdrop-blur-xl">
-        <div className="mb-5 flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-orange-500 text-white shadow-premium">
-              <GraduationCap className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-extrabold tracking-[0.2em] text-blue-700">STUDY MATERIAL</p>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">PLATFORM</p>
-            </div>
-          </Link>
-        </div>
-
-        {/* Selected Class Card */}
-        <div className="relative mb-5 rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-slate-900 p-4 text-white shadow-premium">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-blue-200">Active Class</p>
-            <button
-              onClick={() => setShowClassSelector(!showClassSelector)}
-              className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-[11px] font-bold hover:bg-white/20 transition"
-            >
-              <span>Change</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
+      <aside className="glass sticky top-4 hidden h-[calc(100vh-2rem)] flex-col justify-between overflow-y-auto rounded-[2rem] p-5 md:flex border border-white/60 shadow-glass backdrop-blur-xl">
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-orange-500 text-white shadow-premium">
+                <GraduationCap className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-extrabold tracking-[0.2em] text-blue-700">STUDY MATERIAL</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">PLATFORM</p>
+              </div>
+            </Link>
           </div>
-          <h2 className="mt-1 text-base font-extrabold text-white">
-            {session?.grade ?? "11th"} - {session?.stream ?? "Medical"}
-          </h2>
-          <p className="mt-0.5 text-[11px] text-blue-100/80">Filtered content loaded.</p>
+
+          {/* Selected Class Card */}
+          <div className="relative rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-slate-900 p-4 text-white shadow-premium">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-blue-200">Active Class</p>
+              <button
+                onClick={() => setShowClassSelector(!showClassSelector)}
+                className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-[11px] font-bold hover:bg-white/20 transition"
+              >
+                <span>Change</span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </div>
+            <h2 className="mt-1 text-base font-extrabold text-white">
+              {session.grade ?? "11th"} - {session.stream ?? "Medical"}
+            </h2>
+            <p className="mt-0.5 text-[11px] text-blue-100/80">Filtered content loaded.</p>
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="grid gap-1">
+            {nav.map((item) => {
+              const isActive = pathname === item.href;
+              if (item.adminOnly && !isAdmin) {
+                return null;
+              }
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-xs font-bold transition ${
+                    isActive
+                      ? "bg-blue-600 text-white shadow-premium"
+                      : "text-slate-700 hover:bg-white/80 hover:text-blue-600"
+                  }`}
+                >
+                  <item.icon className={`h-4 w-4 ${isActive ? "text-white" : "text-blue-600"}`} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="grid gap-1">
-          {nav.map((item) => {
-            const isActive = pathname === item.href;
-            if (item.adminOnly && !isAdmin) {
-              return null;
-            }
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-xs font-bold transition ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-premium"
-                    : "text-slate-700 hover:bg-white/80 hover:text-blue-600"
-                }`}
-              >
-                <item.icon className={`h-4 w-4 ${isActive ? "text-white" : "text-blue-600"}`} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Sidebar Footer Logout Button */}
+        <div className="pt-4 border-t border-slate-200/60 mt-4">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50/50 px-4 py-3 text-xs font-bold text-rose-600 transition hover:bg-rose-600 hover:text-white hover:border-rose-600 shadow-sm"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Logout Account</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Content Viewport */}
@@ -230,8 +311,8 @@ export function SiteShell({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <Badge className="bg-blue-100 text-blue-700 font-bold border-blue-200 text-[10px] sm:text-xs">Class {session?.grade ?? "11th"}</Badge>
-                <Badge className="bg-orange-100 text-orange-700 font-bold border-orange-200 text-[10px] sm:text-xs">{session?.stream ?? "Medical"} Stream</Badge>
+                <Badge className="bg-blue-100 text-blue-700 font-bold border-blue-200 text-[10px] sm:text-xs">Class {session.grade ?? "11th"}</Badge>
+                <Badge className="bg-orange-100 text-orange-700 font-bold border-orange-200 text-[10px] sm:text-xs">{session.stream ?? "Medical"} Stream</Badge>
                 {isAdmin ? (
                   <Badge className="bg-emerald-600 text-white font-bold text-[10px] sm:text-xs">Admin Mode</Badge>
                 ) : (
@@ -245,19 +326,27 @@ export function SiteShell({
             <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/edit-profile">
                 <div className="flex items-center gap-2 sm:gap-3 rounded-2xl border border-slate-200 bg-white/80 p-1.5 sm:p-2 pr-3 sm:pr-4 shadow-sm hover:shadow transition">
-                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-blue-600 text-white font-extrabold text-xs sm:text-sm">
-                    {session?.name ? session.name[0] : "M"}
+                  <div className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-xl overflow-hidden bg-blue-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center shrink-0">
+                    {session.avatar ? (
+                      <img src={session.avatar} alt="Profile Picture" className="h-full w-full object-cover" />
+                    ) : (
+                      <span>{session.name ? session.name[0] : "M"}</span>
+                    )}
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-bold text-slate-900">{session?.name ?? "Muzamil Ahmad"}</p>
-                    <p className="text-[10px] font-semibold text-slate-500 hidden sm:block">{session?.email ?? "student@studymaterial.com"}</p>
+                    <p className="text-xs font-bold text-slate-900">{session.name ?? "Student"}</p>
+                    <p className="text-[10px] font-semibold text-slate-500 hidden sm:block">{session.email}</p>
                   </div>
                 </div>
               </Link>
 
-              <Link href="/" className="inline-flex h-9 sm:h-10 items-center justify-center rounded-2xl bg-orange-500 px-3 sm:px-4 text-xs font-bold text-white shadow-premium hover:bg-orange-600 transition">
-                Infographic
-              </Link>
+              <button
+                onClick={handleLogout}
+                className="inline-flex h-9 sm:h-10 items-center justify-center gap-1.5 rounded-2xl bg-rose-500 hover:bg-rose-600 px-3 sm:px-4 text-xs font-bold text-white shadow-md transition"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
             </div>
           </div>
         </header>

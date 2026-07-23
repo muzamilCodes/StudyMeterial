@@ -1,357 +1,502 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import {
-  GraduationCap,
+import { useState, useEffect } from "react";
+import { 
+  GraduationCap, 
+  ArrowRight, 
+  Sparkles, 
+  BookOpen, 
+  NotebookTabs, 
+  Download, 
+  Video, 
+  Award, 
   CheckCircle2,
-  ArrowRight,
-  Sparkles,
-  Layers,
-  Database,
-  Cpu,
-  Layout,
-  ExternalLink,
-  PlayCircle,
-  FileText,
-  ScrollText,
-  NotebookTabs,
-  Download,
-  BarChart3,
   Users,
   ShieldCheck,
-  Search,
-  BookOpen,
-  Eye,
-  Maximize2
+  Flame,
+  Clock,
+  Trophy,
+  Check,
+  X,
+  Compass,
+  Star,
+  Search
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PublicShell } from "@/components/public-shell";
-import {
-  databaseCollections,
-  flowSteps,
-  mainFeatures,
-  techStack,
-  gradeConfig
-} from "@/lib/platform-data";
+import { gradeConfig, classSubjects, Grade, Stream } from "@/lib/platform-data";
 
-const pageMockups = [
-  { id: 1, title: "1. Login / Registration", category: "Authentication", route: "/login", desc: "Student Login, Registration, Class & Stream selection, Email/Password, Remember Me, Forgot Password." },
-  { id: 2, title: "2. Student Dashboard", category: "Core Platform", route: "/dashboard", desc: "Welcome Student, Search Bar, Notification Bell, Profile Avatar, 9 Learning Cards, Stats: 24 Notes, 15 Papers, 8 Quizzes, 85% Score." },
-  { id: 3, title: "3. Subjects Page", category: "Class-Wise", route: "/subjects", desc: "Displays subject cards according to selected class and stream with Total Notes, Papers, Videos, Quizzes, Download Button." },
-  { id: 4, title: "4. Notes Page", category: "Study Material", route: "/notes", desc: "Subject Wise PDF Notes, Upload Date, File Size, PDF Viewer Preview Modal, Download Button." },
-  { id: 5, title: "5. Previous Papers Page", category: "Board Exams", route: "/previous-papers", desc: "Year Wise Papers (2025 - 2021) with exam terms and direct PDF Download button." },
-  { id: 6, title: "6. Quiz Page", category: "Assessment", route: "/quizzes", desc: "Interactive MCQ Quiz Player, 15:00 Timer, Question navigator, radio choices, instant Result & Accuracy score." },
-  { id: 7, title: "7. Video Lectures Page", category: "E-Learning", route: "/videos", desc: "Subject Wise Video Lectures with duration, instructor name, thumbnail, and 1080p Video Player Modal." },
-  { id: 8, title: "8. Notices Page", category: "Notice Board", route: "/notices", desc: "Latest Announcements, Exam Updates, Holiday Notices with category filters." },
-  { id: 9, title: "9. Downloads Page", category: "User Storage", route: "/downloads", desc: "Downloaded Files History tracking saved PDF notes and board papers with re-download option." },
-  { id: 10, title: "10. Results Page", category: "Analytics", route: "/results", desc: "Quiz Results table, overall performance charts, accuracy %, correct/incorrect score breakdown." },
-  { id: 11, title: "11. Progress Page", category: "Tracking", route: "/progress", desc: "Overall Progress Bar, Completed Quizzes (6/8), Downloaded Notes (18), Downloaded Papers (9), Subject Mastery." },
-  { id: 12, title: "12. Forgot Password", category: "Account Security", route: "/forgot-password", desc: "Email verification & automated password recovery link trigger." },
-  { id: 13, title: "13. Reset Password", category: "Account Security", route: "/reset-password", desc: "Secure password reset form with confirmation validation." },
-  { id: 14, title: "14. Edit Profile", category: "Settings", route: "/edit-profile", desc: "Form to update student identity, class, stream, profile avatar, and bio details." },
-  { id: 15, title: "15. Admin Dashboard", category: "Management", route: "/admin", desc: "Admin Cards (Total Users, Notes, Papers, Quizzes, Downloads), Management Tabs, Upload PDF/Video, Recent Activities Panel, Analytics Charts." }
+// Daily questions for the streak hook
+const dailyQuestions = [
+  {
+    subject: "Chemistry",
+    question: "Which of the following non-metals remains in liquid state at room temperature?",
+    options: ["Phosphorus", "Bromine", "Chlorine", "Helium"],
+    correct: 1,
+    explanation: "Bromine is the only non-metallic element that exists as a liquid at standard temperature and pressure."
+  },
+  {
+    subject: "Physics",
+    question: "The value of acceleration due to gravity (g) is maximum at which point of Earth?",
+    options: ["The Equator", "The Poles", "Center of Earth", "Mount Everest summit"],
+    correct: 1,
+    explanation: "Acceleration due to gravity is maximum at the poles because the polar radius of the Earth is slightly smaller than the equatorial radius."
+  }
 ];
 
-const classStreamMatrix = [
-  { class: "10th Class", stream: "General", subjects: ["Mathematics", "Science", "Social Science", "English", "Hindi"] },
-  { class: "11th Class", stream: "Medical", subjects: ["Biology", "Physics", "Chemistry", "English"] },
-  { class: "11th Class", stream: "Non-Medical", subjects: ["Physics", "Chemistry", "Mathematics", "English"] },
-  { class: "11th Class", stream: "Commerce", subjects: ["Accountancy", "Business Studies", "Economics", "English"] },
-  { class: "11th Class", stream: "Arts", subjects: ["History", "Political Science", "Sociology", "English"] },
-  { class: "12th Class", stream: "Medical", subjects: ["Biology", "Physics", "Chemistry"] },
-  { class: "12th Class", stream: "Non-Medical", subjects: ["Mathematics", "Physics", "Chemistry"] },
-  { class: "12th Class", stream: "Commerce", subjects: ["Accountancy", "Economics", "Business Studies"] },
-  { class: "12th Class", stream: "Arts", subjects: ["History", "Geography", "Political Science"] }
+// Leaderboard Top Scores
+const topStudents = [
+  { rank: 1, name: "Rohit K. (Class 12)", points: 1420, stream: "Non-Medical" },
+  { rank: 2, name: "Neha S. (Class 12)", points: 1380, stream: "Medical" },
+  { rank: 3, name: "Amit V. (Class 11)", points: 1250, stream: "Commerce" },
+  { rank: 4, name: "Priyanjali R. (Class 11)", points: 1190, stream: "Commerce" }
 ];
 
-export default function PresentationBoardPage() {
-  const [selectedMockup, setSelectedMockup] = useState<typeof pageMockups[0] | null>(null);
+export default function UniqueAnimatedHomePage() {
+  // Class & Stream selection state
+  const [selectedGrade, setSelectedGrade] = useState<Grade>("11th");
+  const [selectedStream, setSelectedStream] = useState<Stream>("Medical");
+
+  // Streak hooks stored in localStorage
+  const [streak, setStreak] = useState(0);
+  const [hasAnsweredToday, setHasAnsweredToday] = useState(false);
+  const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+  const [questionIndex, setQuestionIndex] = useState(0);
+
+  // Board Exam Countdown
+  const [daysLeft, setDaysLeft] = useState(220);
+
+  useEffect(() => {
+    // 1. Calculate Countdown Days (Target March 1, 2027)
+    const targetDate = new Date("2027-03-01T00:00:00");
+    const diff = targetDate.getTime() - new Date().getTime();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (days > 0) setDaysLeft(days);
+
+    // 2. Load Streak from localstorage
+    if (typeof window !== "undefined") {
+      const savedStreak = localStorage.getItem("study_streak");
+      const answeredToday = localStorage.getItem("answered_today");
+      
+      if (savedStreak) setStreak(parseInt(savedStreak, 10));
+      if (answeredToday === new Date().toDateString()) {
+        setHasAnsweredToday(true);
+        const savedCorrect = localStorage.getItem("last_correct") === "true";
+        const savedOpt = localStorage.getItem("last_opt");
+        setIsCorrect(savedCorrect);
+        if (savedOpt !== null) setSelectedOpt(parseInt(savedOpt, 10));
+        setShowExplanation(true);
+      }
+      
+      setQuestionIndex(new Date().getDate() % dailyQuestions.length);
+    }
+  }, []);
+
+  const handleStreakSubmit = (optIndex: number) => {
+    if (hasAnsweredToday) return;
+
+    setSelectedOpt(optIndex);
+    const correctOpt = dailyQuestions[questionIndex].correct;
+    const answerCorrect = optIndex === correctOpt;
+    
+    setIsCorrect(answerCorrect);
+    setShowExplanation(true);
+    setHasAnsweredToday(true);
+
+    let newStreak = streak;
+    if (answerCorrect) {
+      newStreak = streak + 1;
+      setStreak(newStreak);
+    } else {
+      newStreak = 0;
+      setStreak(0);
+    }
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("study_streak", newStreak.toString());
+      localStorage.setItem("answered_today", new Date().toDateString());
+      localStorage.setItem("last_correct", answerCorrect.toString());
+      localStorage.setItem("last_opt", optIndex.toString());
+    }
+  };
+
+  // Subject filtering
+  const availableStreams = gradeConfig[selectedGrade]?.streams || [];
+  const currentStream = availableStreams.includes(selectedStream) ? selectedStream : (availableStreams[0] || "General");
+  const subjects = classSubjects[selectedGrade]?.[currentStream] || [];
+  const currentQ = dailyQuestions[questionIndex];
 
   return (
     <PublicShell>
-      <div className="page-shell space-y-12 px-4 py-6 md:px-8 md:py-8 max-w-[1600px] mx-auto">
-        {/* SECTION 1: MAIN TITLE & HERO INFOGRAPHIC HEADER */}
-        <section className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-blue-700 via-blue-600 to-slate-950 p-8 md:p-12 text-white shadow-2xl border border-white/10">
-          <div className="absolute -left-20 -top-20 h-96 w-96 rounded-full bg-orange-500/20 blur-3xl" />
-          <div className="absolute -right-20 -bottom-20 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
+      <div className="relative overflow-hidden min-h-screen bg-slate-50/40">
+        
+        {/* Animated Glow Particles */}
+        <div className="absolute top-[-10%] left-[-15%] w-[650px] h-[650px] rounded-full bg-blue-500/15 blur-[140px] animate-pulse-glow pointer-events-none" />
+        <div className="absolute top-[35%] right-[-15%] w-[750px] h-[750px] rounded-full bg-orange-500/10 blur-[170px] animate-pulse-glow pointer-events-none" />
+        <div className="absolute bottom-[-5%] left-[10%] w-[550px] h-[550px] rounded-full bg-indigo-500/10 blur-[140px] pointer-events-none" />
 
-          <div className="relative z-10 space-y-8 text-center max-w-5xl mx-auto">
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Badge className="bg-white/20 text-white border-white/30 px-4 py-1.5 backdrop-blur-md text-xs font-bold uppercase tracking-wider">
-                Ultra HD 4K Presentation Board • Behance & Dribbble Level
-              </Badge>
-              <Badge className="bg-orange-500 text-white px-4 py-1.5 font-bold text-xs uppercase tracking-wider">
-                Figma Quality SaaS UI
-              </Badge>
-            </div>
+        <div className="page-shell px-6 py-12 md:px-8 md:py-20 space-y-36 max-w-[1400px] relative z-10">
+          
+          {/* HERO SECTION WITH DUAL 3D IMAGE COLLAGE & FLOATING BADGES */}
+          <section className="grid lg:grid-cols-12 gap-12 items-center pt-4">
+            <div className="lg:col-span-7 space-y-8 text-left">
+              
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-white/80 px-4.5 py-2 shadow-sm backdrop-blur-md">
+                <Sparkles className="h-4 w-4 text-blue-600 animate-spin" style={{ animationDuration: '8s' }} />
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800">Class 10, 11 & 12 Educational Portal</span>
+              </div>
 
-            <div className="space-y-4">
-              <p className="text-sm font-extrabold tracking-[0.4em] text-orange-400">STUDY MATERIAL</p>
-              <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl lg:text-7xl">
-                STUDY MATERIAL – EDUCATIONAL PLATFORM
+              <h1 className="text-5xl font-black tracking-tight sm:text-6xl md:text-7xl text-slate-900 leading-[1.1]">
+                Master Board Exams <br />
+                With <span className="shimmer-text">Class-Isolated Notes</span>
               </h1>
-              <p className="text-lg md:text-2xl font-semibold text-blue-100/90 max-w-4xl mx-auto leading-relaxed">
-                One Platform for 10th, 11th & 12th Students (Medical, Non-Medical, Commerce & Arts)
+
+              <p className="text-lg md:text-xl text-slate-600 leading-relaxed font-semibold max-w-2xl">
+                Access comprehensive handwritten PDF notes, 5-year solved board papers, video lectures, and daily streak tests. Custom-isolated for Medical, Non-Medical, Commerce, and Arts.
               </p>
-            </div>
 
-            {/* Platform Quick Stats Pill */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto pt-4">
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
-                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">15 Website Pages</p>
-                <p className="text-2xl font-extrabold text-white mt-1">100% Built</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
-                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Class-Wise Filter</p>
-                <p className="text-2xl font-extrabold text-orange-300 mt-1">Isolated</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
-                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Design Theme</p>
-                <p className="text-2xl font-extrabold text-white mt-1">Blue & Orange</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md border border-white/15">
-                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Quality Standard</p>
-                <p className="text-2xl font-extrabold text-emerald-300 mt-1">Apple UI Level</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-              <Link href="/dashboard" className="inline-flex h-14 items-center justify-center rounded-2xl bg-orange-500 px-8 text-base font-extrabold text-white shadow-premium hover:bg-orange-600 transition">
-                Open Interactive Student App <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-              <Link href="/admin" className="inline-flex h-14 items-center justify-center rounded-2xl bg-white px-8 text-base font-extrabold text-slate-900 shadow-premium hover:bg-slate-50 transition">
-                Open Admin Control Center
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* SECTION 2: COMPLETE PLATFORM USER FLOW STEPPER */}
-        <section className="space-y-6">
-          <div className="text-center space-y-2">
-            <Badge className="bg-blue-100 text-blue-700 font-bold">Complete Student Lifecycle</Badge>
-            <h2 className="text-3xl font-extrabold text-slate-950">Platform User Flow</h2>
-            <p className="text-slate-600 text-sm max-w-2xl mx-auto">
-              From student registration to class stream selection, interactive learning, quizzes, results, and progress metrics.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-11">
-            {flowSteps.map((step, idx) => (
-              <div key={step} className="group relative rounded-2xl border border-white/60 bg-white/80 p-4 text-center shadow-glass backdrop-blur-xl hover:shadow-xl hover:border-blue-500 transition">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white font-extrabold text-xs mx-auto mb-2 group-hover:scale-110 transition">
-                  {idx + 1}
+              {/* Countdown Alert Widget */}
+              <div className="flex items-center gap-4 bg-white/90 border border-orange-200/80 rounded-2xl p-4 max-w-lg shadow-md backdrop-blur-md">
+                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/20 shrink-0">
+                  <Clock className="h-6 w-6 animate-pulse" />
                 </div>
-                <p className="text-xs font-bold text-slate-900">{step}</p>
+                <div>
+                  <p className="text-[11px] font-black text-orange-600 uppercase tracking-widest">2027 CBSE Board Exams</p>
+                  <p className="text-sm font-extrabold text-slate-800 mt-0.5">Only <span className="text-orange-500 text-lg font-black">{daysLeft} Days</span> Remaining! Start Practicing Today.</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </section>
 
-        {/* SECTION 3: CLASS & STREAM SUBJECT MATRIX */}
-        <section className="space-y-6">
-          <div className="text-center space-y-2">
-            <Badge className="bg-orange-100 text-orange-700 font-bold">Class-Wise Isolation Engine</Badge>
-            <h2 className="text-3xl font-extrabold text-slate-950">Class & Stream Configuration Matrix</h2>
-            <p className="text-slate-600 text-sm max-w-2xl mx-auto">
-              When a student selects a class, only that class study material appears on their dashboard.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            {classStreamMatrix.map((item, idx) => (
-              <Card key={idx} className="rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl hover:shadow-xl transition">
-                <div className="flex items-center justify-between mb-3">
-                  <Badge className="bg-blue-600 text-white font-bold">{item.class}</Badge>
-                  <Badge className="bg-orange-100 text-orange-700 font-bold">{item.stream}</Badge>
-                </div>
-                <h3 className="font-extrabold text-lg text-slate-950 mb-2">{item.class} – {item.stream}</h3>
-                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
-                  {item.subjects.map((s) => (
-                    <span key={s} className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        {/* SECTION 4: SINGLE LARGE INFOGRAPHIC SHOWCASE – ALL 15 WEBSITE PAGES GRID */}
-        <section className="space-y-8">
-          <div className="text-center space-y-2">
-            <Badge className="bg-blue-100 text-blue-700 font-bold">Single Large Infographic Visual Board</Badge>
-            <h2 className="text-3xl font-extrabold text-slate-950">All 15 Website Pages Mockup Presentation</h2>
-            <p className="text-slate-600 text-sm max-w-3xl mx-auto">
-              Complete high-resolution representation of all 15 platform views designed in blue & white theme with orange accent, glassmorphism, soft shadows, and rounded corners.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {pageMockups.map((page) => (
-              <Card
-                key={page.id}
-                className="group relative overflow-hidden rounded-[2.5rem] border border-white/80 bg-white/90 p-6 shadow-glass backdrop-blur-xl transition hover:-translate-y-1.5 hover:shadow-2xl hover:border-blue-500 flex flex-col justify-between"
-              >
-                <div className="space-y-4">
-                  {/* Mockup Header Pill */}
-                  <div className="flex items-center justify-between">
-                    <Badge className="bg-blue-50 text-blue-700 font-bold">{page.category}</Badge>
-                    <span className="text-xs font-bold text-slate-400">Ultra HD 4K</span>
-                  </div>
-
-                  {/* Mockup Screen Visual Simulation Frame */}
-                  <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-4 text-white shadow-inner flex flex-col justify-between">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                        <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                        <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">studymaterial.edu{page.route}</span>
-                    </div>
-
-                    <div className="my-auto text-center space-y-1">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20 text-orange-400 mx-auto">
-                        <Layout className="h-5 w-5" />
-                      </div>
-                      <p className="text-xs font-bold text-white">{page.title}</p>
-                      <p className="text-[10px] text-blue-200/80 max-w-xs mx-auto line-clamp-2">{page.desc}</p>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/10">
-                      <span>Status: Verified Live</span>
-                      <span className="text-orange-400 font-bold">Class-Wise</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-extrabold text-slate-950 group-hover:text-blue-600 transition">{page.title}</h3>
-                    <p className="mt-1 text-xs text-slate-600 leading-relaxed">{page.desc}</p>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 mt-4 flex gap-2">
-                  <Link href={page.route} className="flex-1">
-                    <Button className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow">
-                      <ExternalLink className="mr-2 h-4 w-4" /> Launch Page View
-                    </Button>
-                  </Link>
-                  <Button
-                    onClick={() => setSelectedMockup(page)}
-                    variant="outline"
-                    className="h-11 px-3 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-700"
-                  >
-                    <Maximize2 className="h-4 w-4" />
+              <div className="flex flex-wrap gap-4 pt-2">
+                <Link href="/dashboard">
+                  <Button className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-lg shadow-blue-500/25 flex items-center gap-3 text-base transition-all hover:scale-[1.03]">
+                    Explore Student App <ArrowRight className="h-5 w-5" />
                   </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        {/* SECTION 5: MAIN FEATURES CHECKLIST */}
-        <section className="rounded-[3rem] bg-white p-8 md:p-12 shadow-glass backdrop-blur-xl border border-white/60 space-y-8">
-          <div className="text-center space-y-2">
-            <Badge className="bg-emerald-100 text-emerald-700 font-bold">Comprehensive Capabilities</Badge>
-            <h2 className="text-3xl font-extrabold text-slate-950">Main Features Checklist</h2>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {mainFeatures.map((feat) => (
-              <div key={feat} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
-                <span className="font-bold text-sm text-slate-900">{feat}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* SECTION 6: TECH STACK & DATABASE COLLECTIONS ARCHITECTURE */}
-        <section className="grid gap-8 lg:grid-cols-2">
-          {/* Tech Stack Card */}
-          <Card className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-8 text-white shadow-2xl border border-white/10 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
-                <Cpu className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-extrabold">Tech Stack Section</h3>
-                <p className="text-xs text-slate-400">Enterprise production web technologies</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2.5">
-              {techStack.map((tech) => (
-                <span key={tech} className="rounded-xl bg-white/10 border border-white/15 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-md">
-                  {tech}
-                </span>
-              ))}
-            </div>
-          </Card>
-
-          {/* Database Collections Card */}
-          <Card className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-orange-950 p-8 text-white shadow-2xl border border-white/10 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-md">
-                <Database className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-extrabold">Database Collections</h3>
-                <p className="text-xs text-slate-400">MongoDB Atlas NoSQL schema architecture</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {databaseCollections.map((col) => (
-                <div key={col} className="rounded-xl bg-white/10 border border-white/15 p-3 text-center backdrop-blur-md">
-                  <p className="text-xs font-extrabold text-orange-300">{col}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </section>
-
-        {/* Mockup Fullscreen Modal */}
-        {selectedMockup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in">
-            <div className="relative w-full max-w-4xl rounded-[3rem] bg-white p-8 shadow-2xl space-y-6">
-              <div className="flex items-center justify-between border-b pb-4">
-                <div>
-                  <Badge className="bg-blue-100 text-blue-700 mb-1">{selectedMockup.category}</Badge>
-                  <h3 className="text-2xl font-extrabold text-slate-900">{selectedMockup.title}</h3>
-                </div>
-                <button onClick={() => setSelectedMockup(null)} className="rounded-full bg-slate-100 p-2 hover:bg-slate-200">
-                  <ExternalLink className="h-5 w-5 text-slate-600" />
-                </button>
-              </div>
-
-              <div className="h-80 rounded-2xl bg-slate-950 p-8 text-white flex flex-col items-center justify-center text-center space-y-4">
-                <Layout className="h-16 w-16 text-orange-400 animate-bounce" />
-                <div>
-                  <h4 className="text-2xl font-extrabold">{selectedMockup.title} Mockup Screen</h4>
-                  <p className="text-sm text-slate-300 max-w-lg mt-2">{selectedMockup.desc}</p>
-                </div>
-                <Badge className="bg-orange-500 text-white font-bold">Ultra HD 4K Figma Quality Preview</Badge>
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <Button variant="outline" onClick={() => setSelectedMockup(null)} className="rounded-xl">
-                  Close Window
-                </Button>
-                <Link href={selectedMockup.route}>
-                  <Button className="rounded-xl bg-blue-600 text-white font-semibold">
-                    Launch Interactive Page <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link href="/login">
+                  <Button variant="outline" className="h-14 px-8 rounded-2xl border-slate-200 text-slate-700 font-extrabold hover:bg-white text-base shadow-sm">
+                    Student Login
                   </Button>
                 </Link>
               </div>
             </div>
-          </div>
-        )}
+
+            {/* DUAL 3D FLOATING IMAGE COLLAGE */}
+            <div className="lg:col-span-5 relative mt-6 lg:mt-0">
+              
+              {/* Primary 3D Student Illustration */}
+              <div className="relative rounded-[2.5rem] border border-white bg-white/60 p-3 shadow-2xl backdrop-blur-md animate-float-slow">
+                <img 
+                  src="/hero_student.png" 
+                  alt="3D Student Learning" 
+                  className="rounded-[2rem] w-full h-auto object-cover border border-slate-100 shadow-md"
+                />
+              </div>
+
+              {/* Floating Badge 1: Dashboard Preview */}
+              <div className="absolute top-[-10%] right-[-5%] w-48 sm:w-56 rounded-2xl border border-white/80 bg-white/90 p-2.5 shadow-2xl backdrop-blur-md animate-float-reverse hidden sm:block">
+                <img 
+                  src="/dashboard_graphic.png" 
+                  alt="Dashboard Preview" 
+                  className="rounded-xl w-full h-24 object-cover border border-slate-100"
+                />
+                <p className="text-[10px] font-black text-slate-800 text-center mt-2 uppercase tracking-wider">Live Student Workspace</p>
+              </div>
+
+              {/* Floating Badge 2: Pass Metric Pill */}
+              <div className="absolute bottom-[-5%] left-[-8%] rounded-2xl border border-white/80 bg-white/95 px-5 py-3 shadow-xl backdrop-blur-md flex items-center gap-3 animate-float-slow">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md">
+                  <Star className="h-5 w-5 fill-current" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-slate-800">98.4% Top Score</p>
+                  <p className="text-[10px] text-slate-500 font-bold">CBSE Board Exam Toppers</p>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* SECTION 2: CURATED SYLLABUS & STREAM MATRICES */}
+          <section className="space-y-12 relative">
+            <div className="text-center space-y-3">
+              <Badge className="bg-blue-100 text-blue-700 border-none font-bold px-4 py-1.5 text-xs">Curated Matrix</Badge>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Interactive Stream Selector</h2>
+              <p className="text-slate-500 max-w-2xl mx-auto text-sm font-medium">
+                Click your class and stream below to unlock subject resources, handwritten PDF notes, and test metrics.
+              </p>
+            </div>
+
+            {/* Selector matrix panel */}
+            <div className="max-w-4xl mx-auto bg-white/80 border border-slate-200/80 rounded-[2.5rem] p-6 sm:p-8 shadow-xl backdrop-blur-md space-y-6">
+              
+              {/* Class Buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest min-w-[110px]">Select Class:</span>
+                <div className="flex flex-wrap gap-2.5">
+                  {(["10th", "11th", "12th"] as Grade[]).map((grade) => (
+                    <button
+                      key={grade}
+                      onClick={() => {
+                        setSelectedGrade(grade);
+                        const avStreams = gradeConfig[grade]?.streams || [];
+                        if (!avStreams.includes(selectedStream)) {
+                          setSelectedStream(avStreams[0] || "General");
+                        }
+                      }}
+                      className={`rounded-2xl px-6 py-3 text-xs font-black transition-all duration-300 ${
+                        selectedGrade === grade 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25 scale-105" 
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {grade} Class
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stream Buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-slate-100">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest min-w-[110px]">Select Stream:</span>
+                <div className="flex flex-wrap gap-2.5">
+                  {availableStreams.map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setSelectedStream(st)}
+                      className={`rounded-2xl px-6 py-3 text-xs font-black transition-all duration-300 ${
+                        selectedStream === st 
+                          ? "bg-orange-500 text-white shadow-lg shadow-orange-500/25 scale-105" 
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Subject Cards Grid */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto pt-4">
+              {subjects.map((sub, idx) => (
+                <Card 
+                  key={idx} 
+                  className="card-3d-effect rounded-[2rem] border-slate-100/90 bg-white p-6 shadow-sm flex flex-col justify-between"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-inner">
+                        <BookOpen className="h-6 w-6" />
+                      </div>
+                      <Badge className="bg-slate-100 text-slate-700 font-bold border-none text-[9px] px-2.5 py-0.5">{selectedGrade} {selectedStream}</Badge>
+                    </div>
+
+                    <h3 className="font-extrabold text-slate-800 text-lg">{sub.name}</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-3 font-medium">{sub.description || "Comprehensive syllabus topics compiled according to CBSE board."}</p>
+                  </div>
+
+                  <div className="pt-5 border-t border-slate-100 mt-6 flex items-center justify-between text-xs text-slate-600 font-bold">
+                    <span className="flex items-center gap-1.5"><NotebookTabs className="h-4 w-4 text-blue-500" /> 12 Notes</span>
+                    <span className="flex items-center gap-1.5"><Award className="h-4 w-4 text-orange-500" /> {sub.quizzes || 5} Quizzes</span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          {/* SECTION 3: GAMIFIED HOOKS (DAILY STREAK & LEADERBOARD) */}
+          <section className="grid md:grid-cols-12 gap-8 max-w-6xl mx-auto">
+            {/* Daily Streak Challenge */}
+            <div className="md:col-span-7 relative">
+              <Card className="relative overflow-hidden rounded-[2.5rem] border border-blue-100 bg-white p-6 sm:p-8 shadow-[0_20px_50px_rgba(59,130,246,0.06)] space-y-6">
+                
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-500 text-white animate-pulse">
+                      <Flame className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-800 text-lg">Daily Streak Challenge</h3>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{currentQ.subject} Practice</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-2 text-center flex items-center gap-1.5 shrink-0">
+                    <span className="text-orange-500 text-lg">⚡</span>
+                    <span className="text-xs font-black text-slate-800">{streak} Day Streak</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-sm sm:text-base font-bold text-slate-800 leading-relaxed">
+                    {currentQ.question}
+                  </p>
+
+                  <div className="space-y-2.5">
+                    {currentQ.options.map((opt, idx) => {
+                      let style = "border-slate-100 bg-slate-50/60 hover:bg-slate-100 text-slate-700";
+                      
+                      if (hasAnsweredToday) {
+                        if (idx === currentQ.correct) {
+                          style = "border-emerald-500 bg-emerald-50 text-emerald-800 font-extrabold";
+                        } else if (selectedOpt === idx) {
+                          style = "border-rose-500 bg-rose-50 text-rose-800 font-extrabold";
+                        } else {
+                          style = "border-slate-100 text-slate-400 opacity-60";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={idx}
+                          disabled={hasAnsweredToday}
+                          onClick={() => handleStreakSubmit(idx)}
+                          className={`w-full flex items-center justify-between rounded-2xl border p-4 text-left text-xs sm:text-sm font-bold transition duration-200 ${style}`}
+                        >
+                          <span>{opt}</span>
+                          {hasAnsweredToday && idx === currentQ.correct && <Check className="h-4.5 w-4.5 text-emerald-600 shrink-0" />}
+                          {hasAnsweredToday && selectedOpt === idx && idx !== currentQ.correct && <X className="h-4.5 w-4.5 text-rose-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {showExplanation && (
+                    <div className="rounded-2xl bg-slate-50 border p-4 text-xs sm:text-sm text-slate-600 space-y-1.5 animate-in fade-in">
+                      <p className="font-extrabold text-slate-800">
+                        {isCorrect ? (
+                          <span className="text-emerald-600">✓ Correct Answer! (+1 Streak Point)</span>
+                        ) : (
+                          <span className="text-rose-600">✗ Incorrect. Streak Reset to 0.</span>
+                        )}
+                      </p>
+                      <p className="leading-relaxed font-semibold">{currentQ.explanation}</p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Weekly Leaderboard */}
+            <div className="md:col-span-5 relative">
+              <Card className="relative overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white p-6 sm:p-8 shadow-[0_20px_50px_rgba(249,115,22,0.04)] flex flex-col justify-between min-h-full">
+                
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 border-b pb-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white">
+                      <Trophy className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-800 text-lg">Weekly Leaderboard</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Student Rank</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3.5">
+                    {topStudents.map((stud) => (
+                      <div key={stud.rank} className="flex items-center justify-between rounded-2xl border border-slate-50 bg-slate-50/40 p-3.5 hover:border-slate-100 transition">
+                        <div className="flex items-center gap-3">
+                          <span className={`h-7 w-7 rounded-full flex items-center justify-center font-black text-xs ${
+                            stud.rank === 1 ? "bg-amber-100 text-amber-700" :
+                            stud.rank === 2 ? "bg-slate-200 text-slate-700" :
+                            stud.rank === 3 ? "bg-orange-100 text-orange-700" : "bg-slate-100 text-slate-500"
+                          }`}>{stud.rank}</span>
+                          <div>
+                            <p className="text-xs font-black text-slate-800">{stud.name}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{stud.stream}</p>
+                          </div>
+                        </div>
+
+                        <span className="text-xs font-black text-blue-600">{stud.points} XP</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-6 mt-6 border-t border-slate-100">
+                  <Link href="/dashboard">
+                    <Button className="w-full h-12 rounded-xl bg-slate-900 text-white font-extrabold hover:bg-slate-800 flex items-center justify-center gap-2">
+                      Join Leaderboard <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+
+              </Card>
+            </div>
+          </section>
+
+          {/* SECTION 4: FEATURE GRAPHICS SHOWCASE WITH 3D IMAGE */}
+          <section className="grid lg:grid-cols-12 gap-12 items-center bg-white border border-slate-100 rounded-[3rem] p-8 md:p-12 shadow-xl">
+            <div className="lg:col-span-6 space-y-6">
+              <Badge className="bg-orange-100 text-orange-700 border-none font-bold px-4 py-1.5 text-xs">All-In-One Toolkit</Badge>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                Everything You Need For Board Exams
+              </h2>
+              <p className="text-slate-600 text-sm md:text-base leading-relaxed font-medium">
+                Our learning platform is engineered specifically for secondary board students. Get access to verified question sets, handwritten notes, and instant online practice.
+              </p>
+
+              <div className="space-y-4 pt-2">
+                {[
+                  "Handwritten PDF Notes by expert faculty",
+                  "Previous 5-year solved board exam papers",
+                  "Interactive chapter MCQ practice tests",
+                  "Isolated subject streams (Medical, Non-Medical, Commerce, Arts)"
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className="h-6 w-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                      <Check className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-6">
+              <div className="relative rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-2xl animate-float-slow">
+                <img 
+                  src="/subject_materials.png" 
+                  alt="3D Study Materials" 
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 5: FINAL HIGH-NEON CTA BANNER */}
+          <section className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-blue-700 via-blue-600 to-slate-950 p-8 md:p-14 text-white text-center shadow-2xl border border-white/10 max-w-5xl mx-auto">
+            <div className="absolute -left-20 -top-20 h-96 w-96 rounded-full bg-orange-500/20 blur-3xl pointer-events-none animate-pulse-glow" />
+            <div className="absolute -right-20 -bottom-20 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 space-y-6 max-w-3xl mx-auto">
+              <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
+                Ready to Supercharge Your Preparation?
+              </h2>
+              <p className="text-sm md:text-base text-blue-100/90 leading-relaxed font-medium">
+                Register a free profile today to isolate your target syllabus notes, solved question bundles, timed quizzes, and start tracking results accuracy!
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-4 pt-3">
+                <Link href="/login">
+                  <Button className="h-13 px-8 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black shadow-lg shadow-orange-500/20 transition-transform hover:scale-[1.02]">
+                    Register Free Account
+                  </Button>
+                </Link>
+                <Link href="/dashboard">
+                  <Button variant="outline" className="h-13 px-8 rounded-xl border-white/20 text-white hover:bg-white/5 font-black">
+                    Explore Learning Dashboard
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </section>
+
+        </div>
       </div>
     </PublicShell>
   );

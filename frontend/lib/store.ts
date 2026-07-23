@@ -1,4 +1,4 @@
-import { DEFAULT_STUDENT_SESSION, getStoredSession, type StudentSession } from "./session";
+import { getStoredSession, type StudentSession } from "./session";
 import { type Grade, type Stream, type QuizItem } from "./platform-data";
 import { apiUrl } from "./api";
 
@@ -570,4 +570,3 @@ export async function uploadBackendFile(file: File): Promise<{ url: string; file
     return null;
   }
 }
-
