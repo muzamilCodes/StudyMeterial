@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { createResetToken, loginStudent, registerStudent, resetPassword } from "../services.js";
+import { createResetToken, loginStudent, registerStudent, resetPassword, deleteStudentAccount } from "../services.js";
 import type { Grade, Stream } from "../types.js";
 
 const gradeSchema = z.enum(["10th", "11th", "12th"]);
@@ -56,6 +56,21 @@ export async function register(req: Request, res: Response) {
     res.json({ message: "Registration successful", ...result });
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : "Registration failed" });
+  }
+}
+
+export async function deleteAccount(req: Request, res: Response) {
+  const schema = z.object({ email: z.string().email() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
+  try {
+    await deleteStudentAccount(parsed.data.email);
+    res.json({ message: "Account deleted permanently" });
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : "Failed to delete account" });
   }
 }
 

@@ -15,6 +15,8 @@ type UserRecord = {
   isAdmin?: boolean;
   grade: Grade;
   stream: Stream;
+  avatar?: string;
+  bio?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -107,6 +109,12 @@ export async function loginStudent(input: { email: string; password: string }) {
     throw new Error("MongoDB database server not connected");
   }
 
+  // Check if account was deleted
+  const deletedCheck = await db.collection("deleted_users").findOne({ email: normalizedEmail });
+  if (deletedCheck) {
+    throw new Error("This account has been permanently deleted. Access is revoked and you cannot log in with this account again.");
+  }
+
   const user = await db.collection<UserRecord>("users").findOne({ email: normalizedEmail });
   if (!user) {
     throw new Error("No account found with this email! Please register first.");
@@ -129,7 +137,8 @@ export async function loginStudent(input: { email: string; password: string }) {
       role: isAdmin ? ("admin" as const) : user.role,
       isAdmin,
       grade: user.grade,
-      stream: user.stream
+      stream: user.stream,
+      avatar: user.avatar
     }
   };
 }
@@ -154,6 +163,9 @@ export async function registerStudent(input: {
   if (existing) {
     throw new Error("This email is already registered! One email can only register once.");
   }
+
+  // Remove from deleted_users if re-registering
+  await db.collection("deleted_users").deleteOne({ email: normalizedEmail });
 
   const now = new Date();
   const result = await users.insertOne({
@@ -181,6 +193,21 @@ export async function registerStudent(input: {
       isAdmin: false
     }
   };
+}
+
+export async function deleteStudentAccount(email: string) {
+  const db = await connectDb();
+  if (!db) return false;
+  const normalizedEmail = email.trim().toLowerCase();
+
+  await db.collection<UserRecord>("users").deleteOne({ email: normalizedEmail });
+  await db.collection("deleted_users").updateOne(
+    { email: normalizedEmail },
+    { $set: { email: normalizedEmail, deletedAt: new Date() } },
+    { upsert: true }
+  );
+
+  return true;
 }
 
 export async function createResetToken(email: string) {
