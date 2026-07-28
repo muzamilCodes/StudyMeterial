@@ -2,9 +2,11 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { SignOptions } from "jsonwebtoken";
 
+import type { JwtRole } from "./types.js";
+
 export type AuthPayload = {
   userId: string;
-  role: "student" | "admin";
+  role: JwtRole;
   email: string;
 };
 

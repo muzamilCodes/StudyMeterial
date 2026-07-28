@@ -1,7 +1,7 @@
 export type Grade = "10th" | "11th" | "12th";
 export type Stream = "General" | "Medical" | "Non-Medical" | "Commerce" | "Arts";
 
-export type JwtRole = "student" | "admin";
+export type JwtRole = "superadmin" | "admin" | "teacher" | "student";
 
 export type AuthUser = {
   id: string;

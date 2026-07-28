@@ -5,6 +5,7 @@ import { connectDb } from "./db.js";
 
 type Grade = "10th" | "11th" | "12th";
 type Stream = "General" | "Medical" | "Non-Medical" | "Commerce" | "Arts";
+type JwtRole = "superadmin" | "admin" | "teacher" | "student";
 
 export type LiveClassLifecycle =
   | "Draft"
@@ -95,7 +96,7 @@ type UserRecord = {
   username: string;
   email: string;
   passwordHash: string;
-  role: "student" | "admin";
+  role: JwtRole;
   isAdmin?: boolean;
   grade: Grade;
   stream: Stream;

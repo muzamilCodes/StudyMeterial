@@ -46,6 +46,7 @@ export async function seedDatabase() {
     const userCount = await usersCol.countDocuments();
     if (userCount === 0) {
       const adminPassHash = await hashPassword("Admin@12345");
+      const teacherPassHash = await hashPassword("Teacher@12345");
       const studentPassHash = await hashPassword("Student@12345");
 
       await usersCol.insertMany([
@@ -55,6 +56,17 @@ export async function seedDatabase() {
           passwordHash: adminPassHash,
           role: "admin",
           isAdmin: true,
+          grade: "11th",
+          stream: "Medical",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          username: "Dr. Ramesh Sharma",
+          email: "teacher@studymaterial.com",
+          passwordHash: teacherPassHash,
+          role: "teacher",
+          isAdmin: false,
           grade: "11th",
           stream: "Medical",
           createdAt: new Date(),
@@ -72,7 +84,7 @@ export async function seedDatabase() {
           updatedAt: new Date()
         }
       ]);
-      console.log(`👤 Seeded Admin and Student users into "users" collection`);
+      console.log(`👤 Seeded Admin, Teacher, and Student users into "users" collection`);
     }
 
     // Seed 2: Classes
