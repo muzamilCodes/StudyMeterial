@@ -81,11 +81,13 @@ export async function resetPasswordHandler(req: Request, res: Response) {
   }
 
   try {
-    const result = await resetPassword({
+    const email = (req.body.email || "").toString();
+    const ok = await resetPassword({
+      email,
       token: parsed.data.token,
-      password: parsed.data.password
+      newPassword: parsed.data.password
     });
-    res.json({ message: "Password updated successfully", ...result });
+    res.json({ message: "Password updated successfully", success: ok });
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : "Reset failed" });
   }

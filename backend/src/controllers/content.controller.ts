@@ -1,6 +1,20 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { createContent, listContent, deleteContent } from "../services.js";
+import { 
+  createContent, 
+  listContent, 
+  deleteContent,
+  listLiveClassesService,
+  getLiveClassByIdService,
+  createLiveClassService,
+  updateLiveClassService,
+  deleteLiveClassService,
+  logLiveAttendanceService,
+  postLiveChatService,
+  getLiveChatService,
+  submitLiveFeedbackService,
+  publishLiveClassService
+} from "../services.js";
 import type { Grade, Stream } from "../types.js";
 
 const gradeSchema = z.enum(["10th", "11th", "12th"]);
@@ -219,5 +233,122 @@ export async function uploadFile(req: Request, res: Response) {
     });
   } catch (error) {
     res.status(500).json({ message: "Error uploading file" });
+  }
+}
+
+// ============================================================================
+// LIVE CLASSES CONTROLLERS
+// ============================================================================
+
+export async function listLiveClasses(req: Request, res: Response) {
+  try {
+    const { grade, stream, subject } = getQueryFilters(req);
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const category = typeof req.query.category === "string" ? req.query.category : undefined;
+    const teacherName = typeof req.query.teacherName === "string" ? req.query.teacherName : undefined;
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+
+    const data = await listLiveClassesService({
+      grade,
+      stream,
+      subject,
+      status,
+      category,
+      teacherName,
+      search
+    });
+
+    res.json({ data });
+  } catch (error) {
+    res.status(500).json({ message: "Error loading live classes" });
+  }
+}
+
+export async function getLiveClassById(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const data = await getLiveClassByIdService(id);
+    if (!data) return res.status(404).json({ message: "Live class not found" });
+    res.json({ data });
+  } catch (error) {
+    res.status(500).json({ message: "Error loading live class details" });
+  }
+}
+
+export async function createLiveClass(req: Request, res: Response) {
+  try {
+    const result = await createLiveClassService(req.body);
+    res.status(201).json({ message: "Live Class created successfully", data: result });
+  } catch (error) {
+    res.status(500).json({ message: "Error creating live class" });
+  }
+}
+
+export async function updateLiveClass(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const ok = await updateLiveClassService(id, req.body);
+    if (!ok) return res.status(404).json({ message: "Live class not found" });
+    res.json({ message: "Live Class updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating live class" });
+  }
+}
+
+export async function publishLiveClass(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const ok = await publishLiveClassService(id);
+    res.json({ message: "Live Class published & student notifications sent successfully", success: ok });
+  } catch (error) {
+    res.status(500).json({ message: "Error publishing live class" });
+  }
+}
+
+export async function deleteLiveClass(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const ok = await deleteLiveClassService(id);
+    if (!ok) return res.status(404).json({ message: "Live class not found" });
+    res.json({ message: "Live Class deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting live class" });
+  }
+}
+
+export async function logAttendance(req: Request, res: Response) {
+  try {
+    const ok = await logLiveAttendanceService(req.body);
+    res.json({ message: "Attendance logged successfully", success: ok });
+  } catch (error) {
+    res.status(500).json({ message: "Error logging attendance" });
+  }
+}
+
+export async function postLiveChat(req: Request, res: Response) {
+  try {
+    const ok = await postLiveChatService(req.body);
+    res.json({ message: "Chat message posted", success: ok });
+  } catch (error) {
+    res.status(500).json({ message: "Error posting chat message" });
+  }
+}
+
+export async function getLiveChat(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const data = await getLiveChatService(id);
+    res.json({ data });
+  } catch (error) {
+    res.status(500).json({ message: "Error loading chat history" });
+  }
+}
+
+export async function submitFeedback(req: Request, res: Response) {
+  try {
+    const ok = await submitLiveFeedbackService(req.body);
+    res.json({ message: "Feedback submitted", success: ok });
+  } catch (error) {
+    res.status(500).json({ message: "Error submitting feedback" });
   }
 }
