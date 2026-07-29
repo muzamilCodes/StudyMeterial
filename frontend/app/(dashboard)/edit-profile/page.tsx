@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { SiteShell } from "@/components/site-shell";
 import { 
   getStoredSession, 
   saveSession, 
@@ -18,6 +14,8 @@ import {
 import { apiUrl } from "@/lib/api";
 import { User, CheckCircle2, Save, LogOut, Trash2, AlertTriangle, X, Upload, Image as ImageIcon } from "lucide-react";
 import { type Grade, type Stream } from "@/lib/platform-data";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function EditProfilePage() {
   const router = useRouter();
@@ -41,11 +39,11 @@ export default function EditProfilePage() {
     const s = getStoredSession();
     setSession(s);
     if (s) {
-      setName(s.name ?? "Muzamil Ahmad");
-      setEmail(s.email ?? "student@studymaterial.edu");
+      setName(s.name ?? "Student");
+      setEmail(s.email ?? "student@studymaterial.com");
       setGrade(s.grade ?? "11th");
       setStream(s.stream ?? "Medical");
-      setBio(s.bio ?? "Class 11th Medical Aspirant");
+      setBio(s.bio ?? "Class 11th Medical Student");
       setAvatar(s.avatar ?? AVATAR_PRESETS[0]);
     }
   }, []);
@@ -90,19 +88,18 @@ export default function EditProfilePage() {
 
   const handleLogout = () => {
     clearSession();
-    router.push("/login");
+    router.push("/register");
   };
 
   const handleDeleteAccount = async () => {
     if (confirmText.trim().toLowerCase() !== "delete") {
-      setDeleteError("Please type 'DELETE' to confirm account deletion.");
+      setDeleteError("Please type 'DELETE' to confirm deletion.");
       return;
     }
 
     setIsDeleting(true);
 
     try {
-      // Call Express/MongoDB backend endpoint to permanently delete user document
       if (email) {
         await fetch(apiUrl("/api/auth/delete-account"), {
           method: "POST",
@@ -111,242 +108,150 @@ export default function EditProfilePage() {
         });
       }
     } catch (err) {
-      console.error("Backend account deletion notice:", err);
+      console.error("Account deletion API trace:", err);
     }
 
-    // Permanently invalidate account in localStorage & clear sessions
     deleteAccountData(email);
     setIsDeleting(false);
-    router.push("/login?deleted=true");
+    router.push("/register?deleted=true");
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Header Banner */}
-      <div className="rounded-[2.5rem] bg-gradient-to-br from-blue-700 via-blue-600 to-slate-900 p-6 md:p-8 text-white shadow-premium">
-        <div className="flex items-center gap-5">
-          <div className="relative h-20 w-20 rounded-2xl border-2 border-white/40 overflow-hidden shadow-xl shrink-0 bg-white/10">
-            {avatar ? (
-              <img src={avatar} alt="Profile Avatar" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center font-black text-3xl text-white">
-                {name ? name[0] : "S"}
-              </div>
-            )}
-          </div>
-          <div>
-            <Badge className="bg-white/20 text-white border-white/30 mb-1">Student Settings</Badge>
-            <h2 className="text-3xl font-extrabold">{name || "Student Profile"}</h2>
-            <p className="text-sm text-blue-100/90">
-              Update avatar picture, student identity, class stream, and account security.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {savedMsg && (
-        <div className="flex items-center gap-3 rounded-2xl bg-emerald-500 p-4 text-white font-medium shadow-lg animate-in fade-in">
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <p className="text-sm font-bold">Profile updated successfully! Refreshing dashboard...</p>
-        </div>
-      )}
-
-      {/* Edit Profile Form */}
-      <Card className="rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl space-y-6">
+    <SiteShell
+      title="Student Profile Settings"
+      description="Manage your personal credentials, profile avatar, class stream selection, and security settings."
+    >
+      <div className="space-y-8 max-w-4xl">
         
-        {/* Profile Avatar Selection Section */}
-        <div className="space-y-3 pb-6 border-b border-slate-100">
-          <Label className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-            <ImageIcon className="h-4 w-4 text-blue-600" />
-            Choose Profile Picture / Avatar
-          </Label>
+        {savedMsg && (
+          <div className="p-4 rounded-2xl bg-emerald-500 text-white font-bold text-xs shadow-lg flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            <span>Profile details updated successfully! Reloading...</span>
+          </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-3 pt-1">
-            {AVATAR_PRESETS.map((presetUrl, idx) => (
+        {/* EDIT PROFILE FORM */}
+        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-6">
+          
+          {/* Avatar selection */}
+          <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
+            <Label className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-blue-600" />
+              Choose Profile Picture / Avatar
+            </Label>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {AVATAR_PRESETS.map((presetUrl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setAvatar(presetUrl);
+                    setCustomAvatarUrl("");
+                  }}
+                  className={`relative h-12 w-12 rounded-2xl overflow-hidden border-2 transition-all ${
+                    avatar === presetUrl 
+                      ? "border-blue-600 ring-4 ring-blue-100 dark:ring-blue-950 scale-105" 
+                      : "border-slate-200 dark:border-slate-800"
+                  }`}
+                >
+                  <img src={presetUrl} alt={`Avatar ${idx + 1}`} className="h-full w-full object-cover" />
+                </button>
+              ))}
+
+              <label className="flex h-12 px-4 items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer text-xs font-bold">
+                <Upload className="h-4 w-4 text-blue-600" />
+                <span>Upload File</span>
+                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <form onSubmit={handleSave} className="space-y-4 text-xs">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="font-bold text-slate-800 dark:text-slate-200">Full Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} required className="h-10 rounded-xl" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-slate-800 dark:text-slate-200">Email Address</Label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-10 rounded-xl" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-slate-800 dark:text-slate-200">Current Class</Label>
+                <select
+                  value={grade}
+                  onChange={(e) => setGrade(e.target.value as Grade)}
+                  className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 font-bold text-slate-800 dark:text-slate-200"
+                >
+                  <option value="10th">10th Class</option>
+                  <option value="11th">11th Class</option>
+                  <option value="12th">12th Class</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="font-bold text-slate-800 dark:text-slate-200">Academic Stream</Label>
+                <select
+                  value={stream}
+                  disabled={grade === "10th"}
+                  onChange={(e) => setStream(e.target.value as Stream)}
+                  className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 font-bold text-slate-800 dark:text-slate-200 disabled:opacity-50"
+                >
+                  <option value="Medical">Medical</option>
+                  <option value="Non-Medical">Non-Medical</option>
+                  <option value="Commerce">Commerce</option>
+                  <option value="Arts">Arts</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="font-bold text-slate-800 dark:text-slate-200">Profile Bio</Label>
+                <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Short profile description..." className="h-10 rounded-xl" />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
               <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setAvatar(presetUrl);
-                  setCustomAvatarUrl("");
-                }}
-                className={`relative h-14 w-14 rounded-2xl overflow-hidden border-2 transition-all ${
-                  avatar === presetUrl 
-                    ? "border-blue-600 ring-4 ring-blue-100 scale-105" 
-                    : "border-slate-200 hover:border-slate-400"
-                }`}
+                type="submit"
+                className="rounded-2xl bg-blue-600 px-6 py-3 font-bold text-white shadow-md hover:bg-blue-700 transition flex items-center gap-2"
               >
-                <img src={presetUrl} alt={`Avatar ${idx + 1}`} className="h-full w-full object-cover" />
-                {avatar === presetUrl && (
-                  <div className="absolute inset-0 bg-blue-600/30 flex items-center justify-center text-white">
-                    <CheckCircle2 className="h-5 w-5" />
-                  </div>
-                )}
+                <Save className="h-4 w-4" /> Save Profile Changes
               </button>
-            ))}
-
-            {/* Custom file upload button */}
-            <label className="flex h-14 px-4 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100 transition cursor-pointer text-xs font-bold">
-              <Upload className="h-4 w-4 text-blue-600" />
-              <span>Upload Image</span>
-              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-            </label>
-          </div>
-
-          <div className="pt-2 max-w-md">
-            <Label className="text-xs font-bold text-slate-500">Or Paste Image URL:</Label>
-            <Input
-              value={customAvatarUrl}
-              onChange={(e) => {
-                setCustomAvatarUrl(e.target.value);
-                if (e.target.value.trim() !== "") {
-                  setAvatar(e.target.value);
-                }
-              }}
-              placeholder="https://example.com/avatar.png"
-              className="h-10 rounded-xl mt-1 text-xs"
-            />
-          </div>
+            </div>
+          </form>
         </div>
 
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label className="font-bold text-slate-800">Student Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} required className="h-11 rounded-xl" />
-            </div>
-
-            <div className="grid gap-2">
-              <Label className="font-bold text-slate-800">Email Address</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11 rounded-xl" />
-            </div>
-
-            <div className="grid gap-2">
-              <Label className="font-bold text-slate-800">Selected Class</Label>
-              <select
-                value={grade}
-                onChange={(e) => setGrade(e.target.value as Grade)}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900"
-              >
-                <option value="10th">10th Class</option>
-                <option value="11th">11th Class</option>
-                <option value="12th">12th Class</option>
-              </select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label className="font-bold text-slate-800">Selected Stream</Label>
-              <select
-                value={stream}
-                disabled={grade === "10th"}
-                onChange={(e) => setStream(e.target.value as Stream)}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 disabled:opacity-50"
-              >
-                {grade === "10th" ? (
-                  <option value="General">General (All 10th Subjects)</option>
-                ) : (
-                  <>
-                    <option value="Medical">Medical (Biology, Physics, Chemistry, English)</option>
-                    <option value="Non-Medical">Non-Medical (Physics, Chemistry, Mathematics, English)</option>
-                    <option value="Commerce">Commerce (Accountancy, Business Studies, Economics, English)</option>
-                    <option value="Arts">Arts (History, Political Science, Sociology, English)</option>
-                  </>
-                )}
-              </select>
-            </div>
-
-            <div className="grid gap-2 md:col-span-2">
-              <Label className="font-bold text-slate-800">Short Bio</Label>
-              <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Short profile summary..." className="h-11 rounded-xl" />
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <Button type="submit" className="h-12 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 font-semibold text-white shadow-premium">
-              <Save className="mr-2 h-4 w-4" /> Save Profile Changes
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* Danger Zone: Logout & Permanent Account Deletion */}
-      <Card className="rounded-[2.5rem] border-rose-200 bg-rose-50/30 p-6 shadow-sm">
-        <div className="space-y-4">
+        {/* DANGER ZONE */}
+        <div className="rounded-3xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-rose-500 text-white rounded-xl">
+            <div className="p-2 bg-rose-600 text-white rounded-xl">
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-rose-950">Danger Zone & Account Management</h3>
-              <p className="text-xs text-rose-700 font-medium">Log out of your current session or permanently delete your student profile.</p>
+              <h3 className="text-base font-bold text-rose-950 dark:text-rose-200">Danger Zone & Account Actions</h3>
+              <p className="text-xs text-rose-700 dark:text-rose-400">Logout or permanently delete student account.</p>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-rose-200/60 flex flex-wrap items-center justify-between gap-4">
+          <div className="pt-4 border-t border-rose-200 dark:border-rose-900/40 flex items-center justify-between">
             <div>
-              <p className="text-sm font-bold text-slate-800">Session Logout</p>
-              <p className="text-xs text-slate-500">Sign out of this browser. You can log back in anytime.</p>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Session Logout</p>
+              <p className="text-[11px] text-slate-500">Sign out from this device.</p>
             </div>
-            <Button onClick={handleLogout} variant="outline" className="rounded-xl border-rose-300 text-rose-700 hover:bg-rose-600 hover:text-white font-bold">
-              <LogOut className="mr-2 h-4 w-4" /> Logout Account
-            </Button>
-          </div>
-
-          <div className="pt-4 border-t border-rose-200/60 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-bold text-rose-900">Permanently Delete Account</p>
-              <p className="text-xs text-rose-700">Permanently remove all your saved notes history, quiz results, and credentials so you can never log in with this account again.</p>
-            </div>
-            <Button onClick={() => setShowDeleteModal(true)} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md">
-              <Trash2 className="mr-2 h-4 w-4" /> Delete Account Permanently
-            </Button>
+            <button
+              onClick={handleLogout}
+              className="rounded-xl border border-rose-300 dark:border-rose-800 px-4 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition flex items-center gap-1.5"
+            >
+              <LogOut className="h-4 w-4" /> Logout Session
+            </button>
           </div>
         </div>
-      </Card>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl space-y-4 border border-rose-100">
-            <div className="flex justify-between items-start border-b pb-3">
-              <div className="flex items-center gap-2 text-rose-600">
-                <AlertTriangle className="h-5 w-5" />
-                <h3 className="font-extrabold text-base text-slate-900">Delete Account Permanently</h3>
-              </div>
-              <button onClick={() => setShowDeleteModal(false)} className="p-1 text-slate-400 hover:bg-slate-100 rounded-full">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              This action <strong>cannot be undone</strong>. All your student data will be purged, and this email (<strong>{email}</strong>) will be blocked from logging into the platform again.
-            </p>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Type <span className="text-rose-600 font-extrabold">DELETE</span> to confirm:</Label>
-              <Input
-                value={confirmText}
-                onChange={(e) => {
-                  setConfirmText(e.target.value);
-                  setDeleteError("");
-                }}
-                placeholder="DELETE"
-                className="rounded-xl h-11 border-slate-300"
-              />
-              {deleteError && <p className="text-xs text-rose-600 font-bold">{deleteError}</p>}
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button onClick={() => setShowDeleteModal(false)} variant="outline" className="flex-1 rounded-xl font-bold">
-                Cancel
-              </Button>
-              <Button onClick={handleDeleteAccount} disabled={isDeleting} className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md">
-                {isDeleting ? "Deleting..." : "Confirm Delete"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
+    </SiteShell>
   );
 }

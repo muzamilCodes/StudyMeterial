@@ -1,164 +1,257 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { getStoredSession, type StudentSession } from "@/lib/session";
+import { SiteShell } from "@/components/site-shell";
 import { fetchBackendNotes, logDownload, type RealNoteItem } from "@/lib/store";
-import { FileText, Download, Eye, Calendar, HardDrive, CheckCircle2, X, PlusCircle } from "lucide-react";
+import { getStoredSession, type StudentSession } from "@/lib/session";
+import { type Grade, type Stream } from "@/lib/platform-data";
+import { FileText, Download, Eye, Search, Sparkles, CheckCircle2, X, Maximize2, Minimize2 } from "lucide-react";
 
 export default function NotesPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
+  const [notes, setNotes] = useState<RealNoteItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("All");
   const [previewNote, setPreviewNote] = useState<RealNoteItem | null>(null);
-  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
-  const [notesList, setNotesList] = useState<RealNoteItem[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getStoredSession();
     setSession(s);
-
-    const grade = s?.grade ?? "11th";
-    const stream = s?.stream ?? "Medical";
-
-    fetchBackendNotes(grade, stream).then((realNotes) => {
-      setNotesList(realNotes);
-    });
+    const userGrade = s?.grade || "11th";
+    const userStream = s?.stream || "Medical";
+    fetchBackendNotes(userGrade, userStream).then((data) => setNotes(data));
   }, []);
 
-  const grade = session?.grade ?? "11th";
-  const stream = session?.stream ?? "Medical";
+  const subjects = ["All", ...Array.from(new Set(notes.map((n) => n.subject)))];
+
+  const filteredNotes = notes.filter((n) => {
+    const matchesSubject = selectedSubject === "All" || n.subject === selectedSubject;
+    const matchesSearch =
+      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      n.subject.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSubject && matchesSearch;
+  });
 
   const handleDownload = (note: RealNoteItem) => {
-    logDownload(note.title, note.subject, "PDF Note", note.fileSize, note.pdfUrl || note.fileUrl);
-    setDownloadMsg(`Downloaded "${note.title}" (${note.fileSize}). Recorded in Downloads history!`);
-    setTimeout(() => setDownloadMsg(null), 3500);
+    const targetUrl = note.pdfUrl || note.fileUrl || "#";
+    logDownload(note.title, note.subject, "PDF Note", note.fileSize, targetUrl);
 
-    // Actively trigger download in new tab
-    if (note.pdfUrl || note.fileUrl) {
-      window.open(note.pdfUrl || note.fileUrl, "_blank");
-    }
+    const a = document.createElement("a");
+    a.href = targetUrl;
+    a.download = `${note.title}.pdf`;
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setDownloadNotice(`Logged download: "${note.title}"`);
+    setTimeout(() => setDownloadNotice(null), 3000);
+  };
+
+  const getTargetUrl = (note: RealNoteItem) => note.pdfUrl || note.fileUrl || "";
+
+  const isImageFile = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.toLowerCase();
+    return (
+      cleanUrl.includes(".jpg") ||
+      cleanUrl.includes(".jpeg") ||
+      cleanUrl.includes(".png") ||
+      cleanUrl.includes(".webp") ||
+      cleanUrl.startsWith("data:image/") ||
+      cleanUrl.includes("uploads/")
+    );
   };
 
   return (
-    <div className="space-y-6 text-slate-900">
-      {/* Header Banner */}
-      <div className="rounded-[2.5rem] bg-gradient-to-br from-blue-700 via-blue-600 to-slate-900 p-6 md:p-8 text-white shadow-premium">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <Badge className="bg-white/20 text-white border-white/30 mb-1.5 text-xs font-bold">PDF Notes Repository</Badge>
-            <h2 className="text-2xl md:text-3xl font-extrabold">Subject Wise PDF Notes – Class {grade} ({stream})</h2>
-            <p className="mt-1 text-xs md:text-sm text-blue-100/90 max-w-2xl">
-              Verified PDF study notes uploaded by faculty for Class {grade} {stream} syllabus.
+    <SiteShell
+      title="Curated Study Notes & PDF Documents"
+      description="Access, preview full screen, and download subject-wise study material and revision guides."
+    >
+      <div className="space-y-6">
+        
+        {downloadNotice && (
+          <div className="p-4 rounded-2xl bg-emerald-500 text-white font-bold text-xs shadow-lg flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            <span>{downloadNotice}</span>
+          </div>
+        )}
+
+        {/* SEARCH & FILTER BAR */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search notes by title or subject..."
+              className="w-full h-10 rounded-2xl pl-10 pr-4 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* SUBJECT FILTER PILLS */}
+          <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+            {subjects.map((sub) => (
+              <button
+                key={sub}
+                onClick={() => setSelectedSubject(sub)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition shrink-0 ${
+                  selectedSubject === sub
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                }`}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* NOTES GRID */}
+        {filteredNotes.length === 0 ? (
+          <div className="text-center py-16 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+            <FileText className="mx-auto h-12 w-12 text-slate-300" />
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No Notes Found</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              No notes matched your search query. Select another subject or reset your search.
             </p>
           </div>
-          <div className="rounded-2xl bg-white/10 p-4 text-center backdrop-blur-md">
-            <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">Uploaded Notes</p>
-            <p className="text-2xl md:text-3xl font-extrabold text-white mt-1">{notesList.length}</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredNotes.map((note) => (
+              <div
+                key={note.id}
+                className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs hover:shadow-xl transition duration-300 flex flex-col justify-between space-y-4 group"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-3 py-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                      {note.subject}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-400">{note.fileSize}</span>
+                  </div>
+
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition leading-snug">
+                    {note.title}
+                  </h3>
+
+                  <div className="flex items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
+                    <span>{note.pages} Pages</span>
+                    <span>•</span>
+                    <span>Added {note.uploadDate}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    onClick={() => setPreviewNote(note)}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-blue-600" /> Preview
+                  </button>
+                  <button
+                    onClick={() => handleDownload(note)}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition shadow-xs"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
+
       </div>
 
-      {downloadMsg && (
-        <div className="flex items-center gap-3 rounded-2xl bg-emerald-500 p-4 text-white font-bold text-xs shadow-lg animate-in fade-in">
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <p>{downloadMsg}</p>
-        </div>
-      )}
-
-      {/* Real Uploaded Notes Grid */}
-      {notesList.length === 0 ? (
-        <Card className="rounded-[2.5rem] border-white/60 bg-white/80 p-8 shadow-glass text-center space-y-3">
-          <FileText className="h-12 w-12 text-slate-400 mx-auto" />
-          <h3 className="text-lg font-bold text-slate-900">No PDF Notes Uploaded Yet for Class {grade} {stream}</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Admin can upload subject notes for Class {grade} from the Admin Panel. Uploaded notes will appear here dynamically.
-          </p>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {notesList.map((note) => (
-            <Card key={note.id} className="rounded-[2.5rem] border-white/60 bg-white/80 p-6 shadow-glass backdrop-blur-xl hover:shadow-xl transition flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge className="bg-blue-100 text-blue-700 font-bold text-xs">{note.subject}</Badge>
-                  <span className="flex items-center gap-1 text-xs text-slate-500 font-medium">
-                    <Calendar className="h-3.5 w-3.5" /> Uploaded: {note.uploadDate}
-                  </span>
-                </div>
-
-                <h3 className="text-base font-bold text-slate-950 leading-snug">{note.title}</h3>
-
-                <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
-                  <span className="flex items-center gap-1">
-                    <HardDrive className="h-3.5 w-3.5 text-blue-600" /> Size: {note.fileSize}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5 text-orange-500" /> Pages: {note.pages} Pages
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4 mt-3 border-t border-slate-100">
-                <Button
-                  onClick={() => setPreviewNote(note)}
-                  variant="outline"
-                  className="flex-1 h-10 rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-bold"
-                >
-                  <Eye className="mr-1.5 h-3.5 w-3.5 text-blue-600" /> Preview PDF
-                </Button>
-                <Button
-                  onClick={() => handleDownload(note)}
-                  className="flex-1 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow"
-                >
-                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download PDF
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* PDF Preview Modal */}
+      {/* FULL SCREEN RESPONSIVE PDF / IMAGE PREVIEW MODAL */}
       {previewNote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md animate-in fade-in">
-          <div className="relative w-full max-w-3xl rounded-[2.5rem] bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <Badge className="bg-blue-100 text-blue-700 mb-1 text-xs">{previewNote.subject} PDF Notes</Badge>
-                <h3 className="text-lg font-bold text-slate-900">{previewNote.title}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
+          <div
+            className={`w-full bg-slate-900 rounded-3xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 ${
+              isFullscreen ? "h-[98vh] max-w-[98vw]" : "h-[88vh] max-w-5xl"
+            }`}
+          >
+            {/* MODAL HEADER */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="rounded-md bg-blue-500/20 text-blue-300 px-2 py-0.5 text-[10px] font-bold">
+                    {previewNote.subject} Document Viewer
+                  </span>
+                  <h3 className="text-sm font-bold text-white tracking-tight">{previewNote.title}</h3>
+                </div>
               </div>
-              <button onClick={() => setPreviewNote(null)} className="rounded-full bg-slate-100 p-2 hover:bg-slate-200">
-                <X className="h-5 w-5 text-slate-600" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-2 rounded-xl text-slate-300 hover:bg-slate-800 transition"
+                  title={isFullscreen ? "Exit Fullscreen" : "Fullscreen View"}
+                >
+                  {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+                </button>
+                <button
+                  onClick={() => {
+                    setPreviewNote(null);
+                    setIsFullscreen(false);
+                  }}
+                  className="p-2 rounded-xl text-slate-300 hover:bg-slate-800 transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="h-[450px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-              {previewNote.pdfUrl || previewNote.fileUrl ? (
-                <iframe
-                  src={`${previewNote.pdfUrl || previewNote.fileUrl}#toolbar=0`}
-                  className="w-full h-full rounded-2xl"
-                  title={previewNote.title}
-                />
+            {/* FULL SCREEN VIEWER VIEWPORT */}
+            <div className="flex-1 w-full bg-slate-950 overflow-hidden relative flex items-center justify-center p-2">
+              {getTargetUrl(previewNote) ? (
+                isImageFile(getTargetUrl(previewNote)) ? (
+                  <img
+                    src={getTargetUrl(previewNote)}
+                    alt={previewNote.title}
+                    className="w-full h-full object-contain rounded-xl"
+                  />
+                ) : (
+                  <iframe
+                    src={`${getTargetUrl(previewNote)}#toolbar=1`}
+                    className="w-full h-full rounded-xl border-none"
+                    title={previewNote.title}
+                  />
+                )
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center p-6 bg-slate-900 text-white space-y-3">
-                  <FileText className="h-14 w-14 text-blue-400 animate-pulse" />
-                  <p className="font-bold">No Preview URL Available</p>
+                <div className="flex flex-col items-center justify-center text-center p-6 text-slate-400 space-y-3">
+                  <FileText className="h-16 w-16 text-blue-500 animate-pulse" />
+                  <p className="text-base font-bold text-white">Full Screen Document Preview Ready</p>
+                  <p className="text-xs text-slate-400">Class study note for {previewNote.subject}.</p>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setPreviewNote(null)} className="rounded-xl text-xs">
-                Close Preview
-              </Button>
-              <Button onClick={() => { handleDownload(previewNote); setPreviewNote(null); }} className="rounded-xl bg-blue-600 text-white font-bold text-xs">
-                <Download className="mr-1.5 h-3.5 w-3.5" /> Download PDF ({previewNote.fileSize})
-              </Button>
+            {/* MODAL FOOTER */}
+            <div className="flex items-center justify-between p-4 border-t border-slate-800 bg-slate-900/90 rounded-b-3xl shrink-0">
+              <span className="text-xs font-bold text-slate-400">
+                File Size: {previewNote.fileSize} • {previewNote.pages} Pages
+              </span>
+              <button
+                onClick={() => {
+                  handleDownload(previewNote);
+                  setPreviewNote(null);
+                  setIsFullscreen(false);
+                }}
+                className="rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-2 shadow-lg"
+              >
+                <Download className="h-4 w-4" /> Download PDF Document
+              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </SiteShell>
   );
 }

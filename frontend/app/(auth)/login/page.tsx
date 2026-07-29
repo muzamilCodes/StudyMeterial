@@ -56,26 +56,30 @@ export default function LoginPage() {
         localStorage.setItem("study-material-token", data.token);
       }
 
-      const isAdmin = data.user?.isAdmin === true || data.user?.role === "admin" || email.toLowerCase() === "admin@studymaterial.com";
+      const role = data.user?.role || (data.user?.isAdmin ? "admin" : email.toLowerCase().includes("teacher") ? "teacher" : "student");
+      const isAdmin = role === "admin" || role === "superadmin" || email.toLowerCase() === "admin@studymaterial.com";
+      const isTeacher = role === "teacher" || email.toLowerCase() === "teacher@studymaterial.com";
 
       const userSession: StudentSession = {
         id: data.user?.id ?? `usr-${Date.now()}`,
-        name: data.user?.username ?? (isAdmin ? "System Admin" : email.split("@")[0].toUpperCase()),
+        name: data.user?.username ?? (isAdmin ? "System Admin" : isTeacher ? "Dr. Ramesh Sharma" : email.split("@")[0].toUpperCase()),
         email: data.user?.email ?? email,
-        role: isAdmin ? "admin" : "student",
+        role: (isAdmin ? "admin" : isTeacher ? "teacher" : "student") as any,
         isAdmin: isAdmin,
         grade: data.user?.grade ?? "11th",
         stream: data.user?.stream ?? "Medical",
         avatar: data.user?.avatar ?? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        bio: isAdmin ? "System Administrator" : `Student - Class ${data.user?.grade ?? "11th"} (${data.user?.stream ?? "Medical"})`
+        bio: isAdmin ? "System Administrator" : isTeacher ? "Senior Faculty Educator" : `Student - Class ${data.user?.grade ?? "11th"} (${data.user?.stream ?? "Medical"})`
       };
 
       saveSession(userSession);
-      setSuccessMsg("✅ Authentication successful! Opening dashboard...");
+      setSuccessMsg("✅ Authentication successful! Opening portal...");
 
       setTimeout(() => {
         setLoading(false);
-        router.push(isAdmin ? "/admin" : "/dashboard");
+        if (isAdmin) router.push("/admin");
+        else if (isTeacher) router.push("/teacher");
+        else router.push("/dashboard");
       }, 600);
     } catch {
       setErrorMsg("Unable to connect to MongoDB backend server on http://localhost:4000");

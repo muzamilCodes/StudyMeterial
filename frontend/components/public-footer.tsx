@@ -1,77 +1,141 @@
-import Link from "next/link";
-import { BookOpen, Database, Github, Mail, MapPin, Phone } from "lucide-react";
+"use client";
 
-const footerLinks = [
-  { href: "/login", label: "Login" },
-  { href: "/register", label: "Register" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/admin", label: "Admin Panel" }
-];
+import Link from "next/link";
+import { GraduationCap, Mail, Phone, MapPin, Send, Heart, ArrowUpRight } from "lucide-react";
 
 export function PublicFooter() {
   return (
-    <footer className="mt-10 border-t border-white/60 bg-white/70 backdrop-blur-xl">
-      <div className="page-shell grid gap-8 px-4 py-10 md:px-6 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-orange-500 text-white shadow-premium">
-              <BookOpen className="h-5 w-5" />
+    <footer className="w-full border-t border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-950 text-slate-600 dark:text-slate-400 pt-16 pb-12 transition-colors">
+      <div className="max-w-[1600px] mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
+        
+        {/* BRAND & DESCRIPTION */}
+        <div className="lg:col-span-2 space-y-4">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-orange-500 text-white shadow-md">
+              <GraduationCap className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-[0.24em] text-blue-700">STUDY MATERIAL</p>
-              <p className="text-xs text-slate-500">Educational Platform</p>
+              <span className="text-lg font-black tracking-wider bg-gradient-to-r from-blue-600 to-orange-500 bg-clip-text text-transparent">
+                STUDYMATERIAL
+              </span>
+              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                Smart Education Platform
+              </p>
             </div>
-          </div>
-          <p className="max-w-xl text-sm leading-6 text-slate-600">
-            A premium class-wise educational platform for 10th, 11th and 12th students with subject-wise notes,
-            papers, quizzes, videos, results and admin management.
+          </Link>
+          
+          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+            Empowering students with class-wise educational materials, comprehensive notes, previous year solved board papers, interactive live classes, and self-assessment quizzes for 10th, 11th, and 12th grades.
           </p>
-          <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
-              <MapPin className="h-4 w-4 text-blue-600" />
-              India
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
+
+          <div className="flex items-center gap-4 text-xs font-bold text-slate-700 dark:text-slate-300 pt-2">
+            <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-blue-600" />
-              Support Ready
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
-              <Mail className="h-4 w-4 text-blue-600" />
-              help@studymaterial.app
-            </span>
+              <span>+91 98765 43210</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-orange-500" />
+              <span>support@studymaterial.com</span>
+            </div>
           </div>
         </div>
 
-        <div>
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-slate-900">Quick Links</p>
-          <div className="grid gap-3">
-            {footerLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="text-sm text-slate-600 transition hover:text-blue-600">
-                {link.label}
+        {/* QUICK NAVIGATION */}
+        <div className="space-y-3">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            Navigation
+          </p>
+          <ul className="space-y-2 text-xs font-semibold">
+            <li>
+              <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1">
+                <span>Home Landing</span>
               </Link>
-            ))}
-          </div>
+            </li>
+            <li>
+              <Link href="/dashboard" className="hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1">
+                <span>Student Dashboard</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/subjects" className="hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1">
+                <span>All Subjects</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/notes" className="hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1">
+                <span>Curated Notes</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/previous-papers" className="hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1">
+                <span>Previous Year Papers</span>
+              </Link>
+            </li>
+          </ul>
         </div>
 
-        <div>
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-slate-900">Backend Stack</p>
-          <div className="grid gap-3 text-sm text-slate-600">
-            <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3">
-              <Database className="h-4 w-4 text-orange-500" />
-              MongoDB Atlas
+        {/* ACADEMICS & CLASSES */}
+        <div className="space-y-3">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            Academic Streams
+          </p>
+          <ul className="space-y-2 text-xs font-semibold">
+            <li>
+              <Link href="/videos" className="hover:text-blue-600 dark:hover:text-blue-400 transition">
+                Live Interactive Classes
+              </Link>
+            </li>
+            <li>
+              <Link href="/quizzes" className="hover:text-blue-600 dark:hover:text-blue-400 transition">
+                Online Quiz Tests
+              </Link>
+            </li>
+            <li>
+              <span className="text-slate-400">Class 10th General</span>
+            </li>
+            <li>
+              <span className="text-slate-400">Class 11th Medical / Non-Med</span>
+            </li>
+            <li>
+              <span className="text-slate-400">Class 12th Commerce & Arts</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* NEWSLETTER */}
+        <div className="space-y-3">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            Exam Updates & Newsletter
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Subscribe for free weekly model paper uploads and exam date reminders.
+          </p>
+          
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-2">
+            <div className="relative">
+              <input
+                type="email"
+                placeholder="Enter email..."
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                className="absolute right-1.5 top-1.5 rounded-lg bg-blue-600 p-1.5 text-white hover:bg-blue-700 transition"
+              >
+                <Send className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3">
-              <Github className="h-4 w-4 text-blue-600" />
-              GitHub Ready
-            </div>
-          </div>
+          </form>
         </div>
       </div>
 
-      <div className="border-t border-slate-200/70">
-        <div className="page-shell flex flex-col gap-2 px-4 py-4 text-xs text-slate-500 md:flex-row md:items-center md:justify-between md:px-6">
-          <p>© 2026 Study Material. Premium educational platform.</p>
-          <p>Built with Next.js, Tailwind CSS, MongoDB, JWT, and Cloudinary-ready architecture.</p>
+      {/* BOTTOM BAR */}
+      <div className="max-w-[1600px] mx-auto mt-12 pt-6 border-t border-slate-200/60 dark:border-slate-800/80 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-400">
+        <p>© 2026 StudyMaterial Educational Inc. All rights reserved.</p>
+        <div className="flex items-center gap-6">
+          <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">Privacy Policy</span>
+          <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">Terms of Service</span>
+          <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">API Status</span>
         </div>
       </div>
     </footer>
