@@ -28,7 +28,8 @@ export async function seedDatabase() {
       "results",
       "downloads",
       "bookmarks",
-      "notices"
+      "notices",
+      "live_classes"
     ];
 
     const existingCollections = (await db.listCollections().toArray()).map((c) => c.name);
@@ -45,6 +46,7 @@ export async function seedDatabase() {
     const userCount = await usersCol.countDocuments();
     if (userCount === 0) {
       const adminPassHash = await hashPassword("Admin@12345");
+      const teacherPassHash = await hashPassword("Teacher@12345");
       const studentPassHash = await hashPassword("Student@12345");
 
       await usersCol.insertMany([
@@ -54,6 +56,17 @@ export async function seedDatabase() {
           passwordHash: adminPassHash,
           role: "admin",
           isAdmin: true,
+          grade: "11th",
+          stream: "Medical",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          username: "Dr. Ramesh Sharma",
+          email: "teacher@studymaterial.com",
+          passwordHash: teacherPassHash,
+          role: "teacher",
+          isAdmin: false,
           grade: "11th",
           stream: "Medical",
           createdAt: new Date(),
@@ -71,7 +84,7 @@ export async function seedDatabase() {
           updatedAt: new Date()
         }
       ]);
-      console.log(`👤 Seeded Admin and Student users into "users" collection`);
+      console.log(`👤 Seeded Admin, Teacher, and Student users into "users" collection`);
     }
 
     // Seed 2: Classes
@@ -109,12 +122,54 @@ export async function seedDatabase() {
         { grade: "11th", stream: "Medical", name: "Biology", notesCount: 10, papersCount: 6, videosCount: 7, quizzesCount: 5 },
         { grade: "11th", stream: "Medical", name: "Physics", notesCount: 9, papersCount: 6, videosCount: 7, quizzesCount: 5 },
         { grade: "11th", stream: "Medical", name: "Chemistry", notesCount: 9, papersCount: 6, videosCount: 7, quizzesCount: 5 },
-        { grade: "11th", stream: "Medical", name: "English", notesCount: 6, papersCount: 4, videosCount: 4, quizzesCount: 3 }
+        { grade: "11th", stream: "Medical", name: "English", notesCount: 6, papersCount: 4, quizzesCount: 3 }
       ]);
       console.log(`📖 Seeded Subjects into "subjects" collection`);
     }
 
-    // Seed 5: Notices
+    // Seed 5: Live Classes in MongoDB
+    const liveClassesCol = db.collection("live_classes");
+    if ((await liveClassesCol.countDocuments()) === 0) {
+      await liveClassesCol.insertMany([
+        {
+          title: "Cellular Genetics & DNA Replication Masterclass",
+          subject: "Biology",
+          category: "NEET Special Preparation",
+          description: "Deep dive into Mendelian genetics, molecular replication, DNA polymerases, and high-yield board/entrance numericals.",
+          teacherName: "Dr. Ramesh Sharma",
+          teacherPhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+          teacherBio: "14+ Years Senior Biology Educator for Class 11th & 12th Board & NEET Aspirants.",
+          date: "Today, July 28, 2026",
+          startTime: "09:00 PM",
+          endTime: "10:15 PM",
+          duration: "75 Mins",
+          timeZone: "IST (UTC+5:30)",
+          meetingPlatform: "Google Meet",
+          meetingLink: "https://meet.google.com/abc-defg-hij",
+          meetingId: "982-124-4412",
+          meetingPassword: "STUDBIO2026",
+          maxStudents: 500,
+          enrolledStudentsCount: 342,
+          language: "English & Hindi",
+          difficultyLevel: "Intermediate",
+          bannerUrl: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop&q=80",
+          thumbnailUrl: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
+          tags: ["Genetics", "NEET", "Class 11th"],
+          status: "Published",
+          allowRecording: true,
+          allowChat: true,
+          allowScreenShare: true,
+          allowStudentQuestions: true,
+          grade: "11th",
+          stream: "Medical",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ]);
+      console.log(`🎥 Seeded Real Live Classes into "live_classes" collection`);
+    }
+
+    // Seed 6: Notices
     const noticesCol = db.collection("notices");
     if ((await noticesCol.countDocuments()) === 0) {
       await noticesCol.insertMany([
@@ -125,7 +180,7 @@ export async function seedDatabase() {
       console.log(`📢 Seeded Notices into "notices" collection`);
     }
 
-    console.log(`🎉 MongoDB Database "studymeterial" successfully populated with all 12 collections!`);
+    console.log(`🎉 MongoDB Database "studymeterial" successfully populated with all collections!`);
   } catch (error) {
     console.error(`❌ MongoDB Seeding Error:`, error);
   } finally {

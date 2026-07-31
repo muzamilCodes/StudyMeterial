@@ -1,7 +1,3 @@
 .env
 .env.example
-node_modulesbackend/uploads/
-frontend/.next/
-.next/
-node_modules/
-uploads/
+node_modules
