@@ -77,14 +77,14 @@ export default function RegisterPage() {
       };
 
       saveSession(userSession);
-      setSuccessMsg("✅ Registered successfully in MongoDB database 'studymeterial'! Redirecting to Student Dashboard...");
+      setSuccessMsg("Registration successful! Welcome aboard. Redirecting to your dashboard...");
 
       setTimeout(() => {
         setLoading(false);
         router.push("/dashboard");
       }, 1000);
     } catch {
-      setErrorMsg("Unable to connect to MongoDB backend. Make sure backend is running on http://localhost:4000!");
+      setErrorMsg("Something went wrong. Please try again.");
       setLoading(false);
     }
   }
@@ -99,17 +99,17 @@ export default function RegisterPage() {
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-blue-200">JOIN PLATFORM</p>
         <h1 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">Student Registration</h1>
         <p className="mt-4 text-sm leading-relaxed text-blue-100/90">
-          Create your account to unlock class-wise study materials, PDF notes, previous board papers, MCQ quizzes, and progress analytics. Saved directly in MongoDB database!
+          Create your account to unlock class-wise study materials, PDF notes, previous board papers, MCQ quizzes, and progress analytics.
         </p>
 
         <div className="mt-8 space-y-3">
           <div className="flex items-center gap-3 rounded-2xl bg-white/10 p-3.5 backdrop-blur-sm">
             <CheckCircle2 className="h-5 w-5 text-orange-400 shrink-0" />
-            <p className="text-xs font-medium text-white">Direct MongoDB Database Connection ("studymeterial")</p>
+            <p className="text-xs font-medium text-white">Secure Account & Data Protection</p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl bg-white/10 p-3.5 backdrop-blur-sm">
             <CheckCircle2 className="h-5 w-5 text-orange-400 shrink-0" />
-            <p className="text-xs font-medium text-white">Single Email Registration Guard (Strict 1 Email = 1 Account)</p>
+            <p className="text-xs font-medium text-white">One Email per Account (No Duplicate Registration)</p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl bg-white/10 p-3.5 backdrop-blur-sm">
             <CheckCircle2 className="h-5 w-5 text-orange-400 shrink-0" />
@@ -121,9 +121,9 @@ export default function RegisterPage() {
       {/* Right Register Card */}
       <Card className="rounded-[2.5rem] border-white/60 bg-white/90 p-4 sm:p-6 shadow-glass backdrop-blur-xl">
         <CardHeader className="space-y-1">
-          <Badge className="w-fit bg-orange-100 text-orange-700 hover:bg-orange-100 mb-1 text-xs font-bold">MongoDB Live Sync</Badge>
+          <Badge className="w-fit bg-orange-100 text-orange-700 hover:bg-orange-100 mb-1 text-xs font-bold">Free Registration</Badge>
           <CardTitle className="text-xl sm:text-2xl font-bold text-slate-950">Student Registration</CardTitle>
-          <CardDescription className="text-xs sm:text-sm text-slate-600">Enter your details. Saves directly into MongoDB database!</CardDescription>
+          <CardDescription className="text-xs sm:text-sm text-slate-600">Fill in your details below to create your student account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -200,7 +200,7 @@ export default function RegisterPage() {
 
             <div className="flex flex-col sm:flex-row gap-3 pt-3">
               <Button className="flex-1 h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm shadow-premium" type="submit" disabled={loading}>
-                {loading ? "Saving to MongoDB..." : "Register & Save in MongoDB"}
+                {loading ? "Creating Account..." : "Create Account"}
               </Button>
               <Link
                 href="/login"
