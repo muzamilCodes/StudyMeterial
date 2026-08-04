@@ -1,94 +1,155 @@
-export type Grade = "10th" | "11th" | "12th";
-export type Stream = "General" | "Medical" | "Non-Medical" | "Commerce" | "Arts";
+import bcrypt from "bcryptjs";
+import type { AppState, Grade, Stream } from "./types.js";
 
-export type Subject = {
-  name: string;
-  notes: number;
-  papers: number;
-  videos: number;
-  quizzes: number;
+const now = () => new Date().toISOString();
+
+const adminHash = await bcrypt.hash("Admin@12345", 10);
+const studentHash = await bcrypt.hash("Student@12345", 10);
+
+export const seedState: AppState = {
+  users: [
+    {
+      id: "user-admin-1",
+      username: "System Admin",
+      email: "admin@studymaterial.com",
+      passwordHash: adminHash,
+      role: "admin",
+      grade: "11th",
+      stream: "Medical",
+      createdAt: now()
+    },
+    {
+      id: "user-student-1",
+      username: "Muzamil Ahmad",
+      email: "student@studymaterial.com",
+      passwordHash: studentHash,
+      role: "student",
+      grade: "11th",
+      stream: "Medical",
+      createdAt: now()
+    }
+  ],
+  notes: [
+    {
+      id: "note-1",
+      subject: "Biology",
+      title: "Cell Biology & Organelles Notes",
+      grade: "11th",
+      stream: "Medical",
+      createdAt: now(),
+      uploadDate: "2026-07-20",
+      fileSize: "3.4 MB",
+      pages: 18,
+      fileUrl: "http://localhost:4000/uploads/dummy.pdf"
+    }
+  ],
+  papers: [
+    {
+      id: "paper-1",
+      subject: "Physics",
+      title: "2025 Board Solved Paper",
+      grade: "11th",
+      stream: "Medical",
+      createdAt: now(),
+      year: "2025",
+      term: "Board Exam",
+      fileSize: "4.8 MB",
+      fileUrl: "http://localhost:4000/uploads/dummy.pdf"
+    }
+  ],
+  videos: [
+    {
+      id: "video-1",
+      subject: "Chemistry",
+      title: "Organic Chemistry Masterclass",
+      grade: "11th",
+      stream: "Medical",
+      createdAt: now(),
+      instructor: "Dr. Vikram Seth",
+      duration: "45:00",
+      thumbnail: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=600&auto=format&fit=crop&q=80",
+      videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4"
+    }
+  ],
+  quizzes: [],
+  notices: [
+    {
+      id: "notice-1",
+      title: "Mid-Term Examination Schedule Released",
+      body: "The date sheet for upcoming mid-term examinations has been published.",
+      category: "Exam Updates",
+      date: "July 21, 2026",
+      createdAt: now()
+    }
+  ],
+  liveClasses: [
+    {
+      id: "class-1",
+      title: "Cellular Genetics Masterclass",
+      subject: "Biology",
+      category: "NEET Special Preparation",
+      description: "Deep dive into genetics, replication, and high-yield questions.",
+      teacherName: "Dr. Ramesh Sharma",
+      teacherPhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+      teacherBio: "Senior Biology Faculty",
+      date: "2026-08-04",
+      startTime: "09:00 PM",
+      endTime: "10:15 PM",
+      duration: "75 Mins",
+      timeZone: "IST (UTC+5:30)",
+      meetingPlatform: "Google Meet",
+      meetingLink: "https://meet.google.com/abc-defg-hij",
+      meetingId: "982-124-4412",
+      meetingPassword: "STUDBIO2026",
+      maxStudents: 500,
+      enrolledStudentsCount: 342,
+      language: "English & Hindi",
+      difficultyLevel: "Intermediate",
+      bannerUrl: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop&q=80",
+      thumbnailUrl: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
+      tags: ["Genetics", "NEET", "Biology"],
+      status: "Published",
+      allowRecording: true,
+      allowChat: true,
+      allowScreenShare: true,
+      allowStudentQuestions: true,
+      prerequisites: ["Read NCERT Chapter 5"],
+      learningOutcomes: ["Master DNA replication", "Solve genetics numericals"],
+      recordingUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
+      grade: "11th",
+      stream: "Medical",
+      createdAt: now()
+    }
+  ],
+  attendance: []
 };
 
-export const classSubjects: Record<Grade, Record<Stream | "General", Subject[]>> = {
+export const gradeStreams: Record<Grade, Stream[]> = {
+  "10th": ["General"],
+  "11th": ["Medical", "Non-Medical", "Commerce", "Arts"],
+  "12th": ["Medical", "Non-Medical", "Commerce", "Arts"]
+};
+
+export const subjectDirectory: Record<Grade, Record<Stream, string[]>> = {
   "10th": {
-    General: [
-      { name: "Mathematics", notes: 8, papers: 5, videos: 6, quizzes: 4 },
-      { name: "Science", notes: 8, papers: 5, videos: 5, quizzes: 4 },
-      { name: "English", notes: 6, papers: 4, videos: 4, quizzes: 3 },
-      { name: "Social Science", notes: 7, papers: 5, videos: 4, quizzes: 3 }
-    ],
+    General: ["Mathematics", "Science", "English", "Social Science", "Hindi"],
     Medical: [],
     "Non-Medical": [],
     Commerce: [],
     Arts: []
   },
   "11th": {
-    Medical: [
-      { name: "Biology", notes: 10, papers: 6, videos: 7, quizzes: 5 },
-      { name: "Physics", notes: 9, papers: 6, videos: 7, quizzes: 5 },
-      { name: "Chemistry", notes: 9, papers: 6, videos: 7, quizzes: 5 },
-      { name: "English", notes: 6, papers: 4, videos: 4, quizzes: 3 }
-    ],
-    "Non-Medical": [
-      { name: "Physics", notes: 9, papers: 6, videos: 7, quizzes: 5 },
-      { name: "Chemistry", notes: 9, papers: 6, videos: 7, quizzes: 5 },
-      { name: "Mathematics", notes: 11, papers: 7, videos: 8, quizzes: 6 },
-      { name: "English", notes: 6, papers: 4, videos: 4, quizzes: 3 }
-    ],
-    Commerce: [
-      { name: "Accountancy", notes: 9, papers: 6, videos: 6, quizzes: 5 },
-      { name: "Business Studies", notes: 9, papers: 6, videos: 6, quizzes: 5 },
-      { name: "Economics", notes: 8, papers: 5, videos: 6, quizzes: 4 },
-      { name: "English", notes: 6, papers: 4, videos: 4, quizzes: 3 }
-    ],
-    Arts: [
-      { name: "History", notes: 8, papers: 5, videos: 6, quizzes: 4 },
-      { name: "Political Science", notes: 8, papers: 5, videos: 6, quizzes: 4 },
-      { name: "Sociology", notes: 7, papers: 5, videos: 5, quizzes: 4 },
-      { name: "English", notes: 6, papers: 4, videos: 4, quizzes: 3 }
-    ],
-    General: []
+    General: [],
+    Medical: ["Biology", "Physics", "Chemistry", "English"],
+    "Non-Medical": ["Physics", "Chemistry", "Mathematics", "English"],
+    Commerce: ["Accountancy", "Business Studies", "Economics", "English"],
+    Arts: ["History", "Political Science", "Sociology", "English"]
   },
   "12th": {
-    Medical: [
-      { name: "Biology", notes: 11, papers: 7, videos: 8, quizzes: 6 },
-      { name: "Physics", notes: 10, papers: 7, videos: 8, quizzes: 6 },
-      { name: "Chemistry", notes: 10, papers: 7, videos: 8, quizzes: 6 }
-    ],
-    "Non-Medical": [
-      { name: "Mathematics", notes: 12, papers: 8, videos: 9, quizzes: 7 },
-      { name: "Physics", notes: 10, papers: 7, videos: 8, quizzes: 6 },
-      { name: "Chemistry", notes: 10, papers: 7, videos: 8, quizzes: 6 }
-    ],
-    Commerce: [
-      { name: "Accountancy", notes: 10, papers: 7, videos: 7, quizzes: 6 },
-      { name: "Economics", notes: 9, papers: 6, videos: 7, quizzes: 5 },
-      { name: "Business Studies", notes: 10, papers: 7, videos: 7, quizzes: 6 }
-    ],
-    Arts: [
-      { name: "History", notes: 9, papers: 6, videos: 7, quizzes: 5 },
-      { name: "Geography", notes: 9, papers: 6, videos: 7, quizzes: 5 },
-      { name: "Political Science", notes: 8, papers: 5, videos: 6, quizzes: 4 }
-    ],
-    General: []
+    General: [],
+    Medical: ["Biology", "Physics", "Chemistry"],
+    "Non-Medical": ["Mathematics", "Physics", "Chemistry"],
+    Commerce: ["Accountancy", "Economics", "Business Studies"],
+    Arts: ["History", "Geography", "Political Science"]
   }
 };
-
-export const dashboardStats = [
-  { label: "Notes", value: "24", accent: "blue" as const },
-  { label: "Previous Papers", value: "15", accent: "orange" as const },
-  { label: "Quizzes", value: "8", accent: "indigo" as const },
-  { label: "Average Score", value: "85%", accent: "emerald" as const }
-];
-
-export const fallbackNotices = [
-  { title: "Latest Announcements", date: "Today", tag: "Live" },
-  { title: "Exam Updates", date: "Tomorrow", tag: "Exam" },
-  { title: "Holiday Notice", date: "This Week", tag: "Holiday" }
-];
-
-export const studentMetrics = [
-  { label: "Completed Quizzes", value: "6/8" },
-  { label: "Downloaded Notes", value: "18" },
-  { label: "Downloaded Papers", value: "9" }
-];

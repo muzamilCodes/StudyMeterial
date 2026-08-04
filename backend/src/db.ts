@@ -1,17 +1,12 @@
-import { MongoClient, type Db } from "mongodb";
+import mongoose from "mongoose";
 
-let client: MongoClient | null = null;
-let clientPromise: Promise<MongoClient> | null = null;
+export async function connectDB() {
+  const uri = process.env.MONGO_URI || "mongodb://localhost:27017/studymaterial";
+  await mongoose.connect(uri);
+  console.log(`✅ MongoDB connected: ${uri}`);
+}
 
-export async function connectDb(): Promise<Db | null> {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) return null;
-
-  if (!clientPromise) {
-    client = new MongoClient(uri);
-    clientPromise = client.connect();
-  }
-
-  const connectedClient = await clientPromise;
-  return connectedClient.db();
+export async function disconnectDB() {
+  await mongoose.disconnect();
+  console.log("🔌 MongoDB disconnected");
 }

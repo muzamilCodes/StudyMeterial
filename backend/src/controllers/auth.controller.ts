@@ -1,94 +1,69 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { createResetToken, loginStudent, registerStudent, resetPassword } from "../services.js";
-import type { Grade, Stream } from "../types.js";
+import { deleteAccount, forgotPassword, loginUser, registerUser, resetPassword } from "../services.js";
 
-const gradeSchema = z.enum(["10th", "11th", "12th"]);
-const streamSchema = z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]);
+const loginSchema = z.object({
+  email:    z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" })
+});
+
+const registerSchema = z.object({
+  email:           z.string().email({ message: "Please enter a valid email address" }),
+  password:        z.string().min(6, { message: "Password must be at least 6 characters" }),
+  confirmPassword: z.string().min(6, { message: "Confirm password must be at least 6 characters" }).optional(),
+  grade:           z.enum(["10th", "11th", "12th"], { error: "Please select a valid class (10th, 11th, or 12th)" }),
+  stream:          z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"], { error: "Please select a valid stream" }),
+  username:        z.string().min(2, { message: "Name must be at least 2 characters" }).optional()
+});
 
 export async function login(req: Request, res: Response) {
-  const schema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6)
-  });
-
-  const parsed = schema.safeParse(req.body);
+  const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: "Invalid email or password format" });
+    const firstError = parsed.error.issues[0]?.message ?? "Invalid email or password";
+    return res.status(400).json({ message: firstError });
   }
-
-  try {
-    const result = await loginStudent(parsed.data);
-    res.json({ message: "Login successful", ...result });
-  } catch (error) {
-    res.status(400).json({ message: error instanceof Error ? error.message : "Login failed" });
-  }
+  const result = await loginUser(parsed.data);
+  return res.status(result.status).json(result.body);
 }
 
 export async function register(req: Request, res: Response) {
-  const schema = z.object({
-    username: z.string().min(2),
-    email: z.string().email(),
-    password: z.string().min(6),
-    confirmPassword: z.string().min(6).optional(),
-    grade: gradeSchema,
-    stream: streamSchema
-  });
-
-  const parsed = schema.safeParse(req.body);
+  const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => i.message).join(", ");
-    return res.status(400).json({ message: `Validation error: ${issues}` });
+    const firstError = parsed.error.issues[0]?.message ?? "Please fill all required fields correctly";
+    return res.status(400).json({ message: firstError });
   }
-
+  // Only check password match if confirmPassword was provided
   if (parsed.data.confirmPassword && parsed.data.password !== parsed.data.confirmPassword) {
-    return res.status(400).json({ message: "Passwords do not match" });
+    return res.status(400).json({ message: "Passwords do not match. Please try again." });
   }
-
-  try {
-    const result = await registerStudent({
-      username: parsed.data.username,
-      email: parsed.data.email,
-      password: parsed.data.password,
-      grade: parsed.data.grade as Grade,
-      stream: parsed.data.stream as Stream
-    });
-    res.json({ message: "Registration successful", ...result });
-  } catch (error) {
-    res.status(400).json({ message: error instanceof Error ? error.message : "Registration failed" });
-  }
+  const result = await registerUser(parsed.data);
+  return res.status(result.status).json(result.body);
 }
 
-export async function forgotPassword(req: Request, res: Response) {
-  const schema = z.object({ email: z.string().email() });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: "Invalid email address" });
-
-  const result = await createResetToken(parsed.data.email);
-  res.json({ message: "Reset link generated", email: parsed.data.email, ...result });
+export async function forgotPasswordHandler(req: Request, res: Response) {
+  const email = z.string().email({ message: "Please enter a valid email address" }).safeParse(req.body?.email);
+  if (!email.success) return res.status(400).json({ message: email.error.issues[0]?.message ?? "Invalid email" });
+  const result = await forgotPassword(email.data);
+  return res.status(result.status).json(result.body);
 }
 
 export async function resetPasswordHandler(req: Request, res: Response) {
   const schema = z.object({
-    token: z.string().min(5),
-    password: z.string().min(6),
-    confirmPassword: z.string().min(6).optional()
+    email:    z.string().email({ message: "Please enter a valid email address" }),
+    password: z.string().min(6, { message: "Password must be at least 6 characters" })
   });
-
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: "Invalid password reset payload" });
+    const firstError = parsed.error.issues[0]?.message ?? "Invalid reset payload";
+    return res.status(400).json({ message: firstError });
   }
+  const result = await resetPassword(parsed.data.email, parsed.data.password);
+  return res.status(result.status).json(result.body);
+}
 
-  try {
-    const email = (req.body.email || "").toString();
-    const ok = await resetPassword({
-      email,
-      token: parsed.data.token,
-      newPassword: parsed.data.password
-    });
-    res.json({ message: "Password updated successfully", success: ok });
-  } catch (error) {
-    res.status(400).json({ message: error instanceof Error ? error.message : "Reset failed" });
-  }
+export async function deleteAccountHandler(req: Request, res: Response) {
+  const email = z.string().email({ message: "Please enter a valid email address" }).safeParse(req.body?.email);
+  if (!email.success) return res.status(400).json({ message: email.error.issues[0]?.message ?? "Invalid email" });
+  const result = await deleteAccount(email.data);
+  return res.status(result.status).json(result.body);
 }

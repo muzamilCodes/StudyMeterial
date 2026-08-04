@@ -1,632 +1,366 @@
-import crypto from "node:crypto";
-import { ObjectId } from "mongodb";
 import { comparePassword, hashPassword, signToken } from "./auth.js";
-import { connectDb } from "./db.js";
+import {
+  AttendanceModel,
+  LiveClassModel,
+  NoteModel,
+  NoticeModel,
+  PaperModel,
+  QuizModel,
+  UserModel,
+  VideoModel
+} from "./models/index.js";
+import { seedState } from "./data.js";
+import type { Grade, Stream } from "./types.js";
 
-type Grade = "10th" | "11th" | "12th";
-type Stream = "General" | "Medical" | "Non-Medical" | "Commerce" | "Arts";
-type JwtRole = "superadmin" | "admin" | "teacher" | "student";
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export type LiveClassLifecycle =
-  | "Draft"
-  | "Published"
-  | "Upcoming"
-  | "Starting Soon"
-  | "Live"
-  | "Completed"
-  | "Recording Available"
-  | "Archived";
-
-export type LiveClassRecord = {
-  _id?: ObjectId;
-  id?: string;
-  title: string;
-  subject: string;
-  category: string;
-  description: string;
-  teacherName: string;
-  teacherPhoto?: string;
-  teacherBio?: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  duration: string;
-  timeZone?: string;
-  meetingPlatform: "Google Meet" | "Zoom" | "Jitsi" | "LiveKit" | "Custom";
-  meetingLink: string;
-  meetingId?: string;
-  meetingPassword?: string;
-  maxStudents: number;
-  enrolledStudentsCount?: number;
-  language: string;
-  difficultyLevel: "Beginner" | "Intermediate" | "Advanced";
-  bannerUrl?: string;
-  thumbnailUrl?: string;
-  tags?: string[];
-  status: LiveClassLifecycle;
-  allowRecording: boolean;
-  allowChat: boolean;
-  allowScreenShare: boolean;
-  allowStudentQuestions: boolean;
-  attachments?: Array<{ title: string; type: string; url: string; size?: string }>;
-  prerequisites?: string[];
-  learningOutcomes?: string[];
-  recordingUrl?: string;
-  homeworkUrl?: string;
-  grade: Grade;
-  stream: Stream;
-  createdAt?: Date;
-  updatedAt?: Date;
-};
-
-export type LiveClassAttendanceRecord = {
-  _id?: ObjectId;
-  classId: string;
-  studentId?: string;
-  studentName: string;
-  email: string;
-  joinTime: string;
-  leaveTime?: string;
-  totalDurationMinutes?: number;
-  status: "Present" | "Late" | "Absent";
-  createdAt?: Date;
-};
-
-export type LiveClassChatRecord = {
-  _id?: ObjectId;
-  classId: string;
-  senderName: string;
-  senderRole: "student" | "teacher" | "admin";
-  text: string;
-  time: string;
-  createdAt?: Date;
-};
-
-export type LiveClassFeedbackRecord = {
-  _id?: ObjectId;
-  classId: string;
-  studentName: string;
-  rating: number;
-  comment: string;
-  createdAt?: Date;
-};
-
-type UserRecord = {
-  _id?: ObjectId;
-  username: string;
-  email: string;
-  passwordHash: string;
-  role: JwtRole;
-  isAdmin?: boolean;
-  grade: Grade;
-  stream: Stream;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-type ResetTokenRecord = {
-  email: string;
-  token: string;
-  expiresAt: Date;
-  createdAt: Date;
-};
-
-export async function getSubjectsByGradeStream(grade: Grade, stream: Stream) {
-  const db = await connectDb();
-  if (!db) return [];
-
-  const collection = db.collection("subjects");
-  const existing = await collection.find({ grade, stream }).toArray();
-  return existing;
+/** Convert a Mongoose lean doc to a plain object with `id` string field */
+function toPlain(doc: any) {
+  if (!doc) return null;
+  const plain = { ...doc };
+  plain.id = doc._id?.toString() ?? doc.id;
+  delete plain._id;
+  delete plain.__v;
+  return plain;
 }
 
-export async function getDashboardSummary() {
-  const db = await connectDb();
-  if (!db) {
-    return {
-      stats: [
-        { label: "Users", value: "0", accent: "blue" as const },
-        { label: "Students", value: "0", accent: "indigo" as const },
-        { label: "Admins", value: "0", accent: "amber" as const },
-        { label: "Notes", value: "0", accent: "orange" as const },
-        { label: "Papers", value: "0", accent: "indigo" as const },
-        { label: "Quizzes", value: "0", accent: "emerald" as const },
-        { label: "Live Classes", value: "0", accent: "rose" as const },
-        { label: "Notices", value: "0", accent: "purple" as const }
-      ],
-      notices: [],
-      progress: [],
-      distributions: {
-        medical: 0,
-        nonMedical: 0,
-        commerce: 0,
-        arts: 0,
-        general: 0
-      }
-    };
-  }
-
-  const [
-    users, 
-    students, 
-    admins, 
-    notes, 
-    papers, 
-    quizzes, 
-    notices, 
-    liveClasses,
-    publishedClasses,
-    streamAgg
-  ] = await Promise.all([
-    db.collection("users").countDocuments(),
-    db.collection("users").countDocuments({ role: "student" }),
-    db.collection("users").countDocuments({ $or: [{ role: "admin" }, { isAdmin: true }] }),
-    db.collection("notes").countDocuments(),
-    db.collection("previous_papers").countDocuments(),
-    db.collection("quizzes").countDocuments(),
-    db.collection("notices").countDocuments(),
-    db.collection("live_classes").countDocuments(),
-    db.collection("live_classes").countDocuments({ status: { $in: ["Published", "Live", "Upcoming"] } }),
-    db.collection("users").aggregate([{ $group: { _id: "$stream", count: { $sum: 1 } } }]).toArray()
-  ]);
-
-  const recentNotices = await db.collection("notices").find({}).sort({ createdAt: -1 }).limit(4).toArray();
-
-  const distributions = {
-    medical: streamAgg.find(s => s._id === "Medical")?.count || 0,
-    nonMedical: streamAgg.find(s => s._id === "Non-Medical")?.count || 0,
-    commerce: streamAgg.find(s => s._id === "Commerce")?.count || 0,
-    arts: streamAgg.find(s => s._id === "Arts")?.count || 0,
-    general: streamAgg.find(s => s._id === "General")?.count || 0
-  };
-
-  return {
-    stats: [
-      { label: "Users", value: String(users), accent: "blue" as const },
-      { label: "Students", value: String(students), accent: "indigo" as const },
-      { label: "Admins", value: String(admins), accent: "amber" as const },
-      { label: "Notes", value: String(notes), accent: "orange" as const },
-      { label: "Papers", value: String(papers), accent: "indigo" as const },
-      { label: "Quizzes", value: String(quizzes), accent: "emerald" as const },
-      { label: "Live Classes", value: String(liveClasses), accent: "rose" as const },
-      { label: "Published Classes", value: String(publishedClasses), accent: "rose" as const },
-      { label: "Notices", value: String(notices), accent: "purple" as const }
-    ],
-    notices: recentNotices,
-    progress: [
-      { label: "Active Live Sessions", value: String(publishedClasses) },
-      { label: "Total Quizzes", value: String(quizzes) },
-      { label: "PDF Notes Repository", value: String(notes) },
-      { label: "Solved Board Papers", value: String(papers) }
-    ],
-    distributions
-  };
-}
-
-export async function getRegisteredUsers() {
-  const db = await connectDb();
-  if (!db) return [];
-  const users = await db.collection("users").find({}, { projection: { passwordHash: 0 } }).toArray();
-  return users;
-}
-
-export async function loginStudent(input: { email: string; password: string }) {
-  const db = await connectDb();
-  const normalizedEmail = input.email.trim().toLowerCase();
-  const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@studymaterial.com").trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "Admin@12345";
-
-  if (normalizedEmail === adminEmail && input.password === adminPassword) {
-    return {
-      mode: "admin" as const,
-      token: signToken({ userId: "admin_001", role: "admin", email: normalizedEmail }),
-      user: {
-        id: "admin_001",
-        email: normalizedEmail,
-        username: "System Admin",
-        role: "admin" as const,
-        isAdmin: true,
-        grade: "11th" as const,
-        stream: "Medical" as const
-      }
-    };
-  }
-
-  if (!db) {
-    throw new Error("Database connection unavailable");
-  }
-
-  const usersCollection = db.collection<UserRecord>("users");
-  const user = await usersCollection.findOne({ email: normalizedEmail });
-
-  if (!user) {
-    throw new Error("User with this email does not exist");
-  }
-
-  const isValidPassword = await comparePassword(input.password, user.passwordHash);
-  if (!isValidPassword) {
-    throw new Error("Invalid password credentials");
-  }
-
-  const userId = user._id ? user._id.toString() : "user_" + Date.now();
-  const isAdminRole = user.role === "admin" || user.isAdmin === true;
-  const token = signToken({ userId, role: isAdminRole ? "admin" : "student", email: user.email });
-
-  return {
-    mode: isAdminRole ? ("admin" as const) : ("student" as const),
-    token,
-    user: {
-      id: userId,
-      email: user.email,
-      username: user.username,
-      role: isAdminRole ? ("admin" as const) : ("student" as const),
-      isAdmin: isAdminRole,
-      grade: user.grade,
-      stream: user.stream
-    }
-  };
-}
-
-export async function registerStudent(input: {
-  username: string;
-  email: string;
-  password: string;
-  grade: Grade;
-  stream: Stream;
-}) {
-  const db = await connectDb();
-  if (!db) {
-    throw new Error("Database connection unavailable");
-  }
-
-  const usersCollection = db.collection<UserRecord>("users");
-  const normalizedEmail = input.email.trim().toLowerCase();
-
-  const existing = await usersCollection.findOne({ email: normalizedEmail });
-  if (existing) {
-    throw new Error("An account with this email already exists");
-  }
-
-  const passwordHash = await hashPassword(input.password);
-  const now = new Date();
-  const isAdminEmail = normalizedEmail === (process.env.ADMIN_EMAIL ?? "admin@studymaterial.com").trim().toLowerCase();
-
-  const newUser: UserRecord = {
-    username: input.username,
-    email: normalizedEmail,
-    passwordHash,
-    role: isAdminEmail ? "admin" : "student",
-    isAdmin: isAdminEmail,
-    grade: input.grade,
-    stream: input.grade === "10th" ? "General" : input.stream,
-    createdAt: now,
-    updatedAt: now
-  };
-
-  const result = await usersCollection.insertOne(newUser);
-  const userId = result.insertedId.toString();
-
-  const token = signToken({ userId, role: newUser.role, email: normalizedEmail });
-
-  return {
-    token,
-    user: {
-      id: userId,
-      email: normalizedEmail,
-      username: input.username,
-      role: newUser.role,
-      isAdmin: newUser.isAdmin,
-      grade: newUser.grade,
-      stream: newUser.stream
-    }
-  };
-}
-
-export async function requestPasswordReset(email: string) {
-  const db = await connectDb();
-  const normalizedEmail = email.trim().toLowerCase();
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
-
-  if (db) {
-    const tokensCollection = db.collection<ResetTokenRecord>("reset_tokens");
-    await tokensCollection.deleteMany({ email: normalizedEmail });
-    await tokensCollection.insertOne({
-      email: normalizedEmail,
-      token,
-      expiresAt,
-      createdAt: new Date()
-    });
-  }
-
-  return {
-    token,
-    expiresAt,
-    resetUrl: `/reset-password?token=${token}&email=${encodeURIComponent(normalizedEmail)}`
-  };
-}
-
-export async function resetPasswordWithToken(input: { email: string; token: string; newPassword: string }) {
-  const db = await connectDb();
-  if (!db) {
-    throw new Error("Database not connected");
-  }
-
-  const normalizedEmail = input.email.trim().toLowerCase();
-  const tokensCollection = db.collection<ResetTokenRecord>("reset_tokens");
-  const usersCollection = db.collection<UserRecord>("users");
-
-  const resetRecord = await tokensCollection.findOne({
-    email: normalizedEmail,
-    token: input.token
-  });
-
-  if (!resetRecord) {
-    throw new Error("Invalid or expired password reset token");
-  }
-
-  if (new Date() > new Date(resetRecord.expiresAt)) {
-    await tokensCollection.deleteOne({ email: normalizedEmail, token: input.token });
-    throw new Error("Reset token has expired. Please request a new link.");
-  }
-
-  const passwordHash = await hashPassword(input.newPassword);
-  await usersCollection.updateOne(
-    { email: normalizedEmail },
-    { $set: { passwordHash, updatedAt: new Date() } }
-  );
-
-  await tokensCollection.deleteMany({ email: normalizedEmail });
-  return true;
-}
-
-export async function deleteUserAccountByEmail(email: string) {
-  const db = await connectDb();
-  if (!db) return false;
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const result = await db.collection("users").deleteOne({ email: normalizedEmail });
-  return result.deletedCount > 0;
-}
-
-type ContentDoc = Record<string, unknown> & {
-  createdAt?: Date;
-  updatedAt?: Date;
-};
-
-function collectionName(type: string) {
-  return {
-    notes: "notes",
-    papers: "previous_papers",
-    videos: "videos",
-    quizzes: "quizzes",
-    notices: "notices",
-    downloads: "downloads",
-    results: "results",
-    live_classes: "live_classes"
-  }[type];
-}
-
-export async function listContent(type: string, filter: Record<string, unknown> = {}) {
-  const db = await connectDb();
-  if (!db) return [];
-  const collection = collectionName(type);
-  if (!collection) return [];
-  return db.collection<ContentDoc>(collection).find(filter).sort({ createdAt: -1 }).toArray();
-}
-
-export async function createContent(type: string, payload: ContentDoc) {
-  const db = await connectDb();
-  if (!db) {
-    throw new Error("Database not configured");
-  }
-  const collection = collectionName(type);
-  if (!collection) throw new Error("Invalid content type");
-
-  const doc = {
-    ...payload,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  const result = await db.collection(collection).insertOne(doc);
-  return { insertedId: result.insertedId.toString(), ...doc };
-}
-
-export async function deleteContent(type: string, id: string) {
-  const db = await connectDb();
-  if (!db) throw new Error("Database not configured");
-  const collection = collectionName(type);
-  if (!collection) throw new Error("Invalid content type");
-
-  try {
-    let result = await db.collection(collection).deleteOne({ _id: new ObjectId(id) });
-    if (result.deletedCount === 0) {
-      result = await db.collection(collection).deleteOne({ id: id });
-    }
-    return true;
-  } catch {
-    await db.collection(collection).deleteOne({ id: id });
-    return true;
-  }
-}
-
-// ============================================================================
-// ENTERPRISE LIVE CLASSES MANAGEMENT SERVICES
-// ============================================================================
-
-export async function listLiveClassesService(filter: {
-  grade?: Grade;
-  stream?: Stream;
-  subject?: string;
-  status?: string;
-  category?: string;
-  teacherName?: string;
-  search?: string;
-}) {
-  const db = await connectDb();
-  if (!db) return [];
-
-  const query: Record<string, unknown> = {};
-  if (filter.grade) query.grade = filter.grade;
-  if (filter.stream) query.stream = filter.stream;
-  if (filter.subject) query.subject = filter.subject;
-  if (filter.status && filter.status !== "All") query.status = filter.status;
-  if (filter.category && filter.category !== "All") query.category = filter.category;
-  if (filter.teacherName && filter.teacherName !== "All") query.teacherName = filter.teacherName;
-  if (filter.search) {
+function buildContentQuery(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
+  const query: any = {};
+  if (filters.grade)   query.grade = filters.grade;
+  if (filters.stream)  query.stream = filters.stream;
+  if (filters.subject) query.subject = new RegExp(filters.subject, "i");
+  if (filters.search) {
     query.$or = [
-      { title: { $regex: filter.search, $options: "i" } },
-      { subject: { $regex: filter.search, $options: "i" } },
-      { teacherName: { $regex: filter.search, $options: "i" } },
-      { category: { $regex: filter.search, $options: "i" } }
+      { title:      new RegExp(filters.search, "i") },
+      { subject:    new RegExp(filters.search, "i") },
+      { instructor: new RegExp(filters.search, "i") },
+      { topic:      new RegExp(filters.search, "i") }
     ];
   }
-
-  const items = await db.collection("live_classes").find(query).sort({ createdAt: -1 }).toArray();
-  return items;
+  return query;
 }
 
-export async function getLiveClassByIdService(id: string) {
-  const db = await connectDb();
-  if (!db) return null;
-  try {
-    let doc = await db.collection("live_classes").findOne({ _id: new ObjectId(id) });
-    if (!doc) doc = await db.collection("live_classes").findOne({ id: id });
-    return doc;
-  } catch {
-    return null;
-  }
-}
+// ─── Dashboard ─────────────────────────────────────────────────────────────────
 
-export async function createLiveClassService(payload: LiveClassRecord) {
-  const db = await connectDb();
-  if (!db) throw new Error("Database not configured");
+export async function getDashboardSummary() {
+  const [users, notes, papers, videos, quizzes, liveClasses, notices] = await Promise.all([
+    UserModel.find().lean(),
+    NoteModel.countDocuments(),
+    PaperModel.countDocuments(),
+    VideoModel.countDocuments(),
+    QuizModel.countDocuments(),
+    LiveClassModel.countDocuments(),
+    NoticeModel.countDocuments()
+  ]);
 
-  const doc = {
-    ...payload,
-    enrolledStudentsCount: payload.enrolledStudentsCount || 0,
-    status: payload.status || "Published",
-    createdAt: new Date(),
-    updatedAt: new Date()
+  const stats = [
+    { label: "Users",        value: users.length },
+    { label: "Students",     value: users.filter((u: any) => u.role === "student").length },
+    { label: "Admins",       value: users.filter((u: any) => u.role === "admin").length },
+    { label: "Notes",        value: notes },
+    { label: "Papers",       value: papers },
+    { label: "Videos",       value: videos },
+    { label: "Quizzes",      value: quizzes },
+    { label: "Live Classes", value: liveClasses },
+    { label: "Notices",      value: notices }
+  ];
+
+  const distributions = {
+    medical:    users.filter((u: any) => u.stream === "Medical").length,
+    nonMedical: users.filter((u: any) => u.stream === "Non-Medical").length,
+    commerce:   users.filter((u: any) => u.stream === "Commerce").length,
+    arts:       users.filter((u: any) => u.stream === "Arts").length,
+    general:    users.filter((u: any) => u.stream === "General").length
   };
 
-  const result = await db.collection("live_classes").insertOne(doc);
-  return { insertedId: result.insertedId.toString(), ...doc };
+  return {
+    summary: { stats, distributions },
+    users: users.map((u: any) => ({
+      _id:       u._id.toString(),
+      username:  u.username,
+      email:     u.email,
+      role:      u.role,
+      grade:     u.grade,
+      stream:    u.stream,
+      createdAt: u.createdAt
+    }))
+  };
 }
 
-export async function updateLiveClassService(id: string, payload: Partial<LiveClassRecord>) {
-  const db = await connectDb();
-  if (!db) throw new Error("Database not configured");
+// ─── Auth ──────────────────────────────────────────────────────────────────────
 
-  let result = await db.collection("live_classes").updateOne(
-    { _id: new ObjectId(id) },
-    { $set: { ...payload, updatedAt: new Date() } }
-  );
-
-  if (result.modifiedCount === 0) {
-    result = await db.collection("live_classes").updateOne(
-      { id: id },
-      { $set: { ...payload, updatedAt: new Date() } }
-    );
-  }
-
-  return true;
+export function publicUser(user: any) {
+  return {
+    id:        user._id?.toString() ?? user.id,
+    username:  user.username,
+    email:     user.email,
+    role:      user.role,
+    grade:     user.grade,
+    stream:    user.stream,
+    createdAt: user.createdAt
+  };
 }
 
-export async function publishLiveClassService(id: string) {
-  const db = await connectDb();
-  if (!db) throw new Error("Database not configured");
+export async function registerUser(payload: {
+  email: string;
+  password: string;
+  confirmPassword?: string;
+  grade: Grade;
+  stream: Stream;
+  role?: "superAdmin" | "admin" | "teacher" | "student";
+  username?: string;
+}) {
+  const existing = await UserModel.findOne({ email: payload.email.toLowerCase() }).lean();
+  if (existing) return { status: 409, body: { message: "User already exists" } };
 
-  let query: Record<string, unknown> = { id: id };
-  try {
-    query = { _id: new ObjectId(id) };
-  } catch {
-    query = { id: id };
-  }
-
-  const classDoc = await db.collection("live_classes").findOne(query);
-  await db.collection("live_classes").updateOne(query, {
-    $set: { status: "Published", updatedAt: new Date() }
+  const user = await UserModel.create({
+    username:     payload.username || payload.email.split("@")[0],
+    email:        payload.email.toLowerCase(),
+    passwordHash: await hashPassword(payload.password),
+    role:         payload.role || "student",
+    grade:        payload.grade,
+    stream:       payload.stream
   });
 
-  const title = classDoc?.title || "Live Interactive Lecture";
-  const teacher = classDoc?.teacherName || "Faculty Teacher";
-  const date = classDoc?.date || "Today";
-
-  await db.collection("notices").insertOne({
-    title: `📢 Live Class Published: ${title}`,
-    body: `Live class on "${title}" by ${teacher} has been published for ${date}. Join now from Live Classes stream!`,
-    category: "Live Classes",
-    date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    createdAt: new Date()
-  });
-
-  return true;
-}
-
-export async function deleteLiveClassService(id: string) {
-  const db = await connectDb();
-  if (!db) throw new Error("Database not configured");
-
-  try {
-    let result = await db.collection("live_classes").deleteOne({ _id: new ObjectId(id) });
-    if (result.deletedCount === 0) {
-      result = await db.collection("live_classes").deleteOne({ id: id });
+  return {
+    status: 201,
+    body: {
+      message: "Registration successful",
+      token:   signToken(user as any),
+      user:    publicUser(user)
     }
-    return true;
-  } catch {
-    await db.collection("live_classes").deleteOne({ id: id });
-    return true;
+  };
+}
+
+export async function loginUser(payload: { email: string; password: string }) {
+  const user = await UserModel.findOne({ email: payload.email.toLowerCase() }).lean();
+  if (!user) return { status: 401, body: { message: "Invalid credentials" } };
+
+  const ok = await comparePassword(payload.password, (user as any).passwordHash);
+  if (!ok)   return { status: 401, body: { message: "Invalid credentials" } };
+
+  return {
+    status: 200,
+    body: {
+      message: "Login successful",
+      token:   signToken(user as any),
+      user:    publicUser(user)
+    }
+  };
+}
+
+export async function forgotPassword(email: string) {
+  const exists = await UserModel.exists({ email: email.toLowerCase() });
+  return {
+    status: exists ? 200 : 404,
+    body: exists
+      ? { message: "Password reset link simulated", resetToken: `reset-${Date.now()}` }
+      : { message: "User not found" }
+  };
+}
+
+export async function resetPassword(email: string, password: string) {
+  const user = await UserModel.findOne({ email: email.toLowerCase() });
+  if (!user) return { status: 404, body: { message: "User not found" } };
+
+  (user as any).passwordHash = await hashPassword(password);
+  await user.save();
+  return { status: 200, body: { message: "Password updated" } };
+}
+
+export async function deleteAccount(email: string) {
+  const user = await UserModel.findOneAndDelete({ email: email.toLowerCase() }).lean();
+  if (!user) return { status: 404, body: { message: "User not found" } };
+  return { status: 200, body: { message: "Account deleted", user: publicUser(user) } };
+}
+
+export function normalizeGrade(value: unknown): Grade | undefined {
+  return value === "10th" || value === "11th" || value === "12th" ? value : undefined;
+}
+
+export function normalizeStream(value: unknown): Stream | undefined {
+  return value === "General" || value === "Medical" || value === "Non-Medical" || value === "Commerce" || value === "Arts"
+    ? value : undefined;
+}
+
+// ─── Live Classes ───────────────────────────────────────────────────────────────
+
+export async function listLiveClasses(filters: Partial<{ grade: Grade; stream: Stream; subject: string; status: string; category: string; teacherName: string; search: string }>) {
+  const query: any = {};
+  if (filters.grade)       query.grade = filters.grade;
+  if (filters.stream)      query.stream = filters.stream;
+  if (filters.subject)     query.subject = new RegExp(filters.subject, "i");
+  if (filters.status)      query.status = new RegExp(`^${filters.status}$`, "i");
+  if (filters.category)    query.category = new RegExp(filters.category, "i");
+  if (filters.teacherName) query.teacherName = new RegExp(filters.teacherName, "i");
+  if (filters.search) {
+    query.$or = [
+      { title:       new RegExp(filters.search, "i") },
+      { subject:     new RegExp(filters.search, "i") },
+      { category:    new RegExp(filters.search, "i") },
+      { teacherName: new RegExp(filters.search, "i") },
+      { description: new RegExp(filters.search, "i") }
+    ];
   }
+  const items = await LiveClassModel.find(query).sort({ createdAt: -1 }).lean();
+  return { data: items.map(toPlain) };
 }
 
-export async function logLiveAttendanceService(attendance: LiveClassAttendanceRecord) {
-  const db = await connectDb();
-  if (!db) return false;
-
-  const doc = {
-    ...attendance,
-    createdAt: new Date()
-  };
-
-  await db.collection("live_class_attendance").insertOne(doc);
-  return true;
+export async function createLiveClass(payload: any) {
+  const doc = await LiveClassModel.create({ ...payload, enrolledStudentsCount: payload.enrolledStudentsCount ?? 0 });
+  return { data: toPlain(doc.toObject()) };
 }
 
-export async function postLiveChatService(message: LiveClassChatRecord) {
-  const db = await connectDb();
-  if (!db) return false;
-
-  const doc = {
-    ...message,
-    createdAt: new Date()
-  };
-
-  await db.collection("live_class_chat").insertOne(doc);
-  return true;
+export async function updateLiveClass(id: string, updates: any) {
+  const doc = await LiveClassModel.findByIdAndUpdate(id, { $set: updates }, { new: true }).lean();
+  if (!doc) return null;
+  return toPlain(doc);
 }
 
-export async function getLiveChatService(classId: string) {
-  const db = await connectDb();
-  if (!db) return [];
-
-  const items = await db.collection("live_class_chat").find({ classId }).sort({ createdAt: 1 }).toArray();
-  return items;
+export async function deleteLiveClass(id: string) {
+  const doc = await LiveClassModel.findByIdAndDelete(id).lean();
+  if (!doc) return null;
+  return toPlain(doc);
 }
 
-export async function submitLiveFeedbackService(feedback: LiveClassFeedbackRecord) {
-  const db = await connectDb();
-  if (!db) return false;
+export async function publishLiveClass(id: string) {
+  const item = await updateLiveClass(id, { status: "Published" });
+  if (!item) return null;
 
-  const doc = {
-    ...feedback,
-    createdAt: new Date()
-  };
+  const notice = await NoticeModel.create({
+    title:    `Live class published: ${item.title}`,
+    body:     `${item.teacherName} will conduct ${item.subject} on ${item.date}.`,
+    category: "Live Classes",
+    date:     new Date().toLocaleDateString()
+  });
 
-  await db.collection("live_class_feedback").insertOne(doc);
-  return true;
+  return { item, notice: toPlain(notice.toObject()) };
 }
 
-export const createResetToken = requestPasswordReset;
-export const resetPassword = resetPasswordWithToken;
+// ─── Content Services ───────────────────────────────────────────────────────────
+
+export const contentServices = {
+  async listNotes(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
+    const docs = await NoteModel.find(buildContentQuery(filters)).sort({ createdAt: -1 }).lean();
+    return { data: docs.map(toPlain) };
+  },
+
+  async createNote(payload: any) {
+    const doc = await NoteModel.create(payload);
+    return { data: toPlain(doc.toObject()) };
+  },
+
+  async deleteNote(id: string) {
+    const doc = await NoteModel.findByIdAndDelete(id).lean();
+    return doc ? toPlain(doc) : null;
+  },
+
+  async listPapers(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
+    const docs = await PaperModel.find(buildContentQuery(filters)).sort({ createdAt: -1 }).lean();
+    return { data: docs.map(toPlain) };
+  },
+
+  async createPaper(payload: any) {
+    const doc = await PaperModel.create(payload);
+    return { data: toPlain(doc.toObject()) };
+  },
+
+  async deletePaper(id: string) {
+    const doc = await PaperModel.findByIdAndDelete(id).lean();
+    return doc ? toPlain(doc) : null;
+  },
+
+  async listVideos(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
+    const docs = await VideoModel.find(buildContentQuery(filters)).sort({ createdAt: -1 }).lean();
+    return { data: docs.map(toPlain) };
+  },
+
+  async createVideo(payload: any) {
+    const doc = await VideoModel.create(payload);
+    return { data: toPlain(doc.toObject()) };
+  },
+
+  async deleteVideo(id: string) {
+    const doc = await VideoModel.findByIdAndDelete(id).lean();
+    return doc ? toPlain(doc) : null;
+  },
+
+  async listQuizzes(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
+    const docs = await QuizModel.find(buildContentQuery(filters)).sort({ createdAt: -1 }).lean();
+    return { data: docs.map(toPlain) };
+  },
+
+  async createQuiz(payload: any) {
+    const doc = await QuizModel.create(payload);
+    return { data: toPlain(doc.toObject()) };
+  },
+
+  async listNotices() {
+    const docs = await NoticeModel.find().sort({ createdAt: -1 }).lean();
+    return { data: docs.map(toPlain) };
+  },
+
+  async createNotice(payload: any) {
+    const doc = await NoticeModel.create({
+      ...payload,
+      date: payload.date || new Date().toLocaleDateString()
+    });
+    return { data: toPlain(doc.toObject()) };
+  },
+
+  uploadFile(file: Express.Multer.File | undefined) {
+    if (!file) return null;
+    return {
+      url:      `http://localhost:4000/uploads/${file.filename}`,
+      fileSize: `${Math.max(1, Math.ceil(file.size / 1024))} KB`
+    };
+  },
+
+  async attendance(payload: any) {
+    const doc = await AttendanceModel.create(payload);
+    return { data: toPlain(doc.toObject()) };
+  },
+
+  async reset() {
+    // Clear all collections
+    await Promise.all([
+      UserModel.deleteMany({}),
+      NoteModel.deleteMany({}),
+      PaperModel.deleteMany({}),
+      VideoModel.deleteMany({}),
+      QuizModel.deleteMany({}),
+      NoticeModel.deleteMany({}),
+      LiveClassModel.deleteMany({}),
+      AttendanceModel.deleteMany({})
+    ]);
+
+    // Re-seed from seed data
+    const { users, notes, papers, videos, quizzes, notices, liveClasses } = seedState;
+
+    await Promise.all([
+      UserModel.insertMany(users.map(u => ({
+        username: u.username, email: u.email, passwordHash: u.passwordHash,
+        role: u.role, grade: u.grade, stream: u.stream
+      }))),
+      NoteModel.insertMany(notes.map(n => ({
+        subject: n.subject, title: n.title, grade: n.grade, stream: n.stream,
+        fileUrl: n.fileUrl, fileSize: n.fileSize, pages: n.pages, uploadDate: n.uploadDate
+      }))),
+      PaperModel.insertMany(papers.map(p => ({
+        subject: p.subject, title: p.title, year: p.year, term: p.term,
+        grade: p.grade, stream: p.stream, fileUrl: p.fileUrl, fileSize: p.fileSize
+      }))),
+      VideoModel.insertMany(videos.map(v => ({
+        subject: v.subject, title: v.title, instructor: v.instructor, duration: v.duration,
+        thumbnail: v.thumbnail, videoUrl: v.videoUrl, grade: v.grade, stream: v.stream
+      }))),
+      QuizModel.insertMany(quizzes),
+      NoticeModel.insertMany(notices.map(n => ({
+        title: n.title, body: n.body, category: n.category, date: n.date
+      }))),
+      LiveClassModel.insertMany(liveClasses.map(({ id: _omit, createdAt: _c, ...rest }) => rest))
+    ]);
+
+    return { message: "Seed data restored" };
+  }
+};

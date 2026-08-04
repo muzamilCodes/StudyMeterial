@@ -1,354 +1,276 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { 
-  createContent, 
-  listContent, 
-  deleteContent,
-  listLiveClassesService,
-  getLiveClassByIdService,
-  createLiveClassService,
-  updateLiveClassService,
-  deleteLiveClassService,
-  logLiveAttendanceService,
-  postLiveChatService,
-  getLiveChatService,
-  submitLiveFeedbackService,
-  publishLiveClassService
+import {
+  contentServices,
+  createLiveClass,
+  deleteLiveClass,
+  listLiveClasses,
+  publishLiveClass,
+  updateLiveClass,
+  normalizeGrade,
+  normalizeStream
 } from "../services.js";
-import type { Grade, Stream } from "../types.js";
 
-const gradeSchema = z.enum(["10th", "11th", "12th"]);
-const streamSchema = z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]);
+const gradeSchema  = z.enum(["10th", "11th", "12th"]).optional();
+const streamSchema = z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]).optional();
 
-function getQueryFilters(req: Request) {
-  const grade = gradeSchema.safeParse(req.query.grade).success ? (req.query.grade as Grade) : undefined;
-  const stream = streamSchema.safeParse(req.query.stream).success ? (req.query.stream as Stream) : undefined;
-  const subject = typeof req.query.subject === "string" ? req.query.subject : undefined;
+const asString = (value: unknown) => (typeof value === "string" ? value : undefined);
+const asId     = (value: unknown) => {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value))     return value[0] ?? "";
+  return "";
+};
 
-  return { grade, stream, subject };
+function pickFilters(req: Request) {
+  return {
+    grade:       normalizeGrade(asString(req.query.grade)),
+    stream:      normalizeStream(asString(req.query.stream)),
+    subject:     asString(req.query.subject),
+    status:      asString(req.query.status),
+    category:    asString(req.query.category),
+    teacherName: asString(req.query.teacherName),
+    search:      asString(req.query.search)
+  };
 }
 
-export async function listNotes(req: Request, res: Response) {
-  const { grade, stream, subject } = getQueryFilters(req);
-  const data = await listContent("notes", {
-    ...(grade ? { grade } : {}),
-    ...(stream ? { stream } : {}),
-    ...(subject ? { subject } : {})
-  });
-  res.json({ data });
+// ─── Live Classes ────────────────────────────────────────────────────────────
+
+export async function listLiveClassesHandler(req: Request, res: Response) {
+  return res.json(await listLiveClasses(pickFilters(req)));
 }
 
-export async function createNote(req: Request, res: Response) {
+export async function createLiveClassHandler(req: Request, res: Response) {
   const schema = z.object({
-    grade: gradeSchema,
-    stream: streamSchema,
-    subject: z.string().min(2),
-    title: z.string().min(2),
-    fileUrl: z.string().url(),
-    fileSize: z.string().optional(),
-    pages: z.number().int().optional(),
-    uploadDate: z.string().optional()
+    title:                 z.string().min(2),
+    subject:               z.string().min(2),
+    category:              z.string().min(2),
+    description:           z.string().min(1),
+    teacherName:           z.string().min(2),
+    teacherPhoto:          z.string().url().optional(),
+    teacherBio:            z.string().optional(),
+    date:                  z.string().min(1),
+    startTime:             z.string().min(1),
+    endTime:               z.string().min(1),
+    duration:              z.string().min(1),
+    timeZone:              z.string().optional(),
+    meetingPlatform:       z.enum(["Google Meet", "Zoom", "Jitsi", "LiveKit", "Custom"]),
+    meetingLink:           z.string().url(),
+    meetingId:             z.string().optional(),
+    meetingPassword:       z.string().optional(),
+    maxStudents:           z.number().int().positive(),
+    enrolledStudentsCount: z.number().int().nonnegative().optional(),
+    language:              z.string().min(1),
+    difficultyLevel:       z.enum(["Beginner", "Intermediate", "Advanced"]),
+    bannerUrl:             z.string().url().optional(),
+    thumbnailUrl:          z.string().url().optional(),
+    tags:                  z.array(z.string()).optional(),
+    status:                z.enum(["Draft", "Published", "Upcoming", "Starting Soon", "Live", "Completed", "Recording Available", "Archived"]),
+    allowRecording:        z.boolean(),
+    allowChat:             z.boolean(),
+    allowScreenShare:      z.boolean(),
+    allowStudentQuestions: z.boolean(),
+    attachments:           z.array(z.object({ title: z.string(), type: z.string(), url: z.string(), size: z.string().optional() })).optional(),
+    prerequisites:         z.array(z.string()).optional(),
+    learningOutcomes:      z.array(z.string()).optional(),
+    recordingUrl:          z.string().url().optional(),
+    homeworkUrl:           z.string().url().optional(),
+    grade:                 gradeSchema,
+    stream:                streamSchema
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success || !parsed.data.grade || !parsed.data.stream) {
+    return res.status(400).json({ message: "Invalid live class payload" });
+  }
+
+  return res.status(201).json(await createLiveClass(parsed.data));
+}
+
+export async function updateLiveClassHandler(req: Request, res: Response) {
+  const item = await updateLiveClass(asId(req.params.id), req.body ?? {});
+  if (!item) return res.status(404).json({ message: "Live class not found" });
+  return res.json({ data: item });
+}
+
+export async function deleteLiveClassHandler(req: Request, res: Response) {
+  const removed = await deleteLiveClass(asId(req.params.id));
+  if (!removed) return res.status(404).json({ message: "Live class not found" });
+  return res.json({ message: "Live class deleted", data: removed });
+}
+
+export async function publishLiveClassHandler(req: Request, res: Response) {
+  const result = await publishLiveClass(asId(req.params.id));
+  if (!result) return res.status(404).json({ message: "Live class not found" });
+  return res.json({ message: "Live class published", data: result.item, notice: result.notice });
+}
+
+// ─── Notes ───────────────────────────────────────────────────────────────────
+
+export async function listNotesHandler(req: Request, res: Response) {
+  return res.json(await contentServices.listNotes({
+    grade:   normalizeGrade(asString(req.query.grade)),
+    stream:  normalizeStream(asString(req.query.stream)),
+    subject: asString(req.query.subject),
+    search:  asString(req.query.search)
+  }));
+}
+
+export async function createNoteHandler(req: Request, res: Response) {
+  const schema = z.object({
+    subject:    z.string().min(2),
+    title:      z.string().min(2),
+    grade:      z.enum(["10th", "11th", "12th"]),
+    stream:     z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]),
+    uploadDate: z.string().optional(),
+    fileSize:   z.string().min(1),
+    pages:      z.number().int().positive(),
+    fileUrl:    z.string().min(1)
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Invalid note payload" });
-  const result = await createContent("notes", parsed.data);
-  res.status(201).json({ message: "Note created", data: result });
+  return res.status(201).json(await contentServices.createNote(parsed.data));
 }
 
-export async function listPapers(req: Request, res: Response) {
-  const { grade, stream, subject } = getQueryFilters(req);
-  const data = await listContent("papers", {
-    ...(grade ? { grade } : {}),
-    ...(stream ? { stream } : {}),
-    ...(subject ? { subject } : {})
-  });
-  res.json({ data });
+export async function deleteNoteHandler(req: Request, res: Response) {
+  const removed = await contentServices.deleteNote(asId(req.params.id));
+  if (!removed) return res.status(404).json({ message: "Note not found" });
+  return res.json({ message: "Note deleted", data: removed });
 }
 
-export async function createPaper(req: Request, res: Response) {
+// ─── Papers ──────────────────────────────────────────────────────────────────
+
+export async function listPapersHandler(req: Request, res: Response) {
+  return res.json(await contentServices.listPapers({
+    grade:   normalizeGrade(asString(req.query.grade)),
+    stream:  normalizeStream(asString(req.query.stream)),
+    subject: asString(req.query.subject),
+    search:  asString(req.query.search)
+  }));
+}
+
+export async function createPaperHandler(req: Request, res: Response) {
   const schema = z.object({
-    grade: gradeSchema,
-    stream: streamSchema,
-    subject: z.string().min(2),
-    title: z.string().min(2),
-    year: z.string().min(2),
-    term: z.string().optional(),
-    fileSize: z.string().optional(),
-    fileUrl: z.string().url()
+    subject:  z.string().min(2),
+    title:    z.string().min(2),
+    year:     z.string().min(1),
+    term:     z.string().min(1),
+    grade:    z.enum(["10th", "11th", "12th"]),
+    stream:   z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]),
+    fileSize: z.string().min(1),
+    fileUrl:  z.string().min(1)
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Invalid paper payload" });
-  const result = await createContent("papers", parsed.data);
-  res.status(201).json({ message: "Paper created", data: result });
+  return res.status(201).json(await contentServices.createPaper(parsed.data));
 }
 
-export async function listVideos(req: Request, res: Response) {
-  const { grade, stream, subject } = getQueryFilters(req);
-  const data = await listContent("videos", {
-    ...(grade ? { grade } : {}),
-    ...(stream ? { stream } : {}),
-    ...(subject ? { subject } : {})
-  });
-  res.json({ data });
+export async function deletePaperHandler(req: Request, res: Response) {
+  const removed = await contentServices.deletePaper(asId(req.params.id));
+  if (!removed) return res.status(404).json({ message: "Paper not found" });
+  return res.json({ message: "Paper deleted", data: removed });
 }
 
-export async function createVideo(req: Request, res: Response) {
+// ─── Videos ──────────────────────────────────────────────────────────────────
+
+export async function listVideosHandler(req: Request, res: Response) {
+  return res.json(await contentServices.listVideos({
+    grade:   normalizeGrade(asString(req.query.grade)),
+    stream:  normalizeStream(asString(req.query.stream)),
+    subject: asString(req.query.subject),
+    search:  asString(req.query.search)
+  }));
+}
+
+export async function createVideoHandler(req: Request, res: Response) {
   const schema = z.object({
-    grade: gradeSchema,
-    stream: streamSchema,
-    subject: z.string().min(2),
-    title: z.string().min(2),
-    instructor: z.string().optional(),
-    duration: z.string().optional(),
-    thumbnail: z.string().optional(),
-    videoUrl: z.string().url()
+    subject:    z.string().min(2),
+    title:      z.string().min(2),
+    instructor: z.string().min(2),
+    duration:   z.string().min(1),
+    grade:      z.enum(["10th", "11th", "12th"]),
+    stream:     z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]),
+    thumbnail:  z.string().min(1),
+    videoUrl:   z.string().min(1)
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Invalid video payload" });
-  const result = await createContent("videos", parsed.data);
-  res.status(201).json({ message: "Video created", data: result });
+  return res.status(201).json(await contentServices.createVideo(parsed.data));
 }
 
-export async function listQuizzes(req: Request, res: Response) {
-  const { grade, stream, subject } = getQueryFilters(req);
-  const data = await listContent("quizzes", {
-    ...(grade ? { grade } : {}),
-    ...(stream ? { stream } : {}),
-    ...(subject ? { subject } : {})
-  });
-  res.json({ data });
+export async function deleteVideoHandler(req: Request, res: Response) {
+  const removed = await contentServices.deleteVideo(asId(req.params.id));
+  if (!removed) return res.status(404).json({ message: "Video not found" });
+  return res.json({ message: "Video deleted", data: removed });
 }
 
-export async function createQuiz(req: Request, res: Response) {
+// ─── Quizzes ─────────────────────────────────────────────────────────────────
+
+export async function listQuizzesHandler(req: Request, res: Response) {
+  return res.json(await contentServices.listQuizzes({
+    grade:   normalizeGrade(asString(req.query.grade)),
+    stream:  normalizeStream(asString(req.query.stream)),
+    subject: asString(req.query.subject),
+    search:  asString(req.query.search)
+  }));
+}
+
+export async function createQuizHandler(req: Request, res: Response) {
   const schema = z.object({
-    grade: gradeSchema,
-    stream: streamSchema,
-    subject: z.string().min(2),
-    title: z.string().min(2),
+    subject:         z.string().min(2),
+    topic:           z.string().min(2).optional(),
+    title:           z.string().min(2),
+    grade:           z.enum(["10th", "11th", "12th"]),
+    stream:          z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"]),
     durationMinutes: z.number().int().positive(),
-    questions: z.array(
+    questions:       z.array(
       z.object({
-        question: z.string().min(2),
-        options: z.array(z.string().min(1)).min(2),
-        answer: z.string().min(1)
+        question: z.string().min(1),
+        options:  z.array(z.string().min(1)).min(2),
+        answer:   z.string().min(1)
       })
-    )
+    ).min(1)
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Invalid quiz payload" });
-  const result = await createContent("quizzes", parsed.data);
-  res.status(201).json({ message: "Quiz created", data: result });
+  return res.status(201).json(await contentServices.createQuiz(parsed.data));
 }
 
-export async function listNotices(_req: Request, res: Response) {
-  const data = await listContent("notices");
-  res.json({ data });
+// ─── Notices ─────────────────────────────────────────────────────────────────
+
+export async function listNoticesHandler(_req: Request, res: Response) {
+  return res.json(await contentServices.listNotices());
 }
 
-export async function createNotice(req: Request, res: Response) {
+export async function createNoticeHandler(req: Request, res: Response) {
   const schema = z.object({
-    title: z.string().min(2),
-    body: z.string().min(2),
-    category: z.string().min(2)
+    title:    z.string().min(2),
+    body:     z.string().min(1),
+    category: z.string().min(1),
+    date:     z.string().optional()
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Invalid notice payload" });
-  const result = await createContent("notices", parsed.data);
-  res.status(201).json({ message: "Notice created", data: result });
+  return res.status(201).json(await contentServices.createNotice(parsed.data));
 }
 
-export async function listDownloads(req: Request, res: Response) {
-  const data = await listContent("downloads", req.query.grade ? { grade: req.query.grade } : {});
-  res.json({ data });
+// ─── Upload & Attendance ─────────────────────────────────────────────────────
+
+export function uploadHandler(req: Request, res: Response) {
+  const file   = req.file;
+  const result = contentServices.uploadFile(file as any);
+  if (!result) return res.status(400).json({ message: "No file uploaded" });
+  return res.status(201).json(result);
 }
 
-export async function listResults(req: Request, res: Response) {
-  const data = await listContent("results", req.query.grade ? { grade: req.query.grade } : {});
-  res.json({ data });
-}
-
-export async function listProgress(req: Request, res: Response) {
-  const [notes, papers, quizzes] = await Promise.all([
-    listContent("notes", req.query.grade ? { grade: req.query.grade } : {}),
-    listContent("papers", req.query.grade ? { grade: req.query.grade } : {}),
-    listContent("quizzes", req.query.grade ? { grade: req.query.grade } : {})
-  ]);
-
-  res.json({
-    data: {
-      completedQuizzes: quizzes.length,
-      downloadedNotes: notes.length,
-      downloadedPapers: papers.length
-    }
+export async function attendanceHandler(req: Request, res: Response) {
+  const schema = z.object({
+    classId:     z.string().min(1),
+    studentName: z.string().min(1),
+    email:       z.string().email(),
+    joinTime:    z.string().min(1),
+    status:      z.string().min(1)
   });
-}
-
-export async function deleteNote(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const ok = await deleteContent("notes", id);
-    if (!ok) return res.status(404).json({ message: "Note not found" });
-    res.json({ message: "Note deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting note" });
-  }
-}
-
-export async function deletePaper(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const ok = await deleteContent("papers", id);
-    if (!ok) return res.status(404).json({ message: "Paper not found" });
-    res.json({ message: "Paper deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting paper" });
-  }
-}
-
-export async function deleteVideo(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const ok = await deleteContent("videos", id);
-    if (!ok) return res.status(404).json({ message: "Video not found" });
-    res.json({ message: "Video deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting video" });
-  }
-}
-
-export async function uploadFile(req: Request, res: Response) {
-  try {
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
-    const fileSizeInMB = (file.size / (1024 * 1024)).toFixed(1) + " MB";
-    res.status(200).json({
-      message: "File uploaded successfully",
-      url: fileUrl,
-      fileSize: fileSizeInMB,
-      filename: file.filename,
-      originalName: file.originalname
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Error uploading file" });
-  }
-}
-
-// ============================================================================
-// LIVE CLASSES CONTROLLERS
-// ============================================================================
-
-export async function listLiveClasses(req: Request, res: Response) {
-  try {
-    const { grade, stream, subject } = getQueryFilters(req);
-    const status = typeof req.query.status === "string" ? req.query.status : undefined;
-    const category = typeof req.query.category === "string" ? req.query.category : undefined;
-    const teacherName = typeof req.query.teacherName === "string" ? req.query.teacherName : undefined;
-    const search = typeof req.query.search === "string" ? req.query.search : undefined;
-
-    const data = await listLiveClassesService({
-      grade,
-      stream,
-      subject,
-      status,
-      category,
-      teacherName,
-      search
-    });
-
-    res.json({ data });
-  } catch (error) {
-    res.status(500).json({ message: "Error loading live classes" });
-  }
-}
-
-export async function getLiveClassById(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const data = await getLiveClassByIdService(id);
-    if (!data) return res.status(404).json({ message: "Live class not found" });
-    res.json({ data });
-  } catch (error) {
-    res.status(500).json({ message: "Error loading live class details" });
-  }
-}
-
-export async function createLiveClass(req: Request, res: Response) {
-  try {
-    const result = await createLiveClassService(req.body);
-    res.status(201).json({ message: "Live Class created successfully", data: result });
-  } catch (error) {
-    res.status(500).json({ message: "Error creating live class" });
-  }
-}
-
-export async function updateLiveClass(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const ok = await updateLiveClassService(id, req.body);
-    if (!ok) return res.status(404).json({ message: "Live class not found" });
-    res.json({ message: "Live Class updated successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error updating live class" });
-  }
-}
-
-export async function publishLiveClass(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const ok = await publishLiveClassService(id);
-    res.json({ message: "Live Class published & student notifications sent successfully", success: ok });
-  } catch (error) {
-    res.status(500).json({ message: "Error publishing live class" });
-  }
-}
-
-export async function deleteLiveClass(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const ok = await deleteLiveClassService(id);
-    if (!ok) return res.status(404).json({ message: "Live class not found" });
-    res.json({ message: "Live Class deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting live class" });
-  }
-}
-
-export async function logAttendance(req: Request, res: Response) {
-  try {
-    const ok = await logLiveAttendanceService(req.body);
-    res.json({ message: "Attendance logged successfully", success: ok });
-  } catch (error) {
-    res.status(500).json({ message: "Error logging attendance" });
-  }
-}
-
-export async function postLiveChat(req: Request, res: Response) {
-  try {
-    const ok = await postLiveChatService(req.body);
-    res.json({ message: "Chat message posted", success: ok });
-  } catch (error) {
-    res.status(500).json({ message: "Error posting chat message" });
-  }
-}
-
-export async function getLiveChat(req: Request, res: Response) {
-  try {
-    const id = req.params.id as string;
-    const data = await getLiveChatService(id);
-    res.json({ data });
-  } catch (error) {
-    res.status(500).json({ message: "Error loading chat history" });
-  }
-}
-
-export async function submitFeedback(req: Request, res: Response) {
-  try {
-    const ok = await submitLiveFeedbackService(req.body);
-    res.json({ message: "Feedback submitted", success: ok });
-  } catch (error) {
-    res.status(500).json({ message: "Error submitting feedback" });
-  }
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Invalid attendance payload" });
+  return res.status(201).json(await contentServices.attendance(parsed.data));
 }
