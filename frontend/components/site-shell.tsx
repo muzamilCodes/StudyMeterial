@@ -158,7 +158,7 @@ export function SiteShell({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row transition-colors">
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row transition-colors">
       
       {/* MOBILE TOP BAR */}
       <div className="md:hidden flex items-center justify-between p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40">
@@ -422,10 +422,10 @@ export function SiteShell({
       </aside>
 
       {/* MAIN VIEWPORT */}
-      <main className="flex-1 p-4 md:p-8 space-y-6 max-w-full overflow-x-hidden">
+      <main className="flex-1 p-4 md:p-8 space-y-7 max-w-full overflow-x-hidden animate-in fade-in duration-500">
         
         {/* HEADER BAR */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-[1.75rem] bg-card/80 backdrop-blur-xl border border-border/70 shadow-sm card-hover-effect">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">

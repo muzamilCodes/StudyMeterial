@@ -16,8 +16,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className="scroll-smooth">
-      <body className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-500 selection:text-white" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="scroll-smooth bg-background">
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground" suppressHydrationWarning>
         <ThemeProvider defaultTheme="light" storageKey="study-material-theme">
           {children}
         </ThemeProvider>
