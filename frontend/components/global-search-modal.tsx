@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, X, BookOpen, FileText, Video, User, HelpCircle, ArrowRight, Loader2 } from "lucide-react";
+import { Search, X, FileText, Video, User, HelpCircle, ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   fetchBackendNotes,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/store";
 import { type QuizItem } from "@/lib/platform-data";
 
-export type SearchCategory = "all" | "subjects" | "notes" | "papers" | "quizzes" | "teachers" | "classes";
+export type SearchCategory = "all" | "notes" | "papers" | "quizzes" | "teachers" | "classes";
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -30,14 +30,6 @@ type SearchResult = {
   href: string;
   tag: string;
 };
-
-// Subjects are a stable navigation catalogue, not per-item data.
-const STATIC_SUBJECTS: SearchResult[] = [
-  { id: "s1", title: "Biology - Class 11th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "11th Medical" },
-  { id: "s2", title: "Physics - Class 11th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "11th Medical / Non-Med" },
-  { id: "s3", title: "Chemistry - Class 11th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "11th Medical" },
-  { id: "s4", title: "Mathematics - Class 10th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "10th General" },
-];
 
 export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: GlobalSearchModalProps) {
   const [query, setQuery] = useState(initialQuery);
@@ -131,16 +123,20 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
 
   if (!isOpen) return null;
 
-  const allResults = [...STATIC_SUBJECTS, ...dynamicResults];
+  const q = query.trim().toLowerCase();
+  // Only real backend content is searchable. An empty query shows no results —
+  // the user must type something, and unmatched queries show a "no results" state.
+  const filteredResults = q === ""
+    ? []
+    : dynamicResults.filter((item) => {
+        const matchesCategory = activeCategory === "all" || item.category === activeCategory;
+        const matchesQuery =
+          item.title.toLowerCase().includes(q) ||
+          item.tag.toLowerCase().includes(q);
+        return matchesCategory && matchesQuery;
+      });
 
-  const filteredResults = allResults.filter((item) => {
-    const matchesCategory = activeCategory === "all" || item.category === activeCategory;
-    const q = query.trim().toLowerCase();
-    const matchesQuery = q === "" ||
-      item.title.toLowerCase().includes(q) ||
-      item.tag.toLowerCase().includes(q);
-    return matchesCategory && matchesQuery;
-  });
+  const hasQuery = q !== "";
 
   const handleSelectResult = (href: string) => {
     router.push(href);
@@ -160,7 +156,7 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search subjects, notes, teachers, quizzes, live classes, papers..."
+            placeholder="Search notes, papers, quizzes, live classes, teachers..."
             className="w-full bg-transparent text-sm md:text-base font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
             autoFocus
           />
@@ -185,7 +181,6 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
           {(
             [
               { id: "all", label: "All Items" },
-              { id: "subjects", label: "Subjects" },
               { id: "notes", label: "Notes" },
               { id: "papers", label: "Papers" },
               { id: "quizzes", label: "Quizzes" },
@@ -218,12 +213,23 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
           ) : filteredResults.length === 0 ? (
             <div className="py-12 text-center">
               <Search className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No matching search results found</p>
-              <p className="text-xs text-slate-400 mt-1">
-                {dynamicResults.length === 0
-                  ? "No notes, papers, quizzes or live classes have been published yet."
-                  : "Try a different keyword or category filter."}
-              </p>
+              {!hasQuery ? (
+                <>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Start typing to search</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Search across live notes, papers, quizzes, classes &amp; faculty published on the platform.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No results found for &ldquo;{query.trim()}&rdquo;</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {dynamicResults.length === 0
+                      ? "No notes, papers, quizzes or live classes have been published yet."
+                      : "Try a different keyword or category filter."}
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             filteredResults.map((item) => {
@@ -259,7 +265,11 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
 
         {/* Footer shortcuts hint */}
         <div className="px-6 py-3 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Searching {allResults.length} live platform {allResults.length === 1 ? "item" : "items"}</span>
+          <span>
+            {hasQuery
+              ? `${filteredResults.length} matching ${filteredResults.length === 1 ? "item" : "items"}`
+              : `${dynamicResults.length} live platform ${dynamicResults.length === 1 ? "item" : "items"} indexed`}
+          </span>
           <div className="flex items-center gap-2">
             <span className="rounded bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 dark:text-slate-300">ESC</span> to close
           </div>

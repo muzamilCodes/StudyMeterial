@@ -31,10 +31,12 @@ import {
   fetchBackendQuizzes, 
   fetchBackendNotices,
   fetchEnterpriseLiveClasses,
+  fetchTrendingVideos,
   logDownload,
   type RealNoteItem, 
   type RealPaperItem, 
   type RealNoticeItem,
+  type RealVideoItem,
   type EnterpriseLiveClassItem
 } from "@/lib/store";
 import { GlobalSearchModal } from "@/components/global-search-modal";
@@ -45,6 +47,7 @@ export default function HomePage() {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [notices, setNotices] = useState<RealNoticeItem[]>([]);
   const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
+  const [videos, setVideos] = useState<RealVideoItem[]>([]);
   const [totals, setTotals] = useState({ notes: 0, papers: 0, quizzes: 0, notices: 0, live: 0 });
   const [allData, setAllData] = useState<{ notes: RealNoteItem[]; papers: RealPaperItem[]; quizzes: any[] }>({ notes: [], papers: [], quizzes: [] });
   const [loading, setLoading] = useState(true);
@@ -57,18 +60,20 @@ export default function HomePage() {
     async function loadHomeData() {
       setLoading(true);
       try {
-        const [nData, pData, qData, notifData, lData] = await Promise.all([
+        const [nData, pData, qData, notifData, lData, vData] = await Promise.all([
           fetchBackendNotes(),
           fetchBackendPapers(),
           fetchBackendQuizzes(),
           fetchBackendNotices(),
-          fetchEnterpriseLiveClasses()
+          fetchEnterpriseLiveClasses(),
+          fetchTrendingVideos(undefined, undefined, 8)
         ]);
         setNotes(nData.slice(0, 4));
         setPapers(pData.slice(0, 4));
         setQuizzes(qData.slice(0, 3));
         setNotices(notifData.slice(0, 4));
         setLiveClasses(lData.slice(0, 4));
+        setVideos(vData);
         setTotals({ notes: nData.length, papers: pData.length, quizzes: qData.length, notices: notifData.length, live: lData.length });
         setAllData({ notes: nData, papers: pData, quizzes: qData });
       } catch (err) {
@@ -247,6 +252,79 @@ export default function HomePage() {
             </div>
 
           </div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* TRENDING VIDEO LESSONS (right after the hero CTAs) */}
+        {/* ========================================================= */}
+        <section className="max-w-[1600px] mx-auto px-6 md:px-12 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-orange-500">
+                <Play className="h-3.5 w-3.5 fill-orange-500" /> Video Lessons
+              </span>
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white mt-1">
+                Trending video lessons
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                The most-watched recorded lectures published by faculty on the platform.
+              </p>
+            </div>
+            <Link href="/videos" className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline">
+              <span>Explore all videos</span>
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-56 rounded-3xl bg-slate-200 dark:bg-slate-800 animate-pulse" />
+              ))}
+            </div>
+          ) : videos.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-10 text-center">
+              <Video className="mx-auto h-10 w-10 text-slate-400" />
+              <p className="mt-3 text-base font-bold text-slate-700 dark:text-slate-200">No video lessons published yet</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Recorded lectures uploaded by faculty will appear here automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {videos.map((v) => (
+                <a
+                  key={v.id}
+                  href={v.videoUrl || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-xl transition"
+                >
+                  <div className="relative aspect-video w-full overflow-hidden bg-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={v.thumbnail} alt={v.title} loading="lazy" className="h-full w-full object-cover transition group-hover:scale-105" />
+                    <div className="absolute inset-0 flex items-center justify-center transition group-hover:bg-black/25">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/90 opacity-0 shadow-lg transition group-hover:opacity-100">
+                        <Play className="h-6 w-6 fill-white text-white" />
+                      </div>
+                    </div>
+                    <span className="absolute bottom-2 right-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">{v.duration}</span>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1.5 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="rounded-md bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">{v.subject}</span>
+                      <span className="text-[10px] font-bold text-slate-400">{v.grade} {v.stream}</span>
+                    </div>
+                    <h3 className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-white leading-snug">{v.title}</h3>
+                    <div className="mt-auto flex items-center justify-between pt-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span>{v.instructor}</span>
+                      <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> {v.views ?? 0}</span>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ========================================================= */}
