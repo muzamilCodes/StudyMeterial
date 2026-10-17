@@ -29,6 +29,17 @@ function toPlain(doc: any) {
   return plain;
 }
 
+/** Canonicalise a phone number so the same mobile entered as +91 90000 00000,
+ *  090000-00000 or 9000000000 all map to one identity for uniqueness. Indian
+ *  mobiles collapse to the 10-digit national number; other numbers keep digits only. */
+export function normalizePhone(raw: string) {
+  let d = raw.replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);        // international prefix 00 -> +
+  if (d.length > 10 && d.startsWith("91")) d = d.slice(2); // drop +91 country code
+  while (d.length > 10 && d.startsWith("0")) d = d.slice(1); // drop trunk prefix 0
+  return d;
+}
+
 function buildContentQuery(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
   const query: any = {};
   if (filters.grade)   query.grade = filters.grade;
@@ -116,6 +127,14 @@ export async function sendSignupOtp(rawEmail: string, phone?: string) {
   const existing = await UserModel.findOne({ email }).lean();
   if (existing) return { status: 409, body: { message: "An account with this email already exists" } };
 
+  if (phone) {
+    const normalizedPhone = normalizePhone(phone);
+    if (normalizedPhone.length >= 7) {
+      const phoneTaken = await UserModel.findOne({ phone: normalizedPhone }).lean();
+      if (phoneTaken) return { status: 409, body: { message: "This phone number is already registered with another account" } };
+    }
+  }
+
   const code = generateOtp();
   await OTPModel.deleteMany({ email });
   await OTPModel.create({ email, code, expiresAt: new Date(Date.now() + OTP_TTL_MS) });
@@ -177,6 +196,7 @@ export async function registerUser(payload: {
   role?: "superAdmin" | "admin" | "teacher" | "student";
   username?: string;
   otp?: string;
+  phone?: string;
 }) {
   const requestedRole = payload.role ?? "student";
   if (!["superAdmin", "admin", "teacher", "student"].includes(requestedRole)) {
@@ -185,6 +205,16 @@ export async function registerUser(payload: {
 
   const existing = await UserModel.findOne({ email: payload.email.toLowerCase() }).lean();
   if (existing) return { status: 409, body: { message: "User already exists" } };
+
+  // A phone number is required for student signups and may belong to only one account.
+  const normalizedPhone = payload.phone ? normalizePhone(payload.phone) : "";
+  if (requestedRole === "student") {
+    if (normalizedPhone.length < 7) {
+      return { status: 400, body: { message: "A valid phone number is required to register." } };
+    }
+    const phoneTaken = await UserModel.findOne({ phone: normalizedPhone }).lean();
+    if (phoneTaken) return { status: 409, body: { message: "This phone number is already registered with another account" } };
+  }
 
   // Email OTP is required for open student signups. Privileged roles (admin/teacher/
   // superAdmin) are already gated by an existing administrator's authorization in the
@@ -198,6 +228,7 @@ export async function registerUser(payload: {
   const user = await UserModel.create({
     username:     payload.username || payload.email.split("@")[0],
     email:        payload.email.toLowerCase(),
+    phone:        normalizedPhone || undefined,
     passwordHash: await hashPassword(payload.password),
     role:         requestedRole,
     grade:        payload.grade,
@@ -387,9 +418,19 @@ export const contentServices = {
     return doc ? toPlain(doc) : null;
   },
 
-  async listVideos(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
-    const docs = await VideoModel.find(buildContentQuery(filters)).sort({ createdAt: -1 }).lean();
+  async listVideos(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>, options?: { sort?: "latest" | "trending"; limit?: number }) {
+    const sort: Record<string, 1 | -1> = options?.sort === "trending"
+      ? { views: -1, createdAt: -1 }
+      : { createdAt: -1 };
+    let cursor = VideoModel.find(buildContentQuery(filters)).sort(sort).lean();
+    if (options?.limit && options.limit > 0) cursor = cursor.limit(options.limit);
+    const docs = await cursor;
     return { data: docs.map(toPlain) };
+  },
+
+  async incrementVideoView(id: string) {
+    const doc = await VideoModel.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true }).lean();
+    return doc ? toPlain(doc) : null;
   },
 
   async createVideo(payload: any) {

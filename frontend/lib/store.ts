@@ -88,6 +88,7 @@ export type RealVideoItem = {
   stream: Stream;
   thumbnail: string;
   videoUrl?: string;
+  views?: number;
 };
 
 export type RealNoticeItem = {
@@ -455,10 +456,11 @@ export async function fetchBackendVideos(grade?: Grade, stream?: Stream, subject
     if (stream) q.append("stream", stream);
     if (subject) q.append("subject", subject);
 
-    const res = await fetch(apiUrl(`/api/content/videos?${q.toString()}`), { cache: "no-store" });
+    // Send the auth token so the server can hard-scope a student to their own class.
+    const res = await fetch(apiUrl(`/api/content/videos?${q.toString()}`), { cache: "no-store", headers: getAuthHeaders() });
     if (!res.ok) throw new Error("Failed to load videos from backend");
     const json = await res.json();
-    
+
     const dbVideos = (json.data || []).map((item: any) => ({
       id: item._id || item.id,
       subject: item.subject,
@@ -468,13 +470,53 @@ export async function fetchBackendVideos(grade?: Grade, stream?: Stream, subject
       grade: item.grade,
       stream: item.stream,
       thumbnail: item.thumbnail || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
-      videoUrl: item.videoUrl
+      videoUrl: item.videoUrl,
+      views: item.views ?? 0
     }));
 
     return dbVideos;
   } catch (error) {
     console.error("fetchBackendVideos failed:", error);
     return [];
+  }
+}
+
+/** Fetch the most-viewed videos for a class (server hard-scopes logged-in students). */
+export async function fetchTrendingVideos(grade?: Grade, stream?: Stream, limit = 6): Promise<RealVideoItem[]> {
+  try {
+    const q = new URLSearchParams();
+    if (grade) q.append("grade", grade);
+    if (stream) q.append("stream", stream);
+    q.append("sort", "trending");
+    q.append("limit", String(limit));
+
+    const res = await fetch(apiUrl(`/api/content/videos?${q.toString()}`), { cache: "no-store", headers: getAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to load trending videos");
+    const json = await res.json();
+    return (json.data || []).map((item: any) => ({
+      id: item._id || item.id,
+      subject: item.subject,
+      title: item.title,
+      instructor: item.instructor || "Faculty member",
+      duration: item.duration || "20:00",
+      grade: item.grade,
+      stream: item.stream,
+      thumbnail: item.thumbnail || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
+      videoUrl: item.videoUrl,
+      views: item.views ?? 0
+    }));
+  } catch (error) {
+    console.error("fetchTrendingVideos failed:", error);
+    return [];
+  }
+}
+
+/** Record a view when a student opens a video (drives the trending ranking). */
+export async function incrementVideoView(id: string): Promise<void> {
+  try {
+    await fetch(apiUrl(`/api/content/videos/${id}/view`), { method: "POST", headers: getAuthHeaders() });
+  } catch (error) {
+    console.error("incrementVideoView failed:", error);
   }
 }
 

@@ -173,12 +173,35 @@ export async function deletePaperHandler(req: Request, res: Response) {
 // ─── Videos ──────────────────────────────────────────────────────────────────
 
 export async function listVideosHandler(req: Request, res: Response) {
-  return res.json(await contentServices.listVideos({
-    grade:   normalizeGrade(asString(req.query.grade)),
-    stream:  normalizeStream(asString(req.query.stream)),
-    subject: asString(req.query.subject),
-    search:  asString(req.query.search)
-  }));
+  const authUser = (req as any).user;
+
+  // A student must only ever see their own class's videos. The server overrides any
+  // client-supplied grade/stream so query-param tampering cannot leak other classes.
+  let grade  = normalizeGrade(asString(req.query.grade));
+  let stream = normalizeStream(asString(req.query.stream));
+  if (authUser?.role === "student") {
+    grade  = authUser.grade;
+    stream = authUser.stream;
+  }
+
+  const sort  = asString(req.query.sort) === "trending" ? "trending" : "latest";
+  const limit = Number(asString(req.query.limit)) || undefined;
+
+  return res.json(await contentServices.listVideos(
+    {
+      grade,
+      stream,
+      subject: asString(req.query.subject),
+      search:  asString(req.query.search)
+    },
+    { sort, limit }
+  ));
+}
+
+export async function incrementVideoViewHandler(req: Request, res: Response) {
+  const updated = await contentServices.incrementVideoView(asId(req.params.id));
+  if (!updated) return res.status(404).json({ message: "Video not found" });
+  return res.json({ data: updated });
 }
 
 export async function createVideoHandler(req: Request, res: Response) {

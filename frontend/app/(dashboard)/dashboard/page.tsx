@@ -36,12 +36,15 @@ import {
   fetchBackendQuizzes, 
   fetchBackendNotices, 
   fetchEnterpriseLiveClasses,
+  fetchTrendingVideos,
+  incrementVideoView,
   getDownloadedFiles, 
   getQuizResults,
   logDownload,
   type RealNoteItem,
   type RealPaperItem,
   type RealNoticeItem,
+  type RealVideoItem,
   type EnterpriseLiveClassItem,
   type DownloadRecord,
   type QuizResultRecord
@@ -56,6 +59,7 @@ export default function DashboardPage() {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [notices, setNotices] = useState<RealNoticeItem[]>([]);
   const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
+  const [videos, setVideos] = useState<RealVideoItem[]>([]);
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
   const [quizResults, setQuizResults] = useState<QuizResultRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,12 +77,13 @@ export default function DashboardPage() {
         const grade = s?.grade ?? "11th";
         const stream = s?.stream ?? "Medical";
 
-        const [notesData, papersData, quizzesData, noticesData, liveClassesData] = await Promise.all([
+        const [notesData, papersData, quizzesData, noticesData, liveClassesData, videosData] = await Promise.all([
           fetchBackendNotes(grade, stream),
           fetchBackendPapers(grade, stream),
           fetchBackendQuizzes(grade, stream),
           fetchBackendNotices(),
-          fetchEnterpriseLiveClasses()
+          fetchEnterpriseLiveClasses(),
+          fetchTrendingVideos(grade, stream, 6)
         ]);
 
         setNotes(notesData);
@@ -86,6 +91,7 @@ export default function DashboardPage() {
         setQuizzes(quizzesData);
         setNotices(noticesData);
         setLiveClasses(liveClassesData);
+        setVideos(videosData);
 
         setDownloads(getDownloadedFiles());
         setQuizResults(getQuizResults());
@@ -184,6 +190,76 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* ========================================================= */}
+        {/* TRENDING VIDEOS FOR YOUR CLASS */}
+        {/* ========================================================= */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                <Flame className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                  Trending videos for Class {grade}
+                </h2>
+                <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400">
+                  Most-watched lessons in your {stream} stream — only your class content is shown.
+                </p>
+              </div>
+            </div>
+            <Link href="/videos" className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 shrink-0">
+              View all <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {videos.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-6 text-center">
+              <Video className="mx-auto h-8 w-8 text-slate-400" />
+              <p className="mt-2 text-sm font-bold text-slate-700 dark:text-slate-200">No videos added for your class yet</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Your teachers haven't published lesson videos for Class {grade} ({stream}) yet. Check back soon.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {videos.map((v) => (
+                <a
+                  key={v.id}
+                  href={v.videoUrl || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => { if (v.videoUrl) incrementVideoView(v.id); }}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-lg transition"
+                >
+                  <div className="relative aspect-video w-full overflow-hidden bg-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={v.thumbnail} alt={v.title} loading="lazy" className="h-full w-full object-cover transition group-hover:scale-105" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/90 opacity-0 shadow-lg transition group-hover:opacity-100">
+                        <Play className="h-6 w-6 fill-white text-white" />
+                      </div>
+                    </div>
+                    <span className="absolute bottom-2 right-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {v.duration}
+                    </span>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1 p-3">
+                    <span className="w-fit rounded-md bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                      {v.subject}
+                    </span>
+                    <h3 className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-white leading-snug">{v.title}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{v.instructor}</p>
+                    <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+                      <Eye className="h-3.5 w-3.5" /> {v.views ?? 0} views
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* ROADMAP STRIP */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

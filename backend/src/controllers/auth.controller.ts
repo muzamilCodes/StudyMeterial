@@ -21,6 +21,7 @@ const registerSchema = z.object({
   username:        z.string().min(2, { message: "Name must be at least 2 characters" }).optional(),
   role:            z.enum(["superAdmin", "admin", "teacher", "student"]).optional(),
   otp:             z.string().min(4).optional(),
+  phone:           z.string().min(7, { message: "Please enter a valid phone number" }).optional(),
   adminEmail:      z.string().email().optional(),
   adminPassword:   z.string().min(6).optional()
 });

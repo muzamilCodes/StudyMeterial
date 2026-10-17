@@ -42,6 +42,10 @@ export default function RegisterPage() {
       setErrorMsg("Enter a valid email address first.");
       return;
     }
+    if (phone.replace(/\D/g, "").length < 7) {
+      setErrorMsg("Enter a valid phone number (it can only be used for one account).");
+      return;
+    }
     setSendingOtp(true);
     try {
       const res = await fetch(apiUrl("/api/auth/send-otp"), {
@@ -100,7 +104,8 @@ export default function RegisterPage() {
           password,
           grade,
           stream: grade === "10th" ? "General" : stream,
-          otp: otp.trim()
+          otp: otp.trim(),
+          phone: phone.trim()
         })
       });
 
@@ -209,15 +214,16 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Optional WhatsApp number */}
+            {/* Phone number — required, one account per number */}
             <div className="grid gap-2">
               <Label htmlFor="phone" className="font-bold text-slate-800 text-xs sm:text-sm">
-                WhatsApp Number <span className="font-normal text-slate-400">(optional — code also sent here if WhatsApp is enabled)</span>
+                Phone Number <span className="font-normal text-slate-400">(required — one account per number, OTP can also be sent here if WhatsApp is enabled)</span>
               </Label>
               <Input
                 id="phone"
                 type="tel"
                 placeholder="+91 90000 00000"
+                required
                 value={phone}
                 disabled={otpSent}
                 onChange={(e) => setPhone(e.target.value)}

@@ -12,6 +12,7 @@ import {
   deleteNoteHandler,
   deletePaperHandler,
   deleteVideoHandler,
+  incrementVideoViewHandler,
   listAttendanceHandler,
   listLiveClassesHandler,
   listNoticesHandler,
@@ -47,6 +48,7 @@ router.post("/papers", staffOnly, createPaperHandler);
 router.delete("/papers/:id", staffOnly, deletePaperHandler);
 
 router.get("/videos", listVideosHandler);
+router.post("/videos/:id/view", requireAuth, incrementVideoViewHandler);
 router.post("/videos", staffOnly, createVideoHandler);
 router.delete("/videos/:id", staffOnly, deleteVideoHandler);
 
