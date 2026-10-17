@@ -7,6 +7,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const publicPages = [
     "",
     "/roadmap",
+    "/privacy-policy",
+    "/terms",
     "/student",
     "/student/login",
     "/student/register",

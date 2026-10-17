@@ -24,11 +24,16 @@ export const metadata: Metadata = {
     type: "website",
     title: "StudyMaterial – Notes, Papers, Live Classes & MCQ Quizzes",
     description: "Free PDF notes, previous year board papers, live classes and quizzes for Class 10, 11 and 12.",
+    images: [{ url: "/og-image.png", width: 1536, height: 1024, alt: "StudyMaterial – study notes, papers and quizzes platform" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "StudyMaterial – Notes, Papers, Live Classes & MCQ Quizzes",
     description: "Free PDF notes, previous year board papers, live classes and quizzes for Class 10, 11 and 12.",
+    images: ["/og-image.png"],
+  },
+  icons: {
+    icon: "/icon.png",
   },
   robots: { index: true, follow: true },
 };

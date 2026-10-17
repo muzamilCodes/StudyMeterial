@@ -12,6 +12,7 @@ export const metadata: Metadata = {
       "Free PDF notes, previous year board papers, live classes and MCQ quizzes for Class 10-12. Register and start studying.",
     url: "/",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1536, height: 1024, alt: "StudyMaterial – study notes, papers and quizzes platform" }],
   },
 };
 

@@ -163,12 +163,11 @@ export function PublicFooter() {
       </div>
 
       {/* BOTTOM BAR */}
-      <div className="max-w-[1600px] mx-auto mt-12 pt-6 border-t border-slate-200/60 dark:border-slate-800/80 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-400">
+      <div className="max-w-[1600px] mx-auto mt-12 pt-6 border-t border-slate-200/60 dark:border-slate-800/80 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
         <p>© 2026 StudyMaterial Educational Inc. All rights reserved.</p>
         <div className="flex items-center gap-6">
-          <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">Privacy Policy</span>
-          <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">Terms of Service</span>
-          <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer">API Status</span>
+          <Link href="/privacy-policy" className="hover:text-slate-600 dark:hover:text-slate-300">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-slate-600 dark:hover:text-slate-300">Terms &amp; Conditions</Link>
         </div>
       </div>
     </footer>

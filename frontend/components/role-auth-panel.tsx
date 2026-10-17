@@ -168,6 +168,7 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
                 <input
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900"
                   placeholder="Username"
+                  required
                   value={form.username}
                   onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
                 />
@@ -200,6 +201,7 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900"
               placeholder="Email address"
               type="email"
+              required
               value={form.email}
               onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
             />
@@ -207,6 +209,8 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900"
               placeholder="Password"
               type="password"
+              required
+              minLength={6}
               value={form.password}
               onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
             />
@@ -215,6 +219,8 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900"
                 placeholder="Confirm password"
                 type="password"
+                required
+                minLength={6}
                 value={form.confirmPassword}
                 onChange={(e) => setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
               />
