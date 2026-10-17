@@ -171,7 +171,12 @@ export default function LoginPage() {
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-3 text-center text-xs text-slate-500 border border-slate-100">
-              <p>Admin Login: <span className="font-bold text-slate-800">admin@studymaterial.com</span> | Pass: <span className="font-bold text-slate-800">Admin@12345</span></p>
+              <p>
+                Want to teach?{" "}
+                <Link href="/instructor/register" className="font-bold text-blue-600 hover:underline">
+                  Apply as an instructor
+                </Link>
+              </p>
             </div>
           </form>
         </CardContent>
