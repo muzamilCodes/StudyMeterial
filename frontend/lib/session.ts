@@ -3,7 +3,7 @@ export type StudentSession = {
   email: string;
   username?: string;
   name?: string;
-  role: "superadmin" | "admin" | "teacher" | "student";
+  role: "superAdmin" | "superadmin" | "admin" | "teacher" | "student";
   isAdmin?: boolean;
   grade?: "10th" | "11th" | "12th";
   stream?: "General" | "Medical" | "Non-Medical" | "Commerce" | "Arts";

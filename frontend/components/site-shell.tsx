@@ -57,26 +57,16 @@ const userNavItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-// ADMIN SIDEBAR MENU (18 Enterprise Modules)
+// ADMIN SIDEBAR MENU (modules with real working screens)
 const adminNavItems = [
   { tab: "Dashboard Overview", label: "Dashboard Overview", icon: LayoutDashboard },
   { tab: "Users & Students", label: "Users Directory", icon: Users },
-  { tab: "Students", label: "Students", icon: UserCheck },
-  { tab: "Teachers", label: "Teachers & Faculty", icon: Award },
-  { tab: "Classes", label: "Classes (10th/11th/12th)", icon: GraduationCap },
-  { tab: "Streams", label: "Streams & Specializations", icon: BookOpen },
-  { tab: "Subjects", label: "Configured Subjects", icon: BookOpen },
-  { tab: "Categories", label: "Content Categories", icon: Layers },
   { tab: "Notes Management", label: "Notes Management", icon: FileText },
+  { tab: "Upload PDF Note", label: "Upload PDF Note", icon: Upload },
   { tab: "Previous Papers", label: "Previous Papers", icon: ScrollText },
+  { tab: "Upload Board Paper", label: "Upload Board Paper", icon: ScrollText },
   { tab: "Live Classes", label: "Live Classes Engine", icon: Video },
-  { tab: "Quizzes & Tests", label: "Quizzes & MCQ Tests", icon: HelpCircle },
-  { tab: "Assignments", label: "Assignments & Homework", icon: FolderPlus },
-  { tab: "Notices & Announcements", label: "Notices & Announcements", icon: Bell },
-  { tab: "Attendance", label: "Live Class Attendance", icon: CheckCircle2 },
-  { tab: "Reports", label: "Performance Reports", icon: BarChart3 },
-  { tab: "Analytics", label: "Platform Analytics", icon: TrendingUp },
-  { tab: "Settings", label: "System Settings", icon: Settings },
+  { tab: "Publish Notice", label: "Publish Notice", icon: Bell },
 ];
 
 export function SiteShell({

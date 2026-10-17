@@ -19,7 +19,8 @@ export default function DownloadsPage() {
     if (item.fileUrl) {
       window.open(item.fileUrl, "_blank");
     } else {
-      window.open("http://localhost:4000/uploads/dummy.pdf", "_blank");
+      setDownloadMsg(`No file is attached to "${item.title}" yet.`);
+      setTimeout(() => setDownloadMsg(null), 3000);
     }
   };
 

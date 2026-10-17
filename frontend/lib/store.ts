@@ -1,5 +1,5 @@
 import { getStoredSession, type StudentSession } from "./session";
-import { type Grade, type Stream, type QuizItem, generateAutoQuizBank } from "./platform-data";
+import { type Grade, type Stream, type QuizItem } from "./platform-data";
 import { apiUrl } from "./api";
 
 export type { Grade, Stream };
@@ -129,149 +129,38 @@ export type RegisteredUserItem = {
   grade: Grade;
   stream: Stream;
   createdAt: string;
+  joinedTs: number;
 };
 
 const DOWNLOADS_KEY = "study-material-real-downloads";
+const ASSIGNMENTS_KEY = "study-material-teacher-assignments";
+
+export type TeacherAssignmentItem = {
+  id: string;
+  title: string;
+  subject: string;
+  grade: string;
+  deadline: string;
+  marks: number;
+};
+
+export function getTeacherAssignments(): TeacherAssignmentItem[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(ASSIGNMENTS_KEY) || "[]"); } catch { return []; }
+}
+
+export function addTeacherAssignment(a: TeacherAssignmentItem): TeacherAssignmentItem[] {
+  const list = [a, ...getTeacherAssignments()];
+  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(list));
+  return list;
+}
+
+export function removeTeacherAssignment(id: string): TeacherAssignmentItem[] {
+  const list = getTeacherAssignments().filter(a => a.id !== id);
+  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(list));
+  return list;
+}
 const RESULTS_KEY = "study-material-real-results";
-
-const DEFAULT_ENTERPRISE_LIVE_CLASSES: EnterpriseLiveClassItem[] = [
-  {
-    id: "live-ent-1",
-    title: "Cellular Genetics & DNA Replication Masterclass",
-    subject: "Biology",
-    category: "NEET Special Preparation",
-    description: "Deep dive into Mendelian genetics, molecular replication, DNA polymerases, and high-yield board/entrance numericals.",
-    teacherName: "Dr. Ramesh Sharma",
-    teacherPhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-    teacherBio: "14+ Years Senior Biology Educator for Class 11th & 12th Board & NEET Aspirants.",
-    date: "Today, July 28, 2026",
-    startTime: "09:00 PM",
-    endTime: "10:15 PM",
-    duration: "75 Mins",
-    timeZone: "IST (UTC+5:30)",
-    meetingPlatform: "Google Meet",
-    meetingLink: "https://meet.google.com/abc-defg-hij",
-    meetingId: "982-124-4412",
-    meetingPassword: "STUDBIO2026",
-    maxStudents: 500,
-    enrolledStudentsCount: 342,
-    language: "English & Hindi",
-    difficultyLevel: "Intermediate",
-    bannerUrl: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop&q=80",
-    thumbnailUrl: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80",
-    tags: ["Genetics", "NEET", "Class 11th", "Biology"],
-    status: "Live",
-    allowRecording: true,
-    allowChat: true,
-    allowScreenShare: true,
-    allowStudentQuestions: true,
-    attachments: [
-      { title: "Genetics Chapter Formula Sheet.pdf", type: "PDF", url: "https://www.w3schools.com/html/mov_bbb.mp4", size: "3.4 MB" },
-      { title: "DNA Replication Presentation.ppt", type: "PPT", url: "https://www.w3schools.com/html/mov_bbb.mp4", size: "8.2 MB" }
-    ],
-    prerequisites: ["Read NCERT Chapter 5 Genetics", "Basic understanding of cell structure"],
-    learningOutcomes: [
-      "Master DNA replication machinery and enzymes",
-      "Solve pedigree analysis numericals in under 60 seconds",
-      "Memorize Mendelian dihybrid cross ratios easily"
-    ],
-    recordingUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
-    grade: "11th",
-    stream: "Medical"
-  },
-  {
-    id: "live-ent-2",
-    title: "Kinematics 2D & Projectile Motion Numerical Solving Sprint",
-    subject: "Physics",
-    category: "Board & JEE Foundation",
-    description: "Solving top 20 previous year board questions on vector motion, projectile trajectories, and maximum height calculations.",
-    teacherName: "Prof. Ananya Roy",
-    teacherPhoto: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
-    teacherBio: "M.Tech IIT Delhi, 12 Years Senior Physics Faculty.",
-    date: "Tomorrow, July 29, 2026",
-    startTime: "10:30 AM",
-    endTime: "11:30 AM",
-    duration: "60 Mins",
-    timeZone: "IST (UTC+5:30)",
-    meetingPlatform: "Zoom",
-    meetingLink: "https://zoom.us/j/91284712948",
-    meetingId: "912-847-12948",
-    meetingPassword: "PHYS2026",
-    maxStudents: 300,
-    enrolledStudentsCount: 198,
-    language: "English",
-    difficultyLevel: "Advanced",
-    bannerUrl: "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?w=1200&auto=format&fit=crop&q=80",
-    thumbnailUrl: "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?w=600&auto=format&fit=crop&q=80",
-    tags: ["Kinematics", "Physics", "Class 11th"],
-    status: "Upcoming",
-    allowRecording: true,
-    allowChat: true,
-    allowScreenShare: true,
-    allowStudentQuestions: true,
-    attachments: [
-      { title: "Projectile Motion PYQ Book.pdf", type: "PDF", url: "https://www.w3schools.com/html/mov_bbb.mp4", size: "4.1 MB" }
-    ],
-    prerequisites: ["Vector Addition Laws", "Basic Trigonometry"],
-    learningOutcomes: [
-      "Derive time of flight and range equations",
-      "Solve relative velocity problems"
-    ],
-    grade: "11th",
-    stream: "Medical"
-  },
-  {
-    id: "live-ent-3",
-    title: "Organic Reaction Mechanisms & Electrophilic Substitution",
-    subject: "Chemistry",
-    category: "Board Exam Revision",
-    description: "Detailed reaction pathways, Markovnikov rule, inductive effects, and resonance stability.",
-    teacherName: "Dr. Vikram Seth",
-    teacherPhoto: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80",
-    teacherBio: "PhD Organic Chemistry, Senior Academic Lead.",
-    date: "July 30, 2026",
-    startTime: "05:00 PM",
-    endTime: "06:15 PM",
-    duration: "75 Mins",
-    timeZone: "IST (UTC+5:30)",
-    meetingPlatform: "LiveKit",
-    meetingLink: "https://livekit.io/room/chem-organics",
-    maxStudents: 400,
-    enrolledStudentsCount: 256,
-    language: "English & Hindi",
-    difficultyLevel: "Intermediate",
-    bannerUrl: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200&auto=format&fit=crop&q=80",
-    thumbnailUrl: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=600&auto=format&fit=crop&q=80",
-    tags: ["Organic", "Chemistry", "Class 11th"],
-    status: "Published",
-    allowRecording: true,
-    allowChat: true,
-    allowScreenShare: true,
-    allowStudentQuestions: true,
-    grade: "11th",
-    stream: "Medical"
-  }
-];
-
-const DEFAULT_NOTES: RealNoteItem[] = [
-  { id: "note-1", subject: "Biology", title: "Chapter 1: Cell - The Unit of Life & Organelles Notes", grade: "11th", stream: "Medical", uploadDate: "2026-07-20", fileSize: "3.4 MB", pages: 18, pdfUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { id: "note-2", subject: "Biology", title: "Chapter 2: Cell Cycle, Mitosis & Meiosis Revision", grade: "11th", stream: "Medical", uploadDate: "2026-07-22", fileSize: "2.8 MB", pages: 14, pdfUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { id: "note-3", subject: "Physics", title: "Kinematics 1D & 2D Vector Motion Formula Sheet", grade: "11th", stream: "Medical", uploadDate: "2026-07-18", fileSize: "4.1 MB", pages: 22, pdfUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { id: "note-4", subject: "Chemistry", title: "Organic Chemistry Reaction Mechanisms & Hydrocarbons", grade: "11th", stream: "Medical", uploadDate: "2026-07-15", fileSize: "3.9 MB", pages: 20, pdfUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-];
-
-const DEFAULT_PAPERS: RealPaperItem[] = [
-  { id: "paper-1", subject: "Biology", title: "2025 Annual Board Model Paper with Solved Solutions", year: "2025", term: "Board Exam", grade: "11th", stream: "Medical", fileSize: "4.8 MB", fileUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { id: "paper-2", subject: "Physics", title: "2024 Board Solved Question Paper - Mechanics & Waves", year: "2024", term: "Annual Board", grade: "11th", stream: "Medical", fileSize: "3.9 MB", fileUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-];
-
-const DEFAULT_VIDEOS: RealVideoItem[] = [
-  { id: "vid-1", subject: "Biology", title: "Cell Biology & DNA Structure Complete Masterclass", instructor: "Dr. Ramesh Sharma", duration: "45:00", grade: "11th", stream: "Medical", thumbnail: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&auto=format&fit=crop&q=80", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-];
-
-const DEFAULT_NOTICES: RealNoticeItem[] = [
-  { id: "not-1", title: "Latest Announcements: Mid-Term Examination Datesheet Released", body: "The date sheet for upcoming mid-term examinations for 10th, 11th, and 12th classes has been published by the examination board.", category: "Latest Announcements", date: "July 26, 2026" }
-];
 
 function getAuthHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("study-material-token") : null;
@@ -285,8 +174,35 @@ function getAuthHeaders() {
 // ENTERPRISE LIVE CLASSES API CLIENT
 // ----------------------------------------------------------------------------
 
-export async function fetchEnterpriseLiveClasses(params?: {
-  grade?: Grade;
+export type AttendanceRecord = {
+  id: string;
+  classId: string;
+  studentName: string;
+  email: string;
+  joinTime: string;
+  status: string;
+};
+
+export async function fetchBackendAttendance(): Promise<AttendanceRecord[]> {
+  try {
+    const res = await fetch(apiUrl("/api/content/attendance"), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data || []).map((a: any) => ({
+      id: a._id || a.id,
+      classId: a.classId,
+      studentName: a.studentName,
+      email: a.email,
+      joinTime: a.joinTime,
+      status: a.status
+    }));
+  } catch (error) {
+    console.error("fetchBackendAttendance error:", error);
+    return [];
+  }
+}
+
+export async function fetchEnterpriseLiveClasses(params?: {  grade?: Grade;
   stream?: Stream;
   subject?: string;
   status?: string;
@@ -315,18 +231,18 @@ export async function fetchEnterpriseLiveClasses(params?: {
       description: item.description || "",
       teacherName: item.teacherName || item.instructor || "Faculty Teacher",
       teacherPhoto: item.teacherPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-      teacherBio: item.teacherBio || "Senior Faculty",
-      date: item.date || "Today",
-      startTime: item.startTime || "09:00 PM",
-      endTime: item.endTime || "10:00 PM",
-      duration: item.duration || "60 Mins",
+      teacherBio: item.teacherBio || "",
+      date: item.date || "TBD",
+      startTime: item.startTime || "",
+      endTime: item.endTime || "",
+      duration: item.duration || "",
       timeZone: item.timeZone || "IST",
       meetingPlatform: item.meetingPlatform || "Google Meet",
-      meetingLink: item.meetingLink || "https://meet.google.com/abc-defg-hij",
-      meetingId: item.meetingId || "982-124-4412",
-      meetingPassword: item.meetingPassword || "PASS123",
-      maxStudents: item.maxStudents || 500,
-      enrolledStudentsCount: item.enrolledStudentsCount || 120,
+      meetingLink: item.meetingLink || "",
+      meetingId: item.meetingId || "",
+      meetingPassword: item.meetingPassword || "",
+      maxStudents: item.maxStudents || 0,
+      enrolledStudentsCount: item.enrolledStudentsCount || 0,
       language: item.language || "English",
       difficultyLevel: item.difficultyLevel || "Intermediate",
       bannerUrl: item.bannerUrl || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop&q=80",
@@ -436,28 +352,24 @@ export async function fetchBackendNotes(grade?: Grade, stream?: Stream, subject?
       grade: item.grade,
       stream: item.stream,
       uploadDate: item.uploadDate || (item.createdAt ? item.createdAt.split("T")[0] : new Date().toISOString().split("T")[0]),
-      fileSize: item.fileSize || "2.8 MB",
-      pages: item.pages || 12,
+      fileSize: item.fileSize || "",
+      pages: item.pages || 0,
       pdfUrl: item.fileUrl || item.pdfUrl
     }));
 
-    return [...dbNotes, ...DEFAULT_NOTES];
+    return dbNotes;
   } catch (error) {
-    console.error("fetchBackendNotes fallback active:", error);
-    return DEFAULT_NOTES;
+    console.error("fetchBackendNotes failed:", error);
+    return [];
   }
 }
 
 export async function createBackendNote(note: Omit<RealNoteItem, "id" | "uploadDate">): Promise<boolean> {
   try {
-    const payload = {
-      ...note,
-      fileUrl: note.pdfUrl || "http://localhost:4000/uploads/dummy.pdf"
-    };
     const res = await fetch(apiUrl("/api/content/notes"), {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...note, fileUrl: note.pdfUrl ?? note.fileUrl })
     });
     return res.ok;
   } catch (error) {
@@ -498,27 +410,23 @@ export async function fetchBackendPapers(grade?: Grade, stream?: Stream, subject
       term: item.term || "Board Exam",
       grade: item.grade,
       stream: item.stream,
-      fileSize: item.fileSize || "3.1 MB",
+      fileSize: item.fileSize || "",
       fileUrl: item.fileUrl
     }));
 
-    return [...dbPapers, ...DEFAULT_PAPERS];
+    return dbPapers;
   } catch (error) {
-    console.error("fetchBackendPapers fallback active:", error);
-    return DEFAULT_PAPERS;
+    console.error("fetchBackendPapers failed:", error);
+    return [];
   }
 }
 
 export async function createBackendPaper(paper: Omit<RealPaperItem, "id">): Promise<boolean> {
   try {
-    const payload = {
-      ...paper,
-      fileUrl: paper.fileUrl || "http://localhost:4000/uploads/dummy.pdf"
-    };
     const res = await fetch(apiUrl("/api/content/papers"), {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(paper)
     });
     return res.ok;
   } catch (error) {
@@ -563,23 +471,19 @@ export async function fetchBackendVideos(grade?: Grade, stream?: Stream, subject
       videoUrl: item.videoUrl
     }));
 
-    return [...dbVideos, ...DEFAULT_VIDEOS];
+    return dbVideos;
   } catch (error) {
-    console.error("fetchBackendVideos fallback active:", error);
-    return DEFAULT_VIDEOS;
+    console.error("fetchBackendVideos failed:", error);
+    return [];
   }
 }
 
 export async function createBackendVideo(video: Omit<RealVideoItem, "id">): Promise<boolean> {
   try {
-    const payload = {
-      ...video,
-      videoUrl: video.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4"
-    };
     const res = await fetch(apiUrl("/api/content/videos"), {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(video)
     });
     return res.ok;
   } catch (error) {
@@ -644,17 +548,12 @@ export async function fetchBackendQuizzes(grade?: Grade, stream?: Stream, subjec
       });
     }
 
-    const autoBank = generateAutoQuizBank().filter(qz => {
-      const matchGrade = !grade || qz.grade === grade;
-      const matchStream = !stream || qz.stream === stream || qz.stream === "General";
-      const matchSub = !subject || qz.subject === subject;
-      return matchGrade && matchStream && matchSub;
-    });
-
-    return [...dbQuizzes, ...autoBank];
+    // Only return genuine, backend-stored quizzes (teacher/admin created).
+    // No auto-generated placeholder bank is injected.
+    return dbQuizzes;
   } catch (error) {
     console.error("fetchBackendQuizzes fallback active:", error);
-    return generateAutoQuizBank().filter(qz => (!grade || qz.grade === grade));
+    return [];
   }
 }
 
@@ -714,10 +613,10 @@ export async function fetchBackendNotices(): Promise<RealNoticeItem[]> {
       date: item.date || (item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date().toLocaleDateString())
     }));
 
-    return [...dbNotices, ...DEFAULT_NOTICES];
+    return dbNotices;
   } catch (error) {
-    console.error("fetchBackendNotices fallback active:", error);
-    return DEFAULT_NOTICES;
+    console.error("fetchBackendNotices failed:", error);
+    return [];
   }
 }
 
@@ -829,82 +728,82 @@ export async function fetchBackendAdminDashboard() {
       const summary = json.summary || {};
       const statsArray = summary.stats || [];
       
-      const usersCount = statsArray.find((s: any) => s.label === "Users")?.value || "142";
-      const studentsCount = statsArray.find((s: any) => s.label === "Students")?.value || "140";
-      const adminsCount = statsArray.find((s: any) => s.label === "Admins")?.value || "2";
-      const notesCount = statsArray.find((s: any) => s.label === "Notes")?.value || "10";
-      const papersCount = statsArray.find((s: any) => s.label === "Papers")?.value || "5";
-      const quizzesCount = statsArray.find((s: any) => s.label === "Quizzes")?.value || "60";
-      const liveClassesCount = statsArray.find((s: any) => s.label === "Live Classes")?.value || "24";
-      const noticesCount = statsArray.find((s: any) => s.label === "Notices")?.value || "8";
+      const usersCount = statsArray.find((s: any) => s.label === "Users")?.value || 0;
+      const studentsCount = statsArray.find((s: any) => s.label === "Students")?.value || 0;
+      const teachersCount = statsArray.find((s: any) => s.label === "Teachers")?.value || 0;
+      const adminsCount = statsArray.find((s: any) => s.label === "Admins")?.value || 0;
+      const notesCount = statsArray.find((s: any) => s.label === "Notes")?.value || 0;
+      const papersCount = statsArray.find((s: any) => s.label === "Papers")?.value || 0;
+      const videosCount = statsArray.find((s: any) => s.label === "Videos")?.value || 0;
+      const quizzesCount = statsArray.find((s: any) => s.label === "Quizzes")?.value || 0;
+      const liveClassesCount = statsArray.find((s: any) => s.label === "Live Classes")?.value || 0;
+      const noticesCount = statsArray.find((s: any) => s.label === "Notices")?.value || 0;
 
       const usersList: RegisteredUserItem[] = (json.users || []).map((u: any) => ({
         id: u._id || u.id,
-        username: u.username || "Muzamil Ahmad",
-        email: u.email || "student@studymaterial.com",
+        username: u.username || "—",
+        email: u.email || "—",
         role: u.role || "student",
         grade: u.grade || "11th",
         stream: u.stream || "Medical",
-        createdAt: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "2026-07-28"
+        createdAt: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—",
+        joinedTs: u.createdAt ? new Date(u.createdAt).getTime() : 0
       }));
 
       return {
         stats: {
           totalUsers: Number(usersCount),
           totalStudents: Number(studentsCount),
+          totalTeachers: Number(teachersCount),
           totalAdmins: Number(adminsCount),
           totalNotes: Number(notesCount),
           totalPapers: Number(papersCount),
-          totalVideos: Number(liveClassesCount),
+          totalVideos: Number(videosCount),
+          totalLiveClasses: Number(liveClassesCount),
           totalQuizzes: Number(quizzesCount),
           totalNotices: Number(noticesCount),
-          totalDownloads: getDownloadedFiles().length || 342,
-          averageScore: "85%"
+          totalDownloads: getDownloadedFiles().length
         },
         usersList,
-        distributions: summary.distributions || { medical: 45, nonMedical: 35, commerce: 20, arts: 15, general: 27 }
+        distributions: summary.distributions || { medical: 0, nonMedical: 0, commerce: 0, arts: 0, general: 0 }
       };
     }
 
-    // Return structured default data if auth fails or endpoint unreachable without throwing an unhandled exception
+    // Backend unreachable or admin auth missing: return honest zeros instead of fabricated numbers
     return {
       stats: {
-        totalUsers: 142,
-        totalStudents: 140,
-        totalAdmins: 2,
-        totalNotes: 10,
-        totalPapers: 5,
-        totalVideos: 24,
-        totalQuizzes: 60,
-        totalNotices: 8,
-        totalDownloads: getDownloadedFiles().length || 342,
-        averageScore: "85%"
+        totalUsers: 0,
+        totalStudents: 0,
+        totalTeachers: 0,
+        totalAdmins: 0,
+        totalNotes: 0,
+        totalPapers: 0,
+        totalVideos: 0,
+        totalLiveClasses: 0,
+        totalQuizzes: 0,
+        totalNotices: 0,
+        totalDownloads: getDownloadedFiles().length
       },
-      usersList: [
-        { id: "u-1", username: "System Admin", email: "admin@studymaterial.com", role: "admin", grade: "11th" as Grade, stream: "Medical" as Stream, createdAt: "2026-07-20" },
-        { id: "u-2", username: "Muzamil Ahmad", email: "student@studymaterial.com", role: "student", grade: "11th" as Grade, stream: "Medical" as Stream, createdAt: "2026-07-22" }
-      ],
-      distributions: { medical: 45, nonMedical: 35, commerce: 20, arts: 15, general: 27 }
+      usersList: [],
+      distributions: { medical: 0, nonMedical: 0, commerce: 0, arts: 0, general: 0 }
     };
   } catch (error) {
     return {
       stats: {
-        totalUsers: 142,
-        totalStudents: 140,
-        totalAdmins: 2,
-        totalNotes: 10,
-        totalPapers: 5,
-        totalVideos: 24,
-        totalQuizzes: 60,
-        totalNotices: 8,
-        totalDownloads: 342,
-        averageScore: "85%"
+        totalUsers: 0,
+        totalStudents: 0,
+        totalTeachers: 0,
+        totalAdmins: 0,
+        totalNotes: 0,
+        totalPapers: 0,
+        totalVideos: 0,
+        totalLiveClasses: 0,
+        totalQuizzes: 0,
+        totalNotices: 0,
+        totalDownloads: 0
       },
-      usersList: [
-        { id: "u-1", username: "System Admin", email: "admin@studymaterial.com", role: "admin", grade: "11th" as Grade, stream: "Medical" as Stream, createdAt: "2026-07-20" },
-        { id: "u-2", username: "Muzamil Ahmad", email: "student@studymaterial.com", role: "student", grade: "11th" as Grade, stream: "Medical" as Stream, createdAt: "2026-07-22" }
-      ],
-      distributions: { medical: 45, nonMedical: 35, commerce: 20, arts: 15, general: 27 }
+      usersList: [],
+      distributions: { medical: 0, nonMedical: 0, commerce: 0, arts: 0, general: 0 }
     };
   }
 }

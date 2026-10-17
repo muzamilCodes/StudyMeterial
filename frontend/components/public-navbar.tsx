@@ -31,7 +31,7 @@ import {
 import { getStoredSession, clearSession, type StudentSession } from "@/lib/session";
 import { useTheme } from "@/components/theme-provider";
 import { GlobalSearchModal } from "@/components/global-search-modal";
-import { fetchBackendNotices, type RealNoticeItem } from "@/lib/store";
+import { fetchBackendNotices, fetchEnterpriseLiveClasses, type RealNoticeItem, type EnterpriseLiveClassItem } from "@/lib/store";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home, protected: false },
@@ -47,6 +47,7 @@ export function PublicNavbar() {
   const { theme, setTheme } = useTheme();
   const [session, setSession] = useState<StudentSession | null>(null);
   const [realNotices, setRealNotices] = useState<RealNoticeItem[]>([]);
+  const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
   
   // Modals & Drawers state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -61,6 +62,7 @@ export function PublicNavbar() {
       setSession(s);
     }
     fetchBackendNotices().then((data) => setRealNotices(data));
+    fetchEnterpriseLiveClasses().then((data) => setLiveClasses(data)).catch(() => setLiveClasses([]));
   }, []);
 
   // Global Ctrl+K or Cmd+K keyboard shortcut for Search Modal
@@ -229,9 +231,11 @@ export function PublicNavbar() {
                 title="Messages"
               >
                 <MessageSquare className="h-5 w-5" />
-                <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-                </span>
+                {liveClasses.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                  </span>
+                )}
               </button>
 
               {/* Messages Drawer */}
@@ -244,15 +248,35 @@ export function PublicNavbar() {
                     </Link>
                   </div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-72 overflow-y-auto">
-                    <div className="py-3 flex items-start gap-3">
-                      <div className="h-8 w-8 rounded-full bg-orange-100 text-orange-600 font-bold flex items-center justify-center shrink-0 text-xs">
-                        DS
+                    {liveClasses.length > 0 ? (
+                      liveClasses.slice(0, 4).map((c) => {
+                        const initials = (c.teacherName || "Faculty")
+                          .split(" ")
+                          .map((w) => w[0])
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase();
+                        return (
+                          <div key={c.id} className="py-3 flex items-start gap-3">
+                            <div className="h-8 w-8 rounded-full bg-orange-100 text-orange-600 font-bold flex items-center justify-center shrink-0 text-xs">
+                              {initials || "F"}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{c.teacherName || "Faculty Teacher"}</p>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                {c.title} • <span className="font-semibold text-rose-500">{c.status}</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="py-6 text-center">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">No live rooms active right now</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Faculty chat opens when a teacher goes live. Check the Live Classes page for schedules.</p>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Dr. Ramesh Sharma (Faculty)</p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">&quot;Join today&apos;s live stream for interactive doubt clearing.&quot;</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}

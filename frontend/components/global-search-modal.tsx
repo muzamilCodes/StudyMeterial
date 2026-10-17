@@ -1,9 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, X, BookOpen, FileText, Video, Award, User, HelpCircle, ArrowRight } from "lucide-react";
-import Link from "next/link";
+import { Search, X, BookOpen, FileText, Video, User, HelpCircle, ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  fetchBackendNotes,
+  fetchBackendPapers,
+  fetchBackendQuizzes,
+  fetchEnterpriseLiveClasses,
+  type RealNoteItem,
+  type RealPaperItem,
+  type EnterpriseLiveClassItem,
+} from "@/lib/store";
+import { type QuizItem } from "@/lib/platform-data";
 
 export type SearchCategory = "all" | "subjects" | "notes" | "papers" | "quizzes" | "teachers" | "classes";
 
@@ -13,35 +22,28 @@ interface GlobalSearchModalProps {
   initialQuery?: string;
 }
 
-const SEARCH_DATA = [
+type SearchResult = {
+  id: string;
+  title: string;
+  category: Exclude<SearchCategory, "all">;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+  tag: string;
+};
+
+// Subjects are a stable navigation catalogue, not per-item data.
+const STATIC_SUBJECTS: SearchResult[] = [
   { id: "s1", title: "Biology - Class 11th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "11th Medical" },
   { id: "s2", title: "Physics - Class 11th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "11th Medical / Non-Med" },
   { id: "s3", title: "Chemistry - Class 11th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "11th Medical" },
   { id: "s4", title: "Mathematics - Class 10th", category: "subjects", icon: BookOpen, href: "/subjects", tag: "10th General" },
-  
-  { id: "n1", title: "Cell Biology & Molecular Genetics Notes", category: "notes", icon: FileText, href: "/notes", tag: "PDF • 2.8 MB" },
-  { id: "n2", title: "Newton's Laws & Vector Physics Comprehensive Notes", category: "notes", icon: FileText, href: "/notes", tag: "PDF • 3.4 MB" },
-  { id: "n3", title: "Organic Chemistry Reaction Mechanism Notes", category: "notes", icon: FileText, href: "/notes", tag: "PDF • 4.1 MB" },
-  
-  { id: "p1", title: "2025 Board Exam Physics Model Paper", category: "papers", icon: FileText, href: "/previous-papers", tag: "Year 2025" },
-  { id: "p2", title: "2024 Biology Mid-Term Term Paper", category: "papers", icon: FileText, href: "/previous-papers", tag: "Year 2024" },
-  { id: "p3", title: "2025 Mathematics Sample Question Paper", category: "papers", icon: FileText, href: "/previous-papers", tag: "Year 2025" },
-
-  { id: "q1", title: "Cellular Biology Quick Quiz & Self-Assessment", category: "quizzes", icon: HelpCircle, href: "/quizzes", tag: "10 Questions • 15 Mins" },
-  { id: "q2", title: "Physics Kinematics Speed Test Quiz", category: "quizzes", icon: HelpCircle, href: "/quizzes", tag: "8 Questions • 12 Mins" },
-  { id: "q3", title: "Chemistry Chemical Bonding Quiz", category: "quizzes", icon: HelpCircle, href: "/quizzes", tag: "12 Questions • 20 Mins" },
-
-  { id: "c1", title: "NEET Biology Masterclass: Human Anatomy Live", category: "classes", icon: Video, href: "/videos", tag: "Live • Today 4:00 PM" },
-  { id: "c2", title: "JEE Physics Numericals Sprint Session", category: "classes", icon: Video, href: "/videos", tag: "Live • Tomorrow 11:00 AM" },
-
-  { id: "t1", title: "Dr. Ramesh Sharma (Senior Biology Faculty)", category: "teachers", icon: User, href: "/videos", tag: "14+ Yrs Exp" },
-  { id: "t2", title: "Prof. Ananya Roy (Physics Specialist)", category: "teachers", icon: User, href: "/videos", tag: "10+ Yrs Exp" },
-  { id: "t3", title: "Dr. Vikram Seth (Organic Chemistry HOD)", category: "teachers", icon: User, href: "/videos", tag: "16+ Yrs Exp" }
 ];
 
 export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: GlobalSearchModalProps) {
   const [query, setQuery] = useState(initialQuery);
   const [activeCategory, setActiveCategory] = useState<SearchCategory>("all");
+  const [dynamicResults, setDynamicResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -58,13 +60,85 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoading(true);
+
+    Promise.all([
+      fetchBackendNotes().catch(() => [] as RealNoteItem[]),
+      fetchBackendPapers().catch(() => [] as RealPaperItem[]),
+      fetchBackendQuizzes().catch(() => [] as QuizItem[]),
+      fetchEnterpriseLiveClasses().catch(() => [] as EnterpriseLiveClassItem[]),
+    ]).then(([notes, papers, quizzes, classes]) => {
+      if (cancelled) return;
+
+      const noteResults: SearchResult[] = notes.map((n) => ({
+        id: `note-${n.id}`,
+        title: n.title,
+        category: "notes",
+        icon: FileText,
+        href: "/notes",
+        tag: `${n.subject}${n.fileSize ? ` • ${n.fileSize}` : ""}`,
+      }));
+
+      const paperResults: SearchResult[] = papers.map((p) => ({
+        id: `paper-${p.id}`,
+        title: p.title,
+        category: "papers",
+        icon: FileText,
+        href: "/previous-papers",
+        tag: `${p.subject} • ${p.year ? `Year ${p.year}` : "Board Paper"}`,
+      }));
+
+      const quizResults: SearchResult[] = quizzes.map((q) => ({
+        id: `quiz-${q.id}`,
+        title: q.title,
+        category: "quizzes",
+        icon: HelpCircle,
+        href: "/quizzes",
+        tag: `${q.subject} • ${q.totalQuestions || q.questions?.length || 0} Questions`,
+      }));
+
+      const classResults: SearchResult[] = classes.map((c) => ({
+        id: `class-${c.id}`,
+        title: c.title,
+        category: "classes",
+        icon: Video,
+        href: "/videos",
+        tag: `${c.status} • ${c.teacherName}`,
+      }));
+
+      const teacherResults: SearchResult[] = [
+        ...new Map(classes.filter((c) => c.teacherName).map((c) => [c.teacherName, c])).values(),
+      ].map((c) => ({
+        id: `teacher-${c.teacherName}`,
+        title: c.teacherName,
+        category: "teachers",
+        icon: User,
+        href: "/videos",
+        tag: `${c.subject} Faculty`,
+      }));
+
+      setDynamicResults([...noteResults, ...paperResults, ...quizResults, ...classResults, ...teacherResults]);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const filteredResults = SEARCH_DATA.filter((item) => {
+  const allResults = [...STATIC_SUBJECTS, ...dynamicResults];
+
+  const filteredResults = allResults.filter((item) => {
     const matchesCategory = activeCategory === "all" || item.category === activeCategory;
-    const matchesQuery = query.trim() === "" || 
-      item.title.toLowerCase().includes(query.toLowerCase()) || 
-      item.tag.toLowerCase().includes(query.toLowerCase());
+    const q = query.trim().toLowerCase();
+    const matchesQuery = q === "" ||
+      item.title.toLowerCase().includes(q) ||
+      item.tag.toLowerCase().includes(q);
     return matchesCategory && matchesQuery;
   });
 
@@ -135,11 +209,21 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
 
         {/* Search Results List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {filteredResults.length === 0 ? (
+          {loading ? (
+            <div className="py-12 text-center">
+              <Loader2 className="h-8 w-8 text-blue-500 mx-auto mb-3 animate-spin" />
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Searching platform content...</p>
+              <p className="text-xs text-slate-400 mt-1">Loading notes, papers, quizzes, live classes &amp; faculty.</p>
+            </div>
+          ) : filteredResults.length === 0 ? (
             <div className="py-12 text-center">
               <Search className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
               <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No matching search results found</p>
-              <p className="text-xs text-slate-400 mt-1">Try searching for &quot;Biology&quot;, &quot;Physics&quot;, &quot;Notes&quot;, or &quot;Paper&quot;.</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {dynamicResults.length === 0
+                  ? "No notes, papers, quizzes or live classes have been published yet."
+                  : "Try a different keyword or category filter."}
+              </p>
             </div>
           ) : (
             filteredResults.map((item) => {
@@ -175,7 +259,7 @@ export function GlobalSearchModal({ isOpen, onClose, initialQuery = "" }: Global
 
         {/* Footer shortcuts hint */}
         <div className="px-6 py-3 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Search integrated across 12 Database Collections</span>
+          <span>Searching {allResults.length} live platform {allResults.length === 1 ? "item" : "items"}</span>
           <div className="flex items-center gap-2">
             <span className="rounded bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 dark:text-slate-300">ESC</span> to close
           </div>

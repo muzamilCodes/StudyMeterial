@@ -1,9 +1,35 @@
 "use client";
 
 import Link from "next/link";
+import { useState, type FormEvent } from "react";
 import { GraduationCap, Mail, Phone, MapPin, Send, Heart, ArrowUpRight } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 export function PublicFooter() {
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterMsg, setNewsletterMsg] = useState<string | null>(null);
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
+
+  async function handleNewsletterSubmit(e: FormEvent) {
+    e.preventDefault();
+    setNewsletterLoading(true);
+    setNewsletterMsg(null);
+    try {
+      const res = await fetch(apiUrl("/api/newsletter"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newsletterEmail })
+      });
+      const data = await res.json();
+      setNewsletterMsg(data.message ?? (res.ok ? "Subscribed!" : "Subscription failed."));
+      if (res.ok) setNewsletterEmail("");
+    } catch {
+      setNewsletterMsg("Unable to reach the server. Try again later.");
+    } finally {
+      setNewsletterLoading(false);
+    }
+  }
+
   return (
     <footer className="w-full border-t border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-950 text-slate-600 dark:text-slate-400 pt-16 pb-12 transition-colors">
       <div className="max-w-[1600px] mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
@@ -111,20 +137,27 @@ export function PublicFooter() {
             Subscribe for free weekly model paper uploads and exam date reminders.
           </p>
           
-          <form onSubmit={(e) => e.preventDefault()} className="space-y-2">
+          <form onSubmit={handleNewsletterSubmit} className="space-y-2">
             <div className="relative">
               <input
                 type="email"
+                required
                 placeholder="Enter email..."
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
                 type="submit"
-                className="absolute right-1.5 top-1.5 rounded-lg bg-blue-600 p-1.5 text-white hover:bg-blue-700 transition"
+                disabled={newsletterLoading}
+                className="absolute right-1.5 top-1.5 rounded-lg bg-blue-600 p-1.5 text-white hover:bg-blue-700 transition disabled:opacity-60"
               >
                 <Send className="h-3.5 w-3.5" />
               </button>
             </div>
+            {newsletterMsg && (
+              <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{newsletterMsg}</p>
+            )}
           </form>
         </div>
       </div>

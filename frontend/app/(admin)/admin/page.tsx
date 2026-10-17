@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getStoredSession, saveSession, type StudentSession } from "@/lib/session";
+import { apiUrl } from "@/lib/api";
 import {
   fetchBackendAdminDashboard,
   fetchBackendNotes,
@@ -52,7 +53,6 @@ import {
   Trash2,
   UserCheck,
   BookOpen,
-  DollarSign,
   TrendingUp,
   Activity,
   Layers,
@@ -76,7 +76,7 @@ export default function AdminPage() {
   const [pdfStream, setPdfStream] = useState<Stream>("Medical");
   const [pdfSubject, setPdfSubject] = useState("Biology");
   const [pdfTitle, setPdfTitle] = useState("");
-  const [pdfPages, setPdfPages] = useState(15);
+  const [pdfPages, setPdfPages] = useState(1);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
   // Form states for Upload Paper
@@ -93,15 +93,15 @@ export default function AdminPage() {
   const [vidStream, setVidStream] = useState<Stream>("Medical");
   const [vidSubject, setVidSubject] = useState("Biology");
   const [vidTitle, setVidTitle] = useState("");
-  const [vidInstructor, setVidInstructor] = useState("Dr. Ramesh Sharma");
+  const [vidInstructor, setVidInstructor] = useState("");
   const [vidDuration, setVidDuration] = useState("60 Mins");
   const [videoFile, setVideoFile] = useState<File | null>(null);
 
   // Enterprise Live Class Extended Form States
   const [liveCategory, setLiveCategory] = useState("NEET Special Preparation");
   const [liveDesc, setLiveDesc] = useState("");
-  const [liveTeacherPhoto, setLiveTeacherPhoto] = useState("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80");
-  const [liveTeacherBio, setLiveTeacherBio] = useState("Senior Faculty with 12+ years experience in board & competitive preparation.");
+  const [liveTeacherPhoto, setLiveTeacherPhoto] = useState("");
+  const [liveTeacherBio, setLiveTeacherBio] = useState("");
   const [liveDate, setLiveDate] = useState("Today, July 28, 2026");
   const [liveStartTime, setLiveStartTime] = useState("09:00 PM");
   const [liveEndTime, setLiveEndTime] = useState("10:00 PM");
@@ -145,13 +145,18 @@ export default function AdminPage() {
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUserItem[]>([]);
   const [adminStats, setAdminStats] = useState({
     totalUsers: 0,
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalAdmins: 0,
     totalNotes: 0,
     totalPapers: 0,
     totalVideos: 0,
+    totalLiveClasses: 0,
     totalQuizzes: 0,
-    totalDownloads: 0,
-    averageScore: "85%"
+    totalNotices: 0,
+    totalDownloads: 0
   });
+  const [streamDist, setStreamDist] = useState({ medical: 0, nonMedical: 0, commerce: 0, arts: 0, general: 0 });
 
   useEffect(() => {
     const s = getStoredSession();
@@ -165,21 +170,53 @@ export default function AdminPage() {
     }
   }, []);
 
-  const handleEnableAdminAccess = () => {
-    const adminSession: StudentSession = {
-      id: "admin_001",
-      email: "admin@studymaterial.com",
-      username: "System Admin",
-      name: "System Admin",
-      role: "admin",
-      isAdmin: true,
-      grade: "11th",
-      stream: "Medical"
-    };
-    saveSession(adminSession);
-    setSession(adminSession);
-    setAuthorized(true);
-    refreshData();
+  const [adminLoginEmail, setAdminLoginEmail] = useState("");
+  const [adminLoginPassword, setAdminLoginPassword] = useState("");
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminLoginLoading(true);
+    setAdminLoginError(null);
+    try {
+      const response = await fetch(apiUrl("/api/auth/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminLoginEmail, password: adminLoginPassword })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setAdminLoginError(data.message ?? "Login failed");
+        return;
+      }
+      const role = data.user?.role ?? "student";
+      if (role !== "admin" && role !== "superAdmin") {
+        setAdminLoginError("This account does not have administrator privileges.");
+        return;
+      }
+
+      localStorage.setItem("study-material-token", data.token);
+      const adminSession: StudentSession = {
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
+        name: data.user.username,
+        role: role as StudentSession["role"],
+        isAdmin: true,
+        grade: data.user.grade ?? "11th",
+        stream: data.user.stream ?? "Medical"
+      };
+      saveSession(adminSession);
+      setSession(adminSession);
+      setAuthorized(true);
+      refreshData();
+    } catch {
+      setAdminLoginError("Unable to reach the backend server.");
+    } finally {
+      setAdminLoginLoading(false);
+    }
   };
 
   const refreshData = () => {
@@ -190,6 +227,7 @@ export default function AdminPage() {
     fetchBackendAdminDashboard().then(res => {
       setAdminStats(res.stats);
       setRegisteredUsers(res.usersList);
+      setStreamDist(res.distributions);
     });
   };
 
@@ -203,16 +241,49 @@ export default function AdminPage() {
         <div className="space-y-2">
           <h2 className="text-2xl font-black text-slate-900 dark:text-white">Administrator Access Required</h2>
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            You are currently viewing the platform in student mode. Click below to sign in or switch to Administrator Mode to access master controls.
+            Sign in with an administrator account to access master controls. Only accounts with the admin role are granted access.
           </p>
         </div>
 
-        <div className="w-full space-y-3 pt-2">
+        <form onSubmit={handleAdminLogin} className="w-full space-y-3 pt-2">
+          <div className="grid gap-2 text-left">
+            <Label htmlFor="admin-email" className="text-xs font-bold">Admin Email</Label>
+            <Input
+              id="admin-email"
+              type="email"
+              placeholder="admin@studymaterial.com"
+              value={adminLoginEmail}
+              onChange={(e) => setAdminLoginEmail(e.target.value)}
+              required
+              className="h-11 rounded-xl"
+            />
+          </div>
+          <div className="grid gap-2 text-left">
+            <Label htmlFor="admin-password" className="text-xs font-bold">Password</Label>
+            <Input
+              id="admin-password"
+              type="password"
+              placeholder="••••••••"
+              value={adminLoginPassword}
+              onChange={(e) => setAdminLoginPassword(e.target.value)}
+              required
+              className="h-11 rounded-xl"
+            />
+          </div>
+
+          {adminLoginError && (
+            <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700 border border-rose-200">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <p>{adminLoginError}</p>
+            </div>
+          )}
+
           <Button
-            onClick={handleEnableAdminAccess}
+            type="submit"
+            disabled={adminLoginLoading}
             className="w-full h-12 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold text-xs shadow-lg shadow-amber-500/20"
           >
-            🛡️ Log In as Administrator (1-Click Access)
+            {adminLoginLoading ? "Verifying credentials..." : "🛡️ Sign In as Administrator"}
           </Button>
 
           <Button
@@ -222,7 +293,7 @@ export default function AdminPage() {
           >
             Return to Student Dashboard
           </Button>
-        </div>
+        </form>
       </div>
     );
   }
@@ -384,17 +455,43 @@ export default function AdminPage() {
   };
 
   const adminCards = [
-    { label: "Total Registered Users", value: String(adminStats.totalUsers || registeredUsers.length || 142), icon: Users, color: "from-blue-600 to-indigo-600" },
-    { label: "Total Active Students", value: String(adminStats.totalUsers || 128), icon: UserCheck, color: "from-emerald-600 to-teal-600" },
-    { label: "Faculty & Teachers", value: "18", icon: Award, color: "from-purple-600 to-pink-600" },
-    { label: "Configured Subjects", value: "12", icon: BookOpen, color: "from-indigo-600 to-blue-600" },
-    { label: "Published PDF Notes", value: String(adminStats.totalNotes || realNotes.length), icon: FileText, color: "from-amber-500 to-orange-600" },
-    { label: "Solved Board Papers", value: String(adminStats.totalPapers || realPapers.length), icon: ScrollText, color: "from-orange-600 to-rose-600" },
-    { label: "Live Interactive Classes", value: "24", icon: Video, color: "from-rose-600 to-pink-600" },
-    { label: "Active Quizzes", value: String(adminStats.totalQuizzes || 8), icon: HelpCircle, color: "from-cyan-600 to-blue-600" },
-    { label: "Total Material Downloads", value: String(adminStats.totalDownloads || 342), icon: Download, color: "from-teal-600 to-emerald-600" },
-    { label: "Grant Revenue", value: "$14,200", icon: DollarSign, color: "from-emerald-600 to-green-600" }
+    { label: "Total Registered Users", value: String(adminStats.totalUsers || registeredUsers.length), icon: Users, color: "from-blue-600 to-indigo-600" },
+    { label: "Total Active Students", value: String(adminStats.totalStudents), icon: UserCheck, color: "from-emerald-600 to-teal-600" },
+    { label: "Faculty & Teachers", value: String(adminStats.totalTeachers), icon: Award, color: "from-purple-600 to-pink-600" },
+    { label: "Configured Subjects", value: String(new Set([...realNotes, ...realPapers, ...realVideos].map(i => i.subject)).size), icon: BookOpen, color: "from-indigo-600 to-blue-600" },
+    { label: "Published PDF Notes", value: String(adminStats.totalNotes), icon: FileText, color: "from-amber-500 to-orange-600" },
+    { label: "Solved Board Papers", value: String(adminStats.totalPapers), icon: ScrollText, color: "from-orange-600 to-rose-600" },
+    { label: "Live Interactive Classes", value: String(adminStats.totalLiveClasses), icon: Video, color: "from-rose-600 to-pink-600" },
+    { label: "Active Quizzes", value: String(adminStats.totalQuizzes), icon: HelpCircle, color: "from-cyan-600 to-blue-600" },
+    { label: "Published Notices", value: String(adminStats.totalNotices), icon: Bell, color: "from-blue-600 to-cyan-600" },
+    { label: "Downloads (This Browser)", value: String(adminStats.totalDownloads), icon: Download, color: "from-teal-600 to-emerald-600" }
   ];
+
+  const now = new Date();
+  const growthMonths = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (6 - i), 1);
+    const label = d.toLocaleString("en", { month: "short" });
+    const count = registeredUsers.filter(u => {
+      const ud = new Date(u.joinedTs);
+      return ud.getFullYear() === d.getFullYear() && ud.getMonth() === d.getMonth();
+    }).length;
+    return { month: label, val: count };
+  });
+  const growthMax = Math.max(...growthMonths.map(m => m.val), 1);
+  const lastMonth = growthMonths[growthMonths.length - 1].val;
+  const prevMonth = growthMonths[growthMonths.length - 2]?.val ?? 0;
+  const growthBadge = prevMonth > 0
+    ? `${lastMonth >= prevMonth ? "+" : ""}${Math.round(((lastMonth - prevMonth) / prevMonth) * 100)}% vs Last Month`
+    : `${lastMonth} new this month`;
+
+  const distEntries = [
+    { label: "Medical", count: streamDist.medical, color: "bg-emerald-500" },
+    { label: "Non-Medical", count: streamDist.nonMedical, color: "bg-blue-600" },
+    { label: "Commerce", count: streamDist.commerce, color: "bg-amber-500" },
+    { label: "Arts", count: streamDist.arts, color: "bg-purple-600" },
+    { label: "General (10th)", count: streamDist.general, color: "bg-rose-500" }
+  ];
+  const distTotal = distEntries.reduce((sum, e) => sum + e.count, 0) || 1;
 
   return (
     <SiteShell
@@ -417,7 +514,7 @@ export default function AdminPage() {
               </span>
             </div>
             <h2 className="text-2xl font-black">Platform Administration Console</h2>
-            <p className="text-xs text-slate-400">Managing 12 Database collections and dynamic content streaming.</p>
+            <p className="text-xs text-slate-400">Managing notes, papers, live classes, quizzes, notices and users from MongoDB.</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -468,26 +565,19 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">User Growth & Registration Trend</h4>
-                    <p className="text-xs text-slate-400">Monthly student enrollments</p>
+                    <p className="text-xs text-slate-400">Monthly new registrations (from real join dates)</p>
                   </div>
                   <Badge className="bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400 font-bold text-[10px]">
-                    +24% vs Last Month
+                    {growthBadge}
                   </Badge>
                 </div>
                 <div className="h-48 flex items-end justify-between gap-3 pt-6 pb-2 px-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
-                  {[
-                    { month: "Jan", val: 40 },
-                    { month: "Feb", val: 55 },
-                    { month: "Mar", val: 70 },
-                    { month: "Apr", val: 65 },
-                    { month: "May", val: 85 },
-                    { month: "Jun", val: 110 },
-                    { month: "Jul", val: 142 }
-                  ].map((bar, i) => (
+                  {growthMonths.map((bar, i) => (
                     <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
+                      <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition">{bar.val}</span>
                       <div
                         className="w-full rounded-t-xl bg-gradient-to-t from-blue-600 to-indigo-500 group-hover:from-blue-500 group-hover:to-orange-500 transition-all duration-300"
-                        style={{ height: `${(bar.val / 142) * 100}%` }}
+                        style={{ height: `${(bar.val / growthMax) * 100}%`, minHeight: bar.val > 0 ? "6px" : "2px" }}
                       />
                       <span className="text-[10px] font-bold text-slate-400">{bar.month}</span>
                     </div>
@@ -498,27 +588,22 @@ export default function AdminPage() {
               <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Downloads & Subject Distribution</h4>
-                    <p className="text-xs text-slate-400">Material downloads by academic stream</p>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Student Distribution by Academic Stream</h4>
+                    <p className="text-xs text-slate-400">Registered students grouped by their stream</p>
                   </div>
                   <Badge className="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 font-bold text-[10px]">
-                    342 Total Downloads
+                    {adminStats.totalStudents} Students
                   </Badge>
                 </div>
                 <div className="space-y-3 pt-2">
-                  {[
-                    { label: "Class 11th Medical (Biology & Chemistry)", pct: 45, color: "bg-emerald-500" },
-                    { label: "Class 11th Non-Medical (Physics & Math)", pct: 30, color: "bg-blue-600" },
-                    { label: "Class 10th General Science", pct: 15, color: "bg-amber-500" },
-                    { label: "Commerce & Arts Subjects", pct: 10, color: "bg-purple-600" }
-                  ].map((item, idx) => (
+                  {distEntries.map((item, idx) => (
                     <div key={idx} className="space-y-1 text-xs">
                       <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
-                        <span>{item.label}</span>
-                        <span>{item.pct}%</span>
+                        <span>{item.label} ({item.count})</span>
+                        <span>{Math.round((item.count / distTotal) * 100)}%</span>
                       </div>
                       <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                        <div className={`h-full ${item.color} rounded-full`} style={{ width: `${item.pct}%` }} />
+                        <div className={`h-full ${item.color} rounded-full`} style={{ width: `${(item.count / distTotal) * 100}%` }} />
                       </div>
                     </div>
                   ))}
@@ -755,7 +840,7 @@ export default function AdminPage() {
                       <Input
                         value={vidInstructor}
                         onChange={(e) => setVidInstructor(e.target.value)}
-                        placeholder="Dr. Ramesh Sharma"
+                        placeholder="Enter teacher's full name"
                         required
                         className="mt-1 h-10 rounded-xl"
                       />
@@ -1084,6 +1169,18 @@ export default function AdminPage() {
                   value={pdfTitle}
                   onChange={(e) => setPdfTitle(e.target.value)}
                   placeholder="e.g. Chapter 5 Genetics & Chromosomes Detailed Notes"
+                  required
+                  className="mt-1.5 h-10 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <Label className="font-bold">Total Pages</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={pdfPages}
+                  onChange={(e) => setPdfPages(Number(e.target.value))}
                   required
                   className="mt-1.5 h-10 rounded-xl"
                 />

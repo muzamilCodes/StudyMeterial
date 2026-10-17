@@ -56,20 +56,21 @@ export default function LoginPage() {
         localStorage.setItem("study-material-token", data.token);
       }
 
-      const role = data.user?.role || (data.user?.isAdmin ? "admin" : email.toLowerCase().includes("teacher") ? "teacher" : "student");
-      const isAdmin = role === "admin" || role === "superadmin" || email.toLowerCase() === "admin@studymaterial.com";
-      const isTeacher = role === "teacher" || email.toLowerCase() === "teacher@studymaterial.com";
+      const serverRole = (data.user?.role ?? "student") as string;
+      const isAdmin = serverRole === "admin" || serverRole === "superAdmin";
+      const isTeacher = serverRole === "teacher";
 
       const userSession: StudentSession = {
         id: data.user?.id ?? `usr-${Date.now()}`,
-        name: data.user?.username ?? (isAdmin ? "System Admin" : isTeacher ? "Dr. Ramesh Sharma" : email.split("@")[0].toUpperCase()),
+        username: data.user?.username,
+        name: data.user?.username ?? email.split("@")[0],
         email: data.user?.email ?? email,
-        role: (isAdmin ? "admin" : isTeacher ? "teacher" : "student") as any,
-        isAdmin: isAdmin,
+        role: serverRole as StudentSession["role"],
+        isAdmin: serverRole === "superAdmin" || serverRole === "admin",
         grade: data.user?.grade ?? "11th",
         stream: data.user?.stream ?? "Medical",
         avatar: data.user?.avatar ?? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        bio: isAdmin ? "System Administrator" : isTeacher ? "Senior Faculty Educator" : `Student - Class ${data.user?.grade ?? "11th"} (${data.user?.stream ?? "Medical"})`
+        bio: isAdmin ? "Platform Administrator" : isTeacher ? "Faculty Educator" : `Student - Class ${data.user?.grade ?? "11th"} (${data.user?.stream ?? "Medical"})`
       };
 
       saveSession(userSession);
@@ -77,12 +78,13 @@ export default function LoginPage() {
 
       setTimeout(() => {
         setLoading(false);
-        if (isAdmin) router.push("/admin");
+        if (serverRole === "superAdmin") router.push("/super-admin");
+        else if (serverRole === "admin") router.push("/admin");
         else if (isTeacher) router.push("/teacher");
         else router.push("/dashboard");
       }, 600);
     } catch {
-      setErrorMsg("Unable to connect to MongoDB backend server on http://localhost:4000");
+      setErrorMsg(`Unable to connect to the backend server at ${apiUrl("")}`);
       setLoading(false);
     }
   }
@@ -136,11 +138,7 @@ export default function LoginPage() {
               <Input id="password" name="password" type="password" placeholder="••••••••" required className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
             </div>
 
-            <div className="flex items-center justify-between text-xs sm:text-sm">
-              <label className="flex items-center gap-2 font-medium text-slate-600 cursor-pointer">
-                <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-slate-300 text-blue-600" />
-                Remember Me
-              </label>
+            <div className="flex items-center justify-end text-xs sm:text-sm">
               <Link href="/forgot-password" className="font-bold text-blue-600 hover:underline">
                 Forgot Password?
               </Link>

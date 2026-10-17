@@ -1,25 +1,62 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  const emailParam = searchParams.get("email") ?? "";
+  const tokenParam = searchParams.get("token") ?? "";
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setDone(true);
-    setTimeout(() => {
-      router.push("/login");
-    }, 1500);
+    setLoading(true);
+    setErrorMsg(null);
+
+    const formData = new FormData(e.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const token = String(formData.get("token") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+    if (password !== confirmPassword) {
+      setErrorMsg("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, token, password, confirmPassword })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErrorMsg(data.message ?? "Password reset failed.");
+        setLoading(false);
+        return;
+      }
+
+      setDone(true);
+      setTimeout(() => router.push("/login"), 1500);
+    } catch {
+      setErrorMsg("Unable to reach the backend server.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -29,7 +66,7 @@ export default function ResetPasswordPage() {
           <Badge className="mx-auto bg-orange-50 text-orange-700">Security Reset</Badge>
           <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
           <CardDescription>
-            Enter your new password to regain full student dashboard access.
+            Enter your email, the reset token you received, and your new password.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -39,25 +76,54 @@ export default function ResetPasswordPage() {
                 <CheckCircle2 className="h-8 w-8" />
               </div>
               <p className="text-sm font-semibold text-slate-900">Password reset successful!</p>
-              <p className="text-xs text-slate-600">Redirecting to Student Login...</p>
+              <p className="text-xs text-slate-600">Redirecting to Login...</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-2">
+                <Label htmlFor="email">Registered Email</Label>
+                <Input id="email" name="email" type="email" defaultValue={emailParam} placeholder="you@example.com" required className="h-11 rounded-xl" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="token">Reset Token</Label>
+                <Input id="token" name="token" defaultValue={tokenParam} placeholder="Paste the token from the forgot-password step" required className="h-11 rounded-xl font-mono text-xs" />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="pass">New Password</Label>
-                <Input id="pass" type="password" placeholder="••••••••" required className="h-11 rounded-xl" />
+                <Input id="pass" name="password" type="password" placeholder="••••••••" required minLength={6} className="h-11 rounded-xl" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="confirm">Confirm New Password</Label>
-                <Input id="confirm" type="password" placeholder="••••••••" required className="h-11 rounded-xl" />
+                <Input id="confirm" name="confirmPassword" type="password" placeholder="••••••••" required minLength={6} className="h-11 rounded-xl" />
               </div>
-              <Button type="submit" className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold shadow text-white">
-                Save & Login
+
+              {errorMsg && (
+                <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700 border border-rose-200">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <p>{errorMsg}</p>
+                </div>
+              )}
+
+              <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold shadow text-white">
+                {loading ? "Resetting..." : "Reset Password"}
               </Button>
+              <div className="text-center pt-1">
+                <Link href="/forgot-password" className="text-xs font-semibold text-slate-600 hover:underline">
+                  Request a new token
+                </Link>
+              </div>
             </form>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
 import { getStoredSession, type StudentSession } from "@/lib/session";
 import { fetchBackendQuizzes, recordQuizResult } from "@/lib/store";
@@ -11,6 +12,7 @@ export default function QuizzesPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
   const [availableQuizzes, setAvailableQuizzes] = useState<QuizItem[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<QuizItem | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>("All");
   
   // Quiz execution states
@@ -33,7 +35,8 @@ export default function QuizzesPage() {
       if (classQ.length > 0) {
         setActiveQuiz(classQ[0]);
       }
-    });
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   // Timer interval ONLY runs when isQuizStarted === true and not submitted
@@ -45,13 +48,30 @@ export default function QuizzesPage() {
     return () => clearInterval(interval);
   }, [isQuizStarted, submitted, activeQuiz]);
 
-  if (!activeQuiz) {
+  if (loading) {
     return (
       <SiteShell title="Interactive Quiz Engine" description="Loading class quizzes...">
         <div className="py-20 text-center space-y-3">
           <Clock className="h-12 w-12 text-indigo-500 mx-auto animate-pulse" />
           <h3 className="text-xl font-bold text-slate-900 dark:text-white">Loading Quizzes...</h3>
           <p className="text-xs text-slate-400">Fetching quizzes for your class and stream...</p>
+        </div>
+      </SiteShell>
+    );
+  }
+
+  if (!activeQuiz) {
+    return (
+      <SiteShell title="Interactive Quiz Engine" description="No quizzes published yet">
+        <div className="py-20 text-center space-y-3">
+          <HelpCircle className="h-12 w-12 text-slate-400 mx-auto" />
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">No quizzes available yet</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Quizzes created by your teachers and administrators for Class {session?.grade ?? "11th"} {session?.stream ?? "Medical"} will appear here. Check back after faculty publish practice tests.
+          </p>
+          <Link href="/dashboard" className="inline-block mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+            ← Back to Dashboard
+          </Link>
         </div>
       </SiteShell>
     );

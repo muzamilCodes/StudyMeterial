@@ -66,9 +66,10 @@ export default function RegisterPage() {
 
       const userSession: StudentSession = {
         id: data.user?.id ?? `usr-${Date.now()}`,
+        username: data.user?.username ?? name,
         name: data.user?.username ?? name,
         email: data.user?.email ?? email,
-        role: "student",
+        role: data.user?.role ?? "student",
         isAdmin: false,
         grade,
         stream: grade === "10th" ? "General" : stream,

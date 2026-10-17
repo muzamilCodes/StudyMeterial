@@ -74,23 +74,35 @@ export default function VideosPage() {
   const [activePoll, setActivePoll] = useState<{ question: string; options: string[]; votes: number[] } | null>(null);
   const [attendanceLogged, setAttendanceLogged] = useState(false);
 
-  // Live Stream Seconds counter & Viewers Ticker
-  const [liveViewersCount, setLiveViewersCount] = useState(342);
-  const [liveSeconds, setLiveSeconds] = useState(1458);
+  // Live stream session timer (starts when room is opened)
+  const [liveSeconds, setLiveSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!activeRoomClass) {
+      setLiveSeconds(0);
+      return;
+    }
+    const id = setInterval(() => setLiveSeconds(s => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [activeRoomClass]);
 
   // Live Chat State
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMsgText, setNewMsgText] = useState("");
   const [asTeacher, setAsTeacher] = useState(false);
 
-  // Comments / Discussion State for Details View
-  const [classComments, setClassComments] = useState<Array<{ id: string; name: string; text: string; date: string }>>([
-    { id: "cm-1", name: "Ananya Sharma", text: "Great introductory session! The diagram explanations were very helpful.", date: "July 27, 2026" },
-    { id: "cm-2", name: "Rahul Verma", text: "Looking forward to tomorrow's numerical solving session.", date: "July 28, 2026" }
-  ]);
+  // Comments / Discussion State for Details View (persisted per browser)
+  const [classComments, setClassComments] = useState<Array<{ id: string; name: string; text: string; date: string }>>([]);
   const [newCommentInput, setNewCommentInput] = useState("");
   const [ratingInput, setRatingInput] = useState(5);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("live-class-comments");
+      if (saved) setClassComments(JSON.parse(saved));
+    } catch { /* ignore malformed cache */ }
+  }, []);
 
   useEffect(() => {
     const s = getStoredSession();
@@ -153,36 +165,19 @@ export default function VideosPage() {
       try {
         setChatMessages(JSON.parse(raw));
       } catch {
-        setChatMessages(getDefaultChat(activeRoomClass.teacherName));
+        setChatMessages([]);
       }
     } else {
-      setChatMessages(getDefaultChat(activeRoomClass.teacherName));
+      setChatMessages([]);
     }
   }, [activeRoomClass]);
-
-  const getDefaultChat = (instructor: string): ChatMessage[] => [
-    {
-      id: "c-1",
-      senderName: instructor || "Dr. Ramesh Sharma",
-      senderRole: "teacher",
-      text: "Welcome students! Today's live interactive session is now broadcasting.",
-      time: "09:00 PM"
-    },
-    {
-      id: "c-2",
-      senderName: "Muzamil Ahmad",
-      senderRole: "student",
-      text: "Good evening Sir! Ready for live doubt clearing & numerical solutions.",
-      time: "09:01 PM"
-    }
-  ];
 
   const handleSendChatMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMsgText.trim() || !activeRoomClass) return;
 
     const senderName = asTeacher
-      ? activeRoomClass.teacherName || "Dr. Ramesh Sharma"
+      ? activeRoomClass.teacherName || "Teacher"
       : session?.name || "Student";
     const senderRole = asTeacher ? "teacher" : "student";
 
@@ -213,7 +208,9 @@ export default function VideosPage() {
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     };
 
-    setClassComments([newCm, ...classComments]);
+    const updated = [newCm, ...classComments];
+    setClassComments(updated);
+    localStorage.setItem("live-class-comments", JSON.stringify(updated));
     setNewCommentInput("");
     setFeedbackSuccess(true);
     setTimeout(() => setFeedbackSuccess(false), 3000);
@@ -269,6 +266,13 @@ export default function VideosPage() {
         )}
 
         {/* HERO LIVE BROADCAST FEATURED BANNER */}
+        {!liveClasses[0] ? (
+          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center space-y-2">
+            <Radio className="h-8 w-8 mx-auto text-slate-300" />
+            <h2 className="text-lg font-black text-slate-700 dark:text-slate-200">No live classes published yet</h2>
+            <p className="text-xs text-slate-400 font-medium">Live classrooms scheduled by your teachers will appear here once published.</p>
+          </div>
+        ) : (
         <div className="rounded-3xl border border-rose-500/30 bg-gradient-to-r from-rose-950 via-slate-900 to-indigo-950 p-6 md:p-8 text-white shadow-2xl space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -276,44 +280,43 @@ export default function VideosPage() {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1 text-xs font-black text-white shadow-lg animate-pulse">
-                  <Radio className="h-4 w-4" /> 🔴 REAL LIVE BROADCAST STREAM
+                  <Radio className="h-4 w-4" /> LIVE BROADCAST
                 </span>
                 <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-200 backdrop-blur-md">
-                  Class {grade} {stream}
+                  Class {liveClasses[0].grade} {liveClasses[0].stream}
                 </span>
                 <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-3 py-1 text-xs font-bold border border-emerald-500/30 flex items-center gap-1">
-                  <Users className="h-3.5 w-3.5" /> {liveClasses[0]?.enrolledStudentsCount || 342} Enrolled Students
+                  <Users className="h-3.5 w-3.5" /> {liveClasses[0].enrolledStudentsCount} Enrolled Students
                 </span>
               </div>
 
               <h2 className="text-2xl md:text-3xl font-black tracking-tight">
-                {liveClasses[0]?.title || "Cellular Genetics & DNA Replication Masterclass"}
+                {liveClasses[0].title}
               </h2>
 
               <p className="text-xs md:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
-                Senior Faculty <strong>{liveClasses[0]?.teacherName || "Dr. Ramesh Sharma"}</strong> is broadcasting live with real WebRTC camera feed, interactive student chat, screen sharing, and doubt clearing.
+                <strong>{liveClasses[0].teacherName}</strong> — interactive student chat, screen sharing, and doubt clearing inside the classroom room.
               </p>
 
               <div className="flex items-center gap-4 text-xs font-bold text-slate-400 pt-1">
                 <span className="flex items-center gap-1 text-rose-400">
-                  <Calendar className="h-4 w-4" /> {liveClasses[0]?.date || "Scheduled Today"} • {liveClasses[0]?.startTime || "09:00 PM IST"}
+                  <Calendar className="h-4 w-4" /> {liveClasses[0].date} • {liveClasses[0].startTime}
                 </span>
               </div>
             </div>
 
-            {liveClasses[0] && (
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => setActiveRoomClass(liveClasses[0])}
-                  className="shrink-0 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-3.5 text-xs font-black text-white shadow-xl hover:from-rose-700 transition"
-                >
-                  <Radio className="h-5 w-5 animate-pulse" />
-                  <span>Join Live Classroom Room</span>
-                </button>
-              </div>
-            )}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setActiveRoomClass(liveClasses[0])}
+                className="shrink-0 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-3.5 text-xs font-black text-white shadow-xl hover:from-rose-700 transition"
+              >
+                <Radio className="h-5 w-5 animate-pulse" />
+                <span>Join Live Classroom Room</span>
+              </button>
+            </div>
           </div>
         </div>
+        )}
 
         {/* SEARCH & CATEGORY FILTER TABS */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -416,7 +419,7 @@ export default function VideosPage() {
                             {item.subject}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400">
-                            {item.enrolledStudentsCount || 342} / {item.maxStudents || 500} Enrolled
+                            {item.enrolledStudentsCount} / {item.maxStudents} Enrolled
                           </span>
                         </div>
 
@@ -486,7 +489,7 @@ export default function VideosPage() {
                     </span>
                     <span className="text-slate-500">•</span>
                     <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                      <Users className="h-3.5 w-3.5" /> {liveViewersCount} Students Enrolled & Online
+                      <Users className="h-3.5 w-3.5" /> {activeRoomClass.enrolledStudentsCount} Enrolled Students
                     </span>
                   </div>
                   <h3 className="text-sm font-bold text-white mt-0.5">{activeRoomClass.title}</h3>

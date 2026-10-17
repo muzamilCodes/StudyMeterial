@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Sparkles, ArrowRight } from "lucide-react";
 import { apiUrl } from "@/lib/api";
+import { saveSession, type StudentSession } from "@/lib/session";
 
 type RoleName = "superAdmin" | "admin" | "teacher" | "student";
 
@@ -27,8 +28,12 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
     password: "",
     confirmPassword: "",
     grade: "11th",
-    stream: "Medical"
+    stream: "Medical",
+    adminEmail: "",
+    adminPassword: ""
   });
+
+  const privilegedRole = role === "superAdmin" || role === "admin" || role === "teacher";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,7 +44,7 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
       const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
       const payload =
         mode === "login"
-          ? { email: form.email, password: form.password, role }
+          ? { email: form.email, password: form.password }
           : {
               username: form.username,
               email: form.email,
@@ -47,7 +52,8 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
               confirmPassword: form.confirmPassword,
               grade: form.grade,
               stream: form.stream,
-              role
+              role,
+              ...(privilegedRole ? { adminEmail: form.adminEmail, adminPassword: form.adminPassword } : {})
             };
 
       const response = await fetch(apiUrl(endpoint), {
@@ -61,10 +67,32 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
         throw new Error(data?.message || "Request failed");
       }
 
-      setStatus(data?.message || "Success");
+      if (mode === "login") {
+        const serverRole = (data.user?.role ?? "student") as RoleName;
+        if (serverRole !== role) {
+          throw Error(`These credentials belong to a "${serverRole}" account, not a ${role} account.`);
+        }
+      }
+
       if (data?.token) {
         localStorage.setItem("study-material-token", data.token);
       }
+
+      if (data?.user) {
+        const session: StudentSession = {
+          id: data.user.id,
+          email: data.user.email,
+          username: data.user.username,
+          name: data.user.username,
+          role: data.user.role,
+          isAdmin: data.user.role === "admin" || data.user.role === "superAdmin",
+          grade: data.user.grade,
+          stream: data.user.stream
+        };
+        saveSession(session);
+      }
+
+      setStatus(data?.message || "Success");
       router.push(homeHref);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Something went wrong");
@@ -190,6 +218,28 @@ export function RoleAuthPanel({ role, mode, title, description, accent, homeHref
                 value={form.confirmPassword}
                 onChange={(e) => setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
               />
+            )}
+
+            {mode === "register" && privilegedRole && (
+              <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                  Creating a {role} account requires authorization from an existing administrator.
+                </p>
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900"
+                  placeholder="Authorizing admin email"
+                  type="email"
+                  value={form.adminEmail}
+                  onChange={(e) => setForm((prev) => ({ ...prev, adminEmail: e.target.value }))}
+                />
+                <input
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900"
+                  placeholder="Authorizing admin password"
+                  type="password"
+                  value={form.adminPassword}
+                  onChange={(e) => setForm((prev) => ({ ...prev, adminPassword: e.target.value }))}
+                />
+              </div>
             )}
 
             <button

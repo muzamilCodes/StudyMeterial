@@ -30,10 +30,12 @@ import {
   fetchBackendPapers, 
   fetchBackendQuizzes, 
   fetchBackendNotices,
+  fetchEnterpriseLiveClasses,
   logDownload,
   type RealNoteItem, 
   type RealPaperItem, 
-  type RealNoticeItem 
+  type RealNoticeItem,
+  type EnterpriseLiveClassItem
 } from "@/lib/store";
 import { GlobalSearchModal } from "@/components/global-search-modal";
 
@@ -42,6 +44,9 @@ export default function HomePage() {
   const [papers, setPapers] = useState<RealPaperItem[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [notices, setNotices] = useState<RealNoticeItem[]>([]);
+  const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
+  const [totals, setTotals] = useState({ notes: 0, papers: 0, quizzes: 0, notices: 0, live: 0 });
+  const [allData, setAllData] = useState<{ notes: RealNoteItem[]; papers: RealPaperItem[]; quizzes: any[] }>({ notes: [], papers: [], quizzes: [] });
   const [loading, setLoading] = useState(true);
 
   // PDF Preview Modal state
@@ -52,16 +57,20 @@ export default function HomePage() {
     async function loadHomeData() {
       setLoading(true);
       try {
-        const [nData, pData, qData, notifData] = await Promise.all([
+        const [nData, pData, qData, notifData, lData] = await Promise.all([
           fetchBackendNotes(),
           fetchBackendPapers(),
           fetchBackendQuizzes(),
-          fetchBackendNotices()
+          fetchBackendNotices(),
+          fetchEnterpriseLiveClasses()
         ]);
         setNotes(nData.slice(0, 4));
         setPapers(pData.slice(0, 4));
         setQuizzes(qData.slice(0, 3));
         setNotices(notifData.slice(0, 4));
+        setLiveClasses(lData.slice(0, 4));
+        setTotals({ notes: nData.length, papers: pData.length, quizzes: qData.length, notices: notifData.length, live: lData.length });
+        setAllData({ notes: nData, papers: pData, quizzes: qData });
       } catch (err) {
         console.error("Error loading home page data:", err);
       } finally {
@@ -157,8 +166,8 @@ export default function HomePage() {
                   <span>MongoDB API Integrated</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-                  <span>4.9 / 5 Rating</span>
+                  <Calendar className="h-4 w-4 text-orange-500" />
+                  <span>{totals.notices} Platform Announcements</span>
                 </div>
               </div>
             </div>
@@ -171,52 +180,66 @@ export default function HomePage() {
                 <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-6 shadow-2xl backdrop-blur-xl space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Live Session Active</span>
+                      <div className={`h-3 w-3 rounded-full animate-pulse ${liveClasses[0] ? "bg-emerald-500" : "bg-slate-300"}`} />
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        {liveClasses[0] ? "Live Session Scheduled" : "No Live Session Yet"}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-1 text-[11px] font-bold text-blue-600 dark:text-blue-400">Class 11th</span>
+                    {liveClasses[0] && (
+                      <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-1 text-[11px] font-bold text-blue-600 dark:text-blue-400">Class {liveClasses[0].grade}</span>
+                    )}
                   </div>
 
                   <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-blue-950 p-5 text-white shadow-inner">
-                    <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">Physics Masterclass</p>
-                    <h3 className="text-lg font-bold mt-1">Newton&apos;s Laws & Mechanics Numericals</h3>
-                    <p className="text-xs text-slate-300 mt-1">Instructor: Prof. Ananya Roy (10+ Yrs Exp)</p>
-                    <div className="mt-4 flex items-center justify-between text-xs pt-3 border-t border-slate-800">
-                      <span className="flex items-center gap-1 text-slate-300">
-                        <Users className="h-3.5 w-3.5 text-orange-400" /> 142 Students Attending
-                      </span>
-                      <Link href="/videos" className="rounded-xl bg-orange-500 px-3 py-1.5 font-bold text-white hover:bg-orange-600 transition">
-                        Join Room
-                      </Link>
-                    </div>
+                    {liveClasses[0] ? (
+                      <>
+                        <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">{liveClasses[0].subject} Live Class</p>
+                        <h3 className="text-lg font-bold mt-1">{liveClasses[0].title}</h3>
+                        <p className="text-xs text-slate-300 mt-1">Instructor: {liveClasses[0].teacherName}</p>
+                        <div className="mt-4 flex items-center justify-between text-xs pt-3 border-t border-slate-800">
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <Users className="h-3.5 w-3.5 text-orange-400" /> {liveClasses[0].enrolledStudentsCount} Students Enrolled
+                          </span>
+                          <Link href="/videos" className="rounded-xl bg-orange-500 px-3 py-1.5 font-bold text-white hover:bg-orange-600 transition">
+                            Join Room
+                          </Link>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">Live Classes</p>
+                        <h3 className="text-lg font-bold mt-1">{loading ? "Loading live classes..." : "No live classes published yet"}</h3>
+                        <p className="text-xs text-slate-300 mt-1">Sessions scheduled by teachers will appear here.</p>
+                      </>
+                    )}
                   </div>
 
-                  {/* Floating Stats Pill 1 */}
+                  {/* Latest Note Pill */}
                   <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center font-bold">
                         <FileText className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="font-bold text-slate-800 dark:text-slate-100">Cell Biology PDF Notes</p>
-                        <p className="text-[10px] text-slate-400">Uploaded Today • 2.8 MB</p>
+                        <p className="font-bold text-slate-800 dark:text-slate-100">{notes[0] ? notes[0].title : "No PDF notes uploaded yet"}</p>
+                        <p className="text-[10px] text-slate-400">{notes[0] ? `${notes[0].subject} • ${notes[0].fileSize}` : `${totals.notes} notes in the library`}</p>
                       </div>
                     </div>
-                    <span className="font-extrabold text-blue-600 dark:text-blue-400">1.4k DLs</span>
+                    <Link href="/notes" className="font-extrabold text-blue-600 dark:text-blue-400">Browse</Link>
                   </div>
 
-                  {/* Floating Stats Pill 2 */}
+                  {/* Latest Quiz Pill */}
                   <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center font-bold">
                         <Award className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="font-bold text-slate-800 dark:text-slate-100">Organic Chemistry Quiz</p>
-                        <p className="text-[10px] text-slate-400">12 Questions • 20 Mins</p>
+                        <p className="font-bold text-slate-800 dark:text-slate-100">{quizzes[0] ? (quizzes[0].topic || quizzes[0].title) : "No quizzes published yet"}</p>
+                        <p className="text-[10px] text-slate-400">{quizzes[0] ? `${quizzes[0].subject} • ${quizzes[0].durationMinutes} Mins` : `${totals.quizzes} quizzes available`}</p>
                       </div>
                     </div>
-                    <span className="font-extrabold text-amber-600 dark:text-amber-400">Take Quiz</span>
+                    <Link href="/quizzes" className="font-extrabold text-amber-600 dark:text-amber-400">Take Quiz</Link>
                   </div>
                 </div>
 
@@ -233,20 +256,20 @@ export default function HomePage() {
           <div className="rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-8 md:p-12 text-white shadow-2xl relative overflow-hidden">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center relative z-10">
               <div className="space-y-1">
-                <p className="text-3xl md:text-5xl font-black tracking-tight">12,400+</p>
-                <p className="text-xs md:text-sm font-bold text-blue-200">Active Students</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-3xl md:text-5xl font-black tracking-tight">850+</p>
+                <p className="text-3xl md:text-5xl font-black tracking-tight">{totals.notes}</p>
                 <p className="text-xs md:text-sm font-bold text-blue-200">Curated PDF Notes</p>
               </div>
               <div className="space-y-1">
-                <p className="text-3xl md:text-5xl font-black tracking-tight">420+</p>
-                <p className="text-xs md:text-sm font-bold text-blue-200">Solved Papers</p>
+                <p className="text-3xl md:text-5xl font-black tracking-tight">{totals.papers}</p>
+                <p className="text-xs md:text-sm font-bold text-blue-200">Solved Board Papers</p>
               </div>
               <div className="space-y-1">
-                <p className="text-3xl md:text-5xl font-black tracking-tight">98.4%</p>
-                <p className="text-xs md:text-sm font-bold text-blue-200">Pass Rate</p>
+                <p className="text-3xl md:text-5xl font-black tracking-tight">{totals.quizzes}</p>
+                <p className="text-xs md:text-sm font-bold text-blue-200">Interactive Quizzes</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-3xl md:text-5xl font-black tracking-tight">{totals.live}</p>
+                <p className="text-xs md:text-sm font-bold text-blue-200">Live Class Sessions</p>
               </div>
             </div>
           </div>
@@ -335,11 +358,14 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { name: "Biology", grade: "11th / 12th Medical", notes: 10, papers: 6, quizzes: 5, bg: "from-emerald-500 to-teal-600", icon: BookOpen },
-              { name: "Physics", grade: "11th / 12th Non-Med & Med", notes: 9, papers: 6, quizzes: 5, bg: "from-blue-600 to-indigo-600", icon: BookOpen },
-              { name: "Chemistry", grade: "11th / 12th Non-Med & Med", notes: 9, papers: 6, quizzes: 5, bg: "from-purple-600 to-pink-600", icon: BookOpen },
-              { name: "Mathematics", grade: "10th General / 11th Non-Med", notes: 8, papers: 5, quizzes: 4, bg: "from-amber-500 to-orange-600", icon: BookOpen }
+              { name: "Biology", grade: "11th / 12th Medical", bg: "from-emerald-500 to-teal-600", icon: BookOpen },
+              { name: "Physics", grade: "11th / 12th Non-Med & Med", bg: "from-blue-600 to-indigo-600", icon: BookOpen },
+              { name: "Chemistry", grade: "11th / 12th Non-Med & Med", bg: "from-purple-600 to-pink-600", icon: BookOpen },
+              { name: "Mathematics", grade: "10th General / 11th Non-Med", bg: "from-amber-500 to-orange-600", icon: BookOpen }
             ].map((sub, idx) => {
+              const notesCount = allData.notes.filter((n) => n.subject === sub.name).length;
+              const papersCount = allData.papers.filter((p) => p.subject === sub.name).length;
+              const quizzesCount = allData.quizzes.filter((q) => q.subject === sub.name).length;
               const IconComponent = sub.icon;
               return (
                 <div 
@@ -356,15 +382,15 @@ export default function HomePage() {
                     </div>
                     <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800 text-center text-xs">
                       <div>
-                        <p className="font-extrabold text-slate-800 dark:text-slate-200">{sub.notes}</p>
+                        <p className="font-extrabold text-slate-800 dark:text-slate-200">{notesCount}</p>
                         <p className="text-[10px] text-slate-400">Notes</p>
                       </div>
                       <div>
-                        <p className="font-extrabold text-slate-800 dark:text-slate-200">{sub.papers}</p>
+                        <p className="font-extrabold text-slate-800 dark:text-slate-200">{papersCount}</p>
                         <p className="text-[10px] text-slate-400">Papers</p>
                       </div>
                       <div>
-                        <p className="font-extrabold text-slate-800 dark:text-slate-200">{sub.quizzes}</p>
+                        <p className="font-extrabold text-slate-800 dark:text-slate-200">{quizzesCount}</p>
                         <p className="text-[10px] text-slate-400">Quizzes</p>
                       </div>
                     </div>
@@ -518,14 +544,15 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-3">
-              {[
-                { title: "NEET Biology: Human Physiology & Genetics", time: "Today, 4:00 PM", teacher: "Dr. Ramesh Sharma" },
-                { title: "JEE Physics: Electromagnetic Induction & Waves", time: "Tomorrow, 11:00 AM", teacher: "Prof. Ananya Roy" }
-              ].map((c, i) => (
-                <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 text-xs">
+              {liveClasses.length === 0 ? (
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-slate-400">
+                  No live sessions scheduled yet. Published classes will appear here automatically.
+                </div>
+              ) : liveClasses.slice(0, 3).map((c) => (
+                <div key={c.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 text-xs">
                   <div>
                     <p className="font-bold text-white">{c.title}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{c.teacher} • {c.time}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{c.teacherName} • {c.date}, {c.startTime}</p>
                   </div>
                   <Link href="/videos" className="shrink-0 rounded-xl bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-500 transition">
                     Join Room
@@ -556,7 +583,7 @@ export default function HomePage() {
                   </div>
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white">{q.topic || q.title}</h4>
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
-                    <span className="text-slate-500 dark:text-slate-400">{q.questions?.length || 10} Multiple Choice Questions</span>
+                    <span className="text-slate-500 dark:text-slate-400">{q.questions?.length || 0} Multiple Choice Questions</span>
                     <Link href="/quizzes" className="font-bold text-blue-600 dark:text-blue-400 hover:underline">
                       Start Test →
                     </Link>
@@ -576,29 +603,30 @@ export default function HomePage() {
           <div className="text-center space-y-2 max-w-xl mx-auto">
             <span className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">Expert Mentors</span>
             <h2 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white">Learn from Experienced Educators</h2>
-            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">Our faculty members have over a decade of teaching experience in board preparation.</p>
+            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">Faculty profiles below are pulled from the live classes currently published on the platform.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { name: "Dr. Ramesh Sharma", role: "Senior Biology Faculty", exp: "14+ Years Exp", desc: "Specializes in NEET preparation, Cellular Biology, and Human Genetics." },
-              { name: "Prof. Ananya Roy", role: "Physics Department Head", exp: "10+ Years Exp", desc: "Expert in Mechanics, Electromagnetism, and board paper problem solving." },
-              { name: "Dr. Vikram Seth", role: "Organic Chemistry HOD", exp: "16+ Years Exp", desc: "Author of multiple chemistry competitive preparation guidebooks." }
-            ].map((t, idx) => (
+            {[...new Map(liveClasses.map(c => [c.teacherName, c])).values()].slice(0, 3).map((t, idx) => (
               <div key={idx} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm hover:shadow-xl transition text-center space-y-3">
                 <div className="h-20 w-20 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xl flex items-center justify-center mx-auto shadow-lg">
-                  {t.name.split(" ").map(n => n[0]).join("")}
+                  {t.teacherName.split(" ").map(n => n[0]).join("")}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t.name}</h3>
-                  <p className="text-xs font-bold text-blue-600 dark:text-blue-400">{t.role}</p>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t.teacherName}</h3>
+                  <p className="text-xs font-bold text-blue-600 dark:text-blue-400">{t.subject} Faculty</p>
                   <span className="inline-block mt-1 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-0.5 text-[10px] font-bold text-slate-500">
-                    {t.exp}
+                    {t.duration}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t.desc}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t.description}</p>
               </div>
             ))}
+            {liveClasses.length === 0 && (
+              <p className="md:col-span-3 text-center text-xs text-slate-400 font-medium py-6">
+                Instructor profiles appear here automatically once teachers publish live classes.
+              </p>
+            )}
           </div>
 
         </section>

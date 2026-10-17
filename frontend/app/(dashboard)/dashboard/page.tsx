@@ -35,12 +35,14 @@ import {
   fetchBackendPapers, 
   fetchBackendQuizzes, 
   fetchBackendNotices, 
+  fetchEnterpriseLiveClasses,
   getDownloadedFiles, 
   getQuizResults,
   logDownload,
   type RealNoteItem,
   type RealPaperItem,
   type RealNoticeItem,
+  type EnterpriseLiveClassItem,
   type DownloadRecord,
   type QuizResultRecord
 } from "@/lib/store";
@@ -53,6 +55,7 @@ export default function DashboardPage() {
   const [papers, setPapers] = useState<RealPaperItem[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [notices, setNotices] = useState<RealNoticeItem[]>([]);
+  const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
   const [quizResults, setQuizResults] = useState<QuizResultRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,17 +73,19 @@ export default function DashboardPage() {
         const grade = s?.grade ?? "11th";
         const stream = s?.stream ?? "Medical";
 
-        const [notesData, papersData, quizzesData, noticesData] = await Promise.all([
+        const [notesData, papersData, quizzesData, noticesData, liveClassesData] = await Promise.all([
           fetchBackendNotes(grade, stream),
           fetchBackendPapers(grade, stream),
           fetchBackendQuizzes(grade, stream),
-          fetchBackendNotices()
+          fetchBackendNotices(),
+          fetchEnterpriseLiveClasses()
         ]);
 
         setNotes(notesData);
         setPapers(papersData);
         setQuizzes(quizzesData);
         setNotices(noticesData);
+        setLiveClasses(liveClassesData);
 
         setDownloads(getDownloadedFiles());
         setQuizResults(getQuizResults());
@@ -97,10 +102,15 @@ export default function DashboardPage() {
   const grade = session?.grade ?? "11th";
   const stream = session?.stream ?? "Medical";
 
-  // Calculate learning progress mastery
+  const nextClass = liveClasses[0] ?? null;
+  const liveNowCount = liveClasses.filter((c) => c.status === "Live" || c.status === "Starting Soon").length;
+
+  // Calculate learning progress mastery (real: completed items over available items)
   const totalItemsAvailable = notes.length + papers.length + quizzes.length;
   const completedCount = downloads.length + quizResults.length;
-  const progressPercent = Math.min(100, Math.round(((completedCount || 3) / (totalItemsAvailable || 10)) * 100));
+  const progressPercent = totalItemsAvailable === 0
+    ? 0
+    : Math.min(100, Math.round((completedCount / totalItemsAvailable) * 100));
 
   const handleDownload = (title: string, subject: string, category: "PDF Note" | "Previous Paper", fileSize: string, fileUrl?: string) => {
     logDownload(title, subject, category, fileSize, fileUrl);
@@ -130,14 +140,14 @@ export default function DashboardPage() {
                   Class {grade} • {stream}
                 </span>
                 <span className="rounded-full bg-orange-500/20 px-3 py-1 text-xs font-extrabold text-orange-300 border border-orange-500/30 flex items-center gap-1">
-                  <Flame className="h-3.5 w-3.5 text-orange-400" /> Active 5-Day Study Streak
+                  <Download className="h-3.5 w-3.5 text-orange-300" /> {downloads.length} Saved {downloads.length === 1 ? "Resource" : "Resources"}
                 </span>
               </div>
               <h2 className="text-2xl md:text-3xl font-black tracking-tight">
                 Welcome Back, {session?.name || "Student"}! 👋
               </h2>
               <p className="text-xs md:text-sm text-blue-100 max-w-2xl leading-relaxed">
-                Here is your daily study status overview. You have 3 pending assignments and 2 upcoming live interactive classes scheduled today.
+                Here is your study status overview. You have {liveClasses.length} scheduled {liveClasses.length === 1 ? "live class" : "live classes"} and {quizzes.length} practice {quizzes.length === 1 ? "quiz" : "quizzes"} available for Class {grade}.
               </p>
             </div>
 
@@ -239,23 +249,38 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-slate-400">Interactive Rooms</p>
                   </div>
                 </div>
-                <span className="rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 px-2 py-0.5 text-[10px] font-extrabold border border-rose-500/20">
-                  LIVE NOW
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${
+                  liveNowCount > 0
+                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                }`}>
+                  {loading ? "LOADING" : liveNowCount > 0 ? "LIVE NOW" : `${liveClasses.length} SCHEDULED`}
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-2">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-100">Cell Biology & Genetics Masterclass</p>
-                <p className="text-[11px] text-slate-400">Dr. Ramesh Sharma • Today 4:00 PM</p>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
-                  <span className="text-rose-500 font-bold flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5 animate-pulse" /> Starts in 15 mins
-                  </span>
-                  <Link href="/videos" className="font-bold text-blue-600 dark:text-blue-400 hover:underline">
-                    Enter Class Room →
-                  </Link>
+              {nextClass ? (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-2">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{nextClass.title}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {nextClass.teacherName || "Faculty"} {nextClass.date && nextClass.date !== "TBD" ? `• ${nextClass.date}` : ""} {nextClass.startTime ? `• ${nextClass.startTime}` : ""}
+                  </p>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
+                    <span className={`font-bold flex items-center gap-1 ${liveNowCount > 0 ? "text-rose-500" : "text-slate-500 dark:text-slate-400"}`}>
+                      <Clock className={`h-3.5 w-3.5 ${liveNowCount > 0 ? "animate-pulse" : ""}`} /> {nextClass.status}
+                    </span>
+                    <Link href="/videos" className="font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                      Enter Class Room →
+                    </Link>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-1">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    {loading ? "Loading live classes..." : "No live classes scheduled yet"}
+                  </p>
+                  <p className="text-[11px] text-slate-400">Faculty rooms will appear here once published by your teachers.</p>
+                </div>
+              )}
             </div>
             
             <Link href="/videos" className="text-center text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
@@ -313,29 +338,17 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <span className="rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 text-[10px] font-bold">
-                  2 Pending
+                  0 Pending
                 </span>
               </div>
 
-              <div className="space-y-2">
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">Biology Lab Report Chapter 4</p>
-                    <p className="text-[10px] text-rose-500 font-bold mt-0.5">Due: Tomorrow 11:59 PM</p>
-                  </div>
-                  <span className="rounded-lg bg-indigo-600 text-white px-2.5 py-1 text-[10px] font-bold">Submit</span>
-                </div>
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">Physics Vector Numericals</p>
-                    <p className="text-[10px] text-amber-500 font-bold mt-0.5">Due: July 30, 2026</p>
-                  </div>
-                  <span className="rounded-lg bg-indigo-600 text-white px-2.5 py-1 text-[10px] font-bold">Submit</span>
-                </div>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center text-xs">
+                <p className="font-bold text-slate-500 dark:text-slate-400">No assignments posted yet</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Homework from your faculty will appear here once teachers publish it.</p>
               </div>
             </div>
 
-            <p className="text-center text-xs font-bold text-slate-400">All submissions synced with faculty server</p>
+            <p className="text-center text-xs font-bold text-slate-400">Submissions sync with faculty when assigned</p>
           </div>
 
           {/* WIDGET 4: ATTENDANCE */}
@@ -350,18 +363,18 @@ export default function DashboardPage() {
                   <p className="text-[11px] text-slate-400">Monthly Attendance Rate</p>
                 </div>
               </div>
-              <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">94.5%</span>
+              <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{liveClasses.length ? "—" : "No Data"}</span>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-3 text-xs">
               <div className="flex justify-between font-semibold">
-                <span className="text-slate-600 dark:text-slate-400">Classes Attended:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">38 / 40 Sessions</span>
+                <span className="text-slate-600 dark:text-slate-400">Live Sessions Attended:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{downloads.length ? "Recorded on join" : "0 / 0 Sessions"}</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full w-[94.5%]" />
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: "0%" }} />
               </div>
-              <p className="text-[11px] text-slate-400">Maintained regular attendance threshold for final examinations.</p>
+              <p className="text-[11px] text-slate-400">Attendance is logged automatically when you join a faculty live class. Join a session to start tracking.</p>
             </div>
           </div>
 
@@ -406,7 +419,7 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {/* WIDGET 6: STUDY MATERIALS */}
+          {/* WIDGET 6: PREVIOUS YEAR PAPERS */}
           <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -415,26 +428,42 @@ export default function DashboardPage() {
                     <BookOpen className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Study Materials</h3>
-                    <p className="text-[11px] text-slate-400">Curated Reference Guides</p>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Previous Year Papers</h3>
+                    <p className="text-[11px] text-slate-400">Class {grade} {stream}</p>
                   </div>
                 </div>
                 <span className="rounded-full bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 px-2 py-0.5 text-[10px] font-bold">
-                  NCERT & Exemplar
+                  {papers.length} Total
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs space-y-2">
-                <p className="font-bold text-slate-800 dark:text-slate-200">NCERT Biology Class 11th Chapterwise Solutions</p>
-                <p className="text-[10px] text-slate-400">Full textbook solutions with diagrams</p>
-                <Link href="/subjects" className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline">
-                  Access Study Drive →
-                </Link>
-              </div>
+              {papers.length === 0 ? (
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center text-xs">
+                  <p className="font-bold text-slate-500 dark:text-slate-400">No board papers published yet</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Solved previous year papers will appear here once uploaded.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {papers.slice(0, 2).map((p) => (
+                    <div key={p.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{p.title}</p>
+                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">{p.subject} • {p.year}</p>
+                      </div>
+                      <button
+                        onClick={() => handleDownload(p.title, p.subject, "Previous Paper", p.fileSize, p.fileUrl)}
+                        className="p-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition shrink-0"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <Link href="/subjects" className="text-center text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
-              Explore All Subjects & Books
+            <Link href="/previous-papers" className="text-center text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+              Explore All Previous Papers
             </Link>
           </div>
 
@@ -530,28 +559,34 @@ export default function DashboardPage() {
                   <CalendarIcon className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Upcoming Exams</h3>
-                  <p className="text-[11px] text-slate-400">Board Schedule Countdown</p>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Practice Tests</h3>
+                  <p className="text-[11px] text-slate-400">Self-Assessment Quizzes</p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-800 dark:text-slate-200">Biology Mid-Term Examination</p>
-                  <p className="text-[10px] text-slate-400">Aug 12, 2026 • 10:00 AM</p>
-                </div>
-                <span className="rounded-lg bg-rose-500 text-white px-2.5 py-1 text-[10px] font-black">15 Days</span>
+            {quizzes.length === 0 ? (
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center text-xs">
+                <p className="font-bold text-slate-500 dark:text-slate-400">No quizzes available yet</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Practice tests generated by faculty will show up here.</p>
               </div>
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-800 dark:text-slate-200">Physics Pre-Board Theory Test</p>
-                  <p className="text-[10px] text-slate-400">Sep 04, 2026 • 09:30 AM</p>
-                </div>
-                <span className="rounded-lg bg-amber-500 text-white px-2.5 py-1 text-[10px] font-black">38 Days</span>
+            ) : (
+              <div className="space-y-2 text-xs">
+                {quizzes.slice(0, 2).map((q) => (
+                  <Link
+                    key={q.id}
+                    href="/quizzes"
+                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between hover:border-rose-300 transition"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{q.title}</p>
+                      <p className="text-[10px] text-slate-400">{q.subject} • {q.totalQuestions || q.questions?.length || 0} Qs</p>
+                    </div>
+                    <span className="rounded-lg bg-rose-500 text-white px-2.5 py-1 text-[10px] font-black shrink-0">Start</span>
+                  </Link>
+                ))}
               </div>
-            </div>
+            )}
           </div>
 
           {/* WIDGET 10: LATEST NOTIFICATIONS */}
@@ -562,25 +597,32 @@ export default function DashboardPage() {
                   <Bell className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Activity Notifications</h3>
-                  <p className="text-[11px] text-slate-400">Class & System Feed</p>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Study Content Feed</h3>
+                  <p className="text-[11px] text-slate-400">Live Platform Totals</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2 text-xs">
               <div className="p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                <FileText className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-slate-800 dark:text-slate-200">2025 Physics Model Paper Added</p>
-                  <p className="text-[10px] text-slate-400">Faculty uploaded solved board papers.</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-200">{notes.length} PDF {notes.length === 1 ? "note" : "notes"} available</p>
+                  <p className="text-[10px] text-slate-400">Curated study material for Class {grade} {stream}.</p>
+                </div>
+              </div>
+              <div className="p-3 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900 flex items-start gap-2">
+                <BookOpen className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-slate-800 dark:text-slate-200">{papers.length} previous {papers.length === 1 ? "paper" : "papers"} published</p>
+                  <p className="text-[10px] text-slate-400">Solved board papers uploaded by faculty.</p>
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900 flex items-start gap-2">
                 <Sparkles className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-slate-800 dark:text-slate-200">New Quiz Available: Cellular Anatomy</p>
-                  <p className="text-[10px] text-slate-400">Test your knowledge before the exam.</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-200">{quizzes.length} practice {quizzes.length === 1 ? "quiz" : "quizzes"} ready</p>
+                  <p className="text-[10px] text-slate-400">Self-assessment tests for exam preparation.</p>
                 </div>
               </div>
             </div>
@@ -594,38 +636,57 @@ export default function DashboardPage() {
                   <CalendarIcon className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Academic Calendar</h3>
-                  <p className="text-[11px] text-slate-400">July - August 2026</p>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Class Schedule</h3>
+                  <p className="text-[11px] text-slate-400">Upcoming Live Sessions</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs text-center space-y-2">
-              <div className="grid grid-cols-7 gap-1 font-bold text-[10px] text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-700">
-                <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
-              </div>
-              <div className="grid grid-cols-7 gap-1 font-semibold text-[11px]">
-                <span className="text-slate-300">27</span><span className="text-slate-300">28</span><span className="bg-blue-600 text-white rounded-lg p-1 font-black shadow">29</span><span>30</span><span>31</span><span>1</span><span>2</span>
-              </div>
-              <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 pt-1">Today: Physics Live Session (4:00 PM)</p>
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs space-y-2">
+              {liveClasses.length === 0 ? (
+                <div className="text-center py-3">
+                  <p className="font-bold text-slate-500 dark:text-slate-400">No classes scheduled</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Your live session timetable appears here once teachers publish classes.</p>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {liveClasses.slice(0, 4).map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-700/60 pb-2 last:border-0 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{c.title}</p>
+                        <p className="text-[10px] text-slate-400">{c.teacherName || "Faculty"} • {c.status}</p>
+                      </div>
+                      <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0 text-right">
+                        {c.date && c.date !== "TBD" ? c.date : "TBD"}
+                        {c.startTime ? <><br/>{c.startTime}</> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
-          {/* WIDGET 12: ANNOUNCEMENTS */}
+          {/* WIDGET 12: LATEST NOTICE */}
           <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-gradient-to-br from-slate-900 to-blue-950 p-6 text-white shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <span className="rounded-full bg-orange-500/20 text-orange-300 px-3 py-1 text-[10px] font-black border border-orange-500/30">
-                CRITICAL ANNOUNCEMENT
+                {notices.length > 0 ? "LATEST NOTICE" : "NOTICE BOARD"}
               </span>
+              {notices.length > 0 && (
+                <span className="text-[10px] font-bold text-slate-400">{notices[0].date}</span>
+              )}
             </div>
             <div>
-              <h4 className="text-sm font-black text-white">Independence Day Special Scholarship Quiz</h4>
-              <p className="text-xs text-slate-300 mt-1">
-                Participate in the upcoming online state scholarship quiz on August 15th for free access to advanced prep material.
+              <h4 className="text-sm font-black text-white">
+                {notices.length > 0 ? notices[0].title : "No announcements yet"}
+              </h4>
+              <p className="text-xs text-slate-300 mt-1 line-clamp-3">
+                {notices.length > 0 ? notices[0].body : "Official exam board updates and platform announcements will be displayed here once published by administrators."}
               </p>
             </div>
-            <Link href="/quizzes" className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-400 hover:underline">
-              <span>Register for Quiz</span>
+            <Link href="/notices" className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-400 hover:underline">
+              <span>Open Notice Board</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>

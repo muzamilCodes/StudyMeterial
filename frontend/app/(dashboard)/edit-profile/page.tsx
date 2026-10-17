@@ -100,15 +100,27 @@ export default function EditProfilePage() {
     setIsDeleting(true);
 
     try {
-      if (email) {
-        await fetch(apiUrl("/api/auth/delete-account"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email })
-        });
+      const token = localStorage.getItem("study-material-token");
+      const response = await fetch(apiUrl("/api/auth/delete-account"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setDeleteError(data?.message ?? "Server could not delete the account. Please sign in again and retry.");
+        setIsDeleting(false);
+        return;
       }
     } catch (err) {
       console.error("Account deletion API trace:", err);
+      setDeleteError("Unable to reach the backend server. Account was not deleted.");
+      setIsDeleting(false);
+      return;
     }
 
     deleteAccountData(email);

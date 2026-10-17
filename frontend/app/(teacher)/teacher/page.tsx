@@ -10,6 +10,14 @@ import {
   deleteEnterpriseLiveClass,
   createBackendNote,
   createBackendNotice,
+  fetchBackendNotes,
+  fetchBackendAttendance,
+  uploadBackendFile,
+  getTeacherAssignments,
+  addTeacherAssignment,
+  removeTeacherAssignment,
+  type TeacherAssignmentItem,
+  type AttendanceRecord,
   type EnterpriseLiveClassItem,
   type Grade,
   type Stream
@@ -41,6 +49,8 @@ export default function TeacherDashboardPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
   const [activeTab, setActiveTab] = useState<string>("Overview");
   const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
+  const [platformNotes, setPlatformNotes] = useState<{ id: string }[]>([]);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -49,43 +59,49 @@ export default function TeacherDashboardPage() {
   const [classSubject, setClassSubject] = useState("Biology");
   const [classGrade, setClassGrade] = useState<Grade>("11th");
   const [classStream, setClassStream] = useState<Stream>("Medical");
-  const [classDate, setClassDate] = useState("Today, July 28, 2026");
+  const [classDate, setClassDate] = useState("");
   const [classTime, setClassTime] = useState("09:00 PM");
+  const [classEndTime, setClassEndTime] = useState("10:00 PM");
   const [classDuration, setClassDuration] = useState("60 Mins");
   const [classPlatform, setClassPlatform] = useState<any>("Google Meet");
-  const [classMeetingLink, setClassMeetingLink] = useState("https://meet.google.com/abc-defg-hij");
+  const [classMeetingLink, setClassMeetingLink] = useState("");
 
   // Note Upload Form State
   const [noteTitle, setNoteTitle] = useState("");
   const [noteSubject, setNoteSubject] = useState("Biology");
   const [noteGrade, setNoteGrade] = useState<Grade>("11th");
   const [noteStream, setNoteStream] = useState<Stream>("Medical");
-  const [noteUrl, setNoteUrl] = useState("https://www.w3schools.com/html/mov_bbb.mp4");
+  const [notePages, setNotePages] = useState(1);
+  const [noteFile, setNoteFile] = useState<File | null>(null);
 
   // Assignment Form State
-  const [assignments, setAssignments] = useState<Array<{ id: string; title: string; subject: string; grade: string; deadline: string; marks: number }>>([
-    { id: "as-1", title: "Genetics Pedigree Numerical Solving Assignment", subject: "Biology", grade: "11th", deadline: "July 30, 2026", marks: 50 },
-    { id: "as-2", title: "DNA Polymerase Mechanism Diagram Submission", subject: "Biology", grade: "11th", deadline: "August 2, 2026", marks: 25 }
-  ]);
+  const [assignments, setAssignments] = useState<TeacherAssignmentItem[]>([]);
   const [assignTitle, setAssignTitle] = useState("");
   const [assignSubject, setAssignSubject] = useState("Biology");
   const [assignGrade, setAssignGrade] = useState<Grade>("11th");
-  const [assignDeadline, setAssignDeadline] = useState("August 5, 2026");
+  const [assignDeadline, setAssignDeadline] = useState("");
   const [assignMarks, setAssignMarks] = useState(50);
 
   useEffect(() => {
     const s = getStoredSession();
     setSession(s);
+    setAssignments(getTeacherAssignments());
     refreshData();
   }, []);
 
   const refreshData = () => {
     fetchEnterpriseLiveClasses().then((data) => setLiveClasses(data));
+    fetchBackendNotes().then((data) => setPlatformNotes(data));
+    fetchBackendAttendance().then((data) => setAttendanceLogs(data));
   };
 
   const handleCreateLiveClass = async (e: React.FormEvent, isDraft: boolean) => {
     e.preventDefault();
-    if (!classTitle) return;
+    if (!classTitle || !classDate || !classMeetingLink) {
+      setSuccessMsg("Class title, date, and a real meeting link are required.");
+      setTimeout(() => setSuccessMsg(null), 3500);
+      return;
+    }
     setLoading(true);
     try {
       const ok = await createEnterpriseLiveClass({
@@ -93,11 +109,11 @@ export default function TeacherDashboardPage() {
         subject: classSubject,
         category: "Faculty Special Preparation",
         description: `Live interactive preparation lecture for Class ${classGrade} ${classStream}.`,
-        teacherName: session?.name || "Dr. Ramesh Sharma",
+        teacherName: session?.name || "Faculty Teacher",
         teacherBio: "Senior Faculty Educator",
         date: classDate,
         startTime: classTime,
-        endTime: "10:00 PM",
+        endTime: classEndTime,
         duration: classDuration,
         meetingPlatform: classPlatform,
         meetingLink: classMeetingLink,
@@ -128,25 +144,39 @@ export default function TeacherDashboardPage() {
 
   const handleUploadNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noteTitle) return;
+    if (!noteTitle || !noteFile) {
+      setSuccessMsg("Note title and a PDF file are required.");
+      setTimeout(() => setSuccessMsg(null), 3500);
+      return;
+    }
     setLoading(true);
     try {
+      const uploadRes = await uploadBackendFile(noteFile);
+      if (!uploadRes) {
+        setSuccessMsg("File upload failed. Check that you are signed in.");
+        setLoading(false);
+        setTimeout(() => setSuccessMsg(null), 3500);
+        return;
+      }
       const ok = await createBackendNote({
         title: noteTitle,
         subject: noteSubject,
         grade: noteGrade,
         stream: noteStream,
-        fileUrl: noteUrl,
-        fileSize: "3.5 MB",
-        pages: 16
+        pdfUrl: uploadRes.url,
+        fileSize: uploadRes.fileSize,
+        pages: Number(notePages) || 1
       });
       if (ok) {
         setSuccessMsg(`Uploaded Study Note: "${noteTitle}"!`);
         setNoteTitle("");
+        setNoteFile(null);
         refreshData();
+      } else {
+        setSuccessMsg("Server rejected the note. Are your administrator/teacher credentials valid?");
       }
     } catch {
-      setSuccessMsg("❌ Error uploading study note.");
+      setSuccessMsg("Error uploading study note.");
     } finally {
       setLoading(false);
       setTimeout(() => setSuccessMsg(null), 3500);
@@ -164,10 +194,14 @@ export default function TeacherDashboardPage() {
       deadline: assignDeadline,
       marks: Number(assignMarks)
     };
-    setAssignments([newAs, ...assignments]);
+    setAssignments(addTeacherAssignment(newAs));
     setAssignTitle("");
     setSuccessMsg(`Published Assignment: "${assignTitle}"!`);
     setTimeout(() => setSuccessMsg(null), 3500);
+  };
+
+  const handleDeleteAssignment = (id: string) => {
+    setAssignments(removeTeacherAssignment(id));
   };
 
   return (
@@ -189,7 +223,7 @@ export default function TeacherDashboardPage() {
               </span>
             </div>
             <h2 className="text-2xl md:text-3xl font-black">
-              Welcome back, {session?.name || "Dr. Ramesh Sharma"}!
+              Welcome back, {session?.name || "Faculty"}!
             </h2>
             <p className="text-xs md:text-sm text-blue-200/90 max-w-2xl">
               Create interactive live classes, upload chapter formula notes, assign student homework, and track live classroom attendance directly in MongoDB.
@@ -228,8 +262,8 @@ export default function TeacherDashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {[
                 { label: "Total Live Classes Scheduled", val: String(liveClasses.length), icon: Radio, col: "from-rose-600 to-pink-600" },
-                { label: "Enrolled Students Count", val: "342", icon: Users, col: "from-blue-600 to-indigo-600" },
-                { label: "Published Chapter Notes", val: "18", icon: FileText, col: "from-amber-500 to-orange-600" },
+                { label: "Enrolled Students Count", val: String(liveClasses.reduce((sum, c) => sum + (c.enrolledStudentsCount || 0), 0)), icon: Users, col: "from-blue-600 to-indigo-600" },
+                { label: "Published Chapter Notes", val: String(platformNotes.length), icon: FileText, col: "from-amber-500 to-orange-600" },
                 { label: "Active Student Assignments", val: String(assignments.length), icon: FolderPlus, col: "from-emerald-600 to-teal-600" }
               ].map((card, idx) => (
                 <div key={idx} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
@@ -379,6 +413,39 @@ export default function TeacherDashboardPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label className="font-bold">Class Date</Label>
+                  <Input
+                    type="date"
+                    value={classDate}
+                    onChange={(e) => setClassDate(e.target.value)}
+                    required
+                    className="mt-1.5 rounded-xl h-11 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="font-bold">Start Time</Label>
+                  <Input
+                    type="time"
+                    value={classTime}
+                    onChange={(e) => setClassTime(e.target.value)}
+                    required
+                    className="mt-1.5 rounded-xl h-11 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="font-bold">End Time</Label>
+                  <Input
+                    type="time"
+                    value={classEndTime}
+                    onChange={(e) => setClassEndTime(e.target.value)}
+                    required
+                    className="mt-1.5 rounded-xl h-11 text-xs"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="font-bold">Meeting Platform</Label>
@@ -399,6 +466,8 @@ export default function TeacherDashboardPage() {
                     value={classMeetingLink}
                     onChange={(e) => setClassMeetingLink(e.target.value)}
                     placeholder="https://meet.google.com/..."
+                    required
+                    type="url"
                     className="mt-1.5 rounded-xl h-11 text-xs"
                   />
                 </div>
@@ -473,12 +542,41 @@ export default function TeacherDashboardPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="font-bold">Total Pages</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={notePages}
+                    onChange={(e) => setNotePages(Number(e.target.value))}
+                    className="mt-1.5 rounded-xl h-11 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="font-bold">Class</Label>
+                  <select
+                    value={noteStream}
+                    onChange={(e) => setNoteStream(e.target.value as Stream)}
+                    className="w-full mt-1.5 h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 font-bold"
+                  >
+                    <option value="Medical">Medical</option>
+                    <option value="Non-Medical">Non-Medical</option>
+                    <option value="Commerce">Commerce</option>
+                    <option value="Arts">Arts</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <Label className="font-bold">PDF Document URL</Label>
+                <Label className="font-bold">PDF File Upload</Label>
                 <Input
-                  value={noteUrl}
-                  onChange={(e) => setNoteUrl(e.target.value)}
-                  className="mt-1.5 rounded-xl h-11 text-xs"
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setNoteFile(e.target.files?.[0] || null)}
+                  required
+                  className="mt-1.5 rounded-xl h-11 text-xs pt-2 bg-slate-50 dark:bg-slate-800 border-none"
                 />
               </div>
 
@@ -505,7 +603,7 @@ export default function TeacherDashboardPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
                     <Label className="font-bold">Subject</Label>
                     <select
@@ -519,10 +617,24 @@ export default function TeacherDashboardPage() {
                     </select>
                   </div>
                   <div>
+                    <Label className="font-bold">Class</Label>
+                    <select
+                      value={assignGrade}
+                      onChange={(e) => setAssignGrade(e.target.value as Grade)}
+                      className="w-full mt-1.5 h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 font-bold"
+                    >
+                      <option value="10th">10th Class</option>
+                      <option value="11th">11th Class</option>
+                      <option value="12th">12th Class</option>
+                    </select>
+                  </div>
+                  <div>
                     <Label className="font-bold">Deadline Date</Label>
                     <Input
+                      type="date"
                       value={assignDeadline}
                       onChange={(e) => setAssignDeadline(e.target.value)}
+                      required
                       className="mt-1.5 rounded-xl h-11 text-xs"
                     />
                   </div>
@@ -554,16 +666,30 @@ export default function TeacherDashboardPage() {
                     <th className="p-3">Class</th>
                     <th className="p-3">Deadline</th>
                     <th className="p-3">Total Marks</th>
+                    <th className="p-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {assignments.map((as) => (
+                  {assignments.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-slate-400 font-semibold">No assignments published yet. Use the form above to publish one.</td>
+                    </tr>
+                  ) : assignments.map((as) => (
                     <tr key={as.id}>
                       <td className="p-3 font-bold">{as.title}</td>
                       <td className="p-3 text-blue-600 font-bold">{as.subject}</td>
                       <td className="p-3 text-slate-500">Class {as.grade}</td>
                       <td className="p-3 font-semibold">{as.deadline}</td>
                       <td className="p-3 font-black text-emerald-600">{as.marks} Marks</td>
+                      <td className="p-3">
+                        <button
+                          onClick={() => handleDeleteAssignment(as.id)}
+                          className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                          title="Remove assignment"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -591,16 +717,18 @@ export default function TeacherDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {[
-                  { name: "Muzamil Ahmad", email: "student@studymaterial.com", classTitle: "Cellular Genetics & DNA Replication Masterclass", time: "09:01 PM IST", status: "Present" },
-                  { name: "Ananya Sharma", email: "ananya@gmail.com", classTitle: "Cellular Genetics & DNA Replication Masterclass", time: "09:03 PM IST", status: "Present" },
-                  { name: "Rahul Verma", email: "rahul@gmail.com", classTitle: "Kinematics 2D Numerical Solving Sprint", time: "10:32 AM IST", status: "Late" }
-                ].map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="p-3 font-bold">{row.name}</td>
+                {attendanceLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-slate-400 font-semibold">
+                      No attendance records yet. Logs appear here when students join a published live class room.
+                    </td>
+                  </tr>
+                ) : attendanceLogs.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="p-3 font-bold">{row.studentName}</td>
                     <td className="p-3 text-slate-500">{row.email}</td>
-                    <td className="p-3 font-semibold text-blue-600">{row.classTitle}</td>
-                    <td className="p-3 text-slate-500">{row.time}</td>
+                    <td className="p-3 font-semibold text-blue-600">{liveClasses.find(c => c.id === row.classId)?.title || row.classId}</td>
+                    <td className="p-3 text-slate-500">{row.joinTime}</td>
                     <td className="p-3">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
                         row.status === "Present" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"

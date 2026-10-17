@@ -7,14 +7,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
-  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [result, setResult] = useState<{ email: string; token: string } | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setSent(true);
+    setLoading(true);
+    setErrorMsg(null);
+    setResult(null);
+
+    const email = String(new FormData(e.currentTarget).get("email") ?? "").trim();
+
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErrorMsg(data.message ?? "Could not find an account with that email.");
+        return;
+      }
+
+      setResult({ email, token: data.resetToken });
+    } catch {
+      setErrorMsg("Unable to reach the backend server. Is it running?");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -24,20 +50,27 @@ export default function ForgotPasswordPage() {
           <Badge className="mx-auto bg-blue-50 text-blue-700">Account Recovery</Badge>
           <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
           <CardDescription>
-            Enter your registered email address. We will send a secure password reset link to your inbox.
+            Enter your registered email address to generate a secure, single-use reset token valid for 15 minutes.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {sent ? (
+          {result ? (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
-              <p className="text-sm font-semibold text-slate-900">Reset link sent successfully!</p>
-              <p className="text-xs text-slate-600">Check your email inbox or proceed to reset password page.</p>
+              <p className="text-sm font-semibold text-slate-900">Reset token generated for {result.email}</p>
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Reset Token</p>
+                <p className="break-all font-mono text-xs font-bold text-slate-800">{result.token}</p>
+              </div>
+              <p className="text-xs text-slate-600">
+                No email service is configured in this local setup, so the token is shown here and printed in the
+                backend server log. It works exactly like a emailed reset link.
+              </p>
               <div className="pt-2 flex flex-col gap-2">
                 <Link
-                  href="/reset-password"
+                  href={`/reset-password?email=${encodeURIComponent(result.email)}&token=${encodeURIComponent(result.token)}`}
                   className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 text-sm font-semibold text-white shadow"
                 >
                   Proceed to Reset Password
@@ -50,11 +83,19 @@ export default function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">Student Email Address</Label>
-                <Input id="email" type="email" placeholder="student@studymaterial.edu" required className="h-11 rounded-xl" />
+                <Label htmlFor="email">Registered Email Address</Label>
+                <Input id="email" name="email" type="email" placeholder="student@studymaterial.com" required className="h-11 rounded-xl" />
               </div>
-              <Button type="submit" className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 font-semibold shadow">
-                Send Reset Link
+
+              {errorMsg && (
+                <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700 border border-rose-200">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <p>{errorMsg}</p>
+                </div>
+              )}
+
+              <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 font-semibold shadow">
+                {loading ? "Generating token..." : "Generate Reset Token"}
               </Button>
               <div className="text-center pt-2">
                 <Link href="/login" className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-blue-600">

@@ -16,7 +16,7 @@ export default function ResultsPage() {
 
   const totalScoreSum = results.reduce((acc, r) => acc + r.score, 0);
   const totalQuestionsSum = results.reduce((acc, r) => acc + r.totalQuestions, 0);
-  const avgAccuracy = results.length > 0 ? Math.round((totalScoreSum / totalQuestionsSum) * 100) : 85;
+  const avgAccuracy = totalQuestionsSum > 0 ? Math.round((totalScoreSum / totalQuestionsSum) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -81,7 +81,13 @@ export default function ResultsPage() {
         <h3 className="text-lg font-bold text-slate-900 mb-4">Completed Quiz Results</h3>
 
         <div className="space-y-3">
-          {results.map((res) => (
+          {results.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 border border-dashed border-slate-200 p-8 text-center">
+              <NotebookTabs className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+              <h4 className="font-bold text-slate-700">No quiz results yet</h4>
+              <p className="text-xs text-slate-400 mt-1">Your scores will appear here after you complete quizzes from the Quiz section.</p>
+            </div>
+          ) : results.map((res) => (
             <div key={res.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100 hover:bg-white transition">
               <div>
                 <div className="flex items-center gap-2 mb-1">
