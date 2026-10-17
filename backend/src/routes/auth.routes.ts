@@ -4,12 +4,14 @@ import {
   forgotPasswordHandler,
   login,
   register,
-  resetPasswordHandler
+  resetPasswordHandler,
+  sendSignupOtpHandler
 } from "../controllers/auth.controller.js";
 
 const router = Router();
 
 router.post("/login", login);
+router.post("/send-otp", sendSignupOtpHandler);
 router.post("/register", register);
 router.post("/forgot-password", forgotPasswordHandler);
 router.post("/reset-password", resetPasswordHandler);

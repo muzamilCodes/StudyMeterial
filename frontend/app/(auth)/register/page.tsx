@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { apiUrl } from "@/lib/api";
 import { saveSession, type StudentSession } from "@/lib/session";
-import { GraduationCap, CheckCircle2, AlertCircle } from "lucide-react";
+import { GraduationCap, CheckCircle2, AlertCircle, Mail, Loader2 } from "lucide-react";
 import { type Grade, type Stream } from "@/lib/platform-data";
 
 export default function RegisterPage() {
@@ -21,26 +21,76 @@ export default function RegisterPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // OTP state
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpChannels, setOtpChannels] = useState<string[]>([]);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
+
+  async function handleSendOtp() {
+    setErrorMsg(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMsg("Enter a valid email address first.");
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      const res = await fetch(apiUrl("/api/auth/send-otp"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, phone: phone.trim() || undefined })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.message ?? "Could not send the verification code.");
+        setSendingOtp(false);
+        return;
+      }
+      setOtpSent(true);
+      setOtpChannels(data.channels ?? []);
+      setResendIn(60);
+    } catch {
+      setErrorMsg("Network error while sending the code. Please try again.");
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
+    if (!otpSent) {
+      setErrorMsg("Please verify your email first by sending a code.");
+      return;
+    }
+    if (otp.trim().length < 4) {
+      setErrorMsg("Enter the verification code you received.");
+      return;
+    }
+
     const formData = new FormData(event.currentTarget);
     const name = String(formData.get("name") ?? "");
-    const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
     if (password !== confirmPassword) {
       setErrorMsg("Passwords do not match!");
-      setLoading(false);
       return;
     }
 
+    setLoading(true);
     try {
-      // Send REAL HTTP POST request to Express & MongoDB backend
       const response = await fetch(apiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -49,19 +99,19 @@ export default function RegisterPage() {
           email,
           password,
           grade,
-          stream: grade === "10th" ? "General" : stream
+          stream: grade === "10th" ? "General" : stream,
+          otp: otp.trim()
         })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setErrorMsg(data.message ?? "Registration failed. Email may already be registered.");
+        setErrorMsg(data.message ?? "Registration failed. Please check your details and try again.");
         setLoading(false);
         return;
       }
 
-      // Save token and user session
       if (data.token) localStorage.setItem("study-material-token", data.token);
 
       const userSession: StudentSession = {
@@ -78,7 +128,7 @@ export default function RegisterPage() {
       };
 
       saveSession(userSession);
-      setSuccessMsg("Registration successful! Welcome aboard. Redirecting to your dashboard...");
+      setSuccessMsg("Email verified and account created! Redirecting to your dashboard...");
 
       setTimeout(() => {
         setLoading(false);
@@ -106,15 +156,15 @@ export default function RegisterPage() {
         <div className="mt-8 space-y-3">
           <div className="flex items-center gap-3 rounded-2xl bg-white/10 p-3.5 backdrop-blur-sm">
             <CheckCircle2 className="h-5 w-5 text-orange-400 shrink-0" />
-            <p className="text-xs font-medium text-white">Secure Account & Data Protection</p>
+            <p className="text-xs font-medium text-white">Email OTP Verification (No Fake Accounts)</p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl bg-white/10 p-3.5 backdrop-blur-sm">
             <CheckCircle2 className="h-5 w-5 text-orange-400 shrink-0" />
-            <p className="text-xs font-medium text-white">One Email per Account (No Duplicate Registration)</p>
+            <p className="text-xs font-medium text-white">Secure Account &amp; Data Protection</p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl bg-white/10 p-3.5 backdrop-blur-sm">
             <CheckCircle2 className="h-5 w-5 text-orange-400 shrink-0" />
-            <p className="text-xs font-medium text-white">Mobile Responsive & Tablet Ready UI</p>
+            <p className="text-xs font-medium text-white">Mobile Responsive &amp; Tablet Ready UI</p>
           </div>
         </div>
       </div>
@@ -124,7 +174,7 @@ export default function RegisterPage() {
         <CardHeader className="space-y-1">
           <Badge className="w-fit bg-orange-100 text-orange-700 hover:bg-orange-100 mb-1 text-xs font-bold">Free Registration</Badge>
           <CardTitle className="text-xl sm:text-2xl font-bold text-slate-950">Student Registration</CardTitle>
-          <CardDescription className="text-xs sm:text-sm text-slate-600">Fill in your details below to create your student account.</CardDescription>
+          <CardDescription className="text-xs sm:text-sm text-slate-600">Verify your email with a one-time code, then set up your account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -133,19 +183,80 @@ export default function RegisterPage() {
               <Input id="name" name="name" type="text" placeholder="Muzamil Ahmad" required className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
             </div>
 
+            {/* Email + Send OTP */}
             <div className="grid gap-2">
               <Label htmlFor="email" className="font-bold text-slate-800 text-xs sm:text-sm">Email Address</Label>
-              <Input id="email" name="email" type="email" placeholder="student@studymaterial.com" required className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
+              <div className="flex gap-2">
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="student@example.com"
+                  required
+                  value={email}
+                  disabled={otpSent}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="flex-1 rounded-xl border-slate-200 h-11 text-xs sm:text-sm disabled:opacity-60"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleSendOtp}
+                  disabled={sendingOtp || (otpSent && resendIn > 0)}
+                  className="h-11 shrink-0 rounded-xl bg-blue-600 text-white hover:bg-blue-700 text-xs sm:text-sm font-bold px-4 disabled:opacity-60"
+                >
+                  {sendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : otpSent ? (resendIn > 0 ? `${resendIn}s` : "Resend") : "Send Code"}
+                </Button>
+              </div>
             </div>
+
+            {/* Optional WhatsApp number */}
+            <div className="grid gap-2">
+              <Label htmlFor="phone" className="font-bold text-slate-800 text-xs sm:text-sm">
+                WhatsApp Number <span className="font-normal text-slate-400">(optional — code also sent here if WhatsApp is enabled)</span>
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+91 90000 00000"
+                value={phone}
+                disabled={otpSent}
+                onChange={(e) => setPhone(e.target.value)}
+                className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm disabled:opacity-60"
+              />
+            </div>
+
+            {/* OTP input (after sent) */}
+            {otpSent && (
+              <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/60 p-3">
+                <Label htmlFor="otp" className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-blue-600" />
+                  Enter verification code
+                </Label>
+                <Input
+                  id="otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="6-digit code"
+                  required
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  className="rounded-xl border-slate-200 h-11 text-sm font-bold tracking-[0.4em] text-center"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Sent via {otpChannels.join(" and ") || "email"}. Code expires in 10 minutes.
+                </p>
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="password" className="font-bold text-slate-800 text-xs sm:text-sm">Password</Label>
-                <Input id="password" name="password" type="password" placeholder="••••••••" required className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
+                <Input id="password" name="password" type="password" placeholder="••••••••" required minLength={6} className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="confirmPassword" className="font-bold text-slate-800 text-xs sm:text-sm">Confirm Password</Label>
-                <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" required className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
+                <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" required minLength={6} className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
               </div>
             </div>
 
@@ -200,7 +311,7 @@ export default function RegisterPage() {
             )}
 
             <div className="flex flex-col sm:flex-row gap-3 pt-3">
-              <Button className="flex-1 h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm shadow-premium" type="submit" disabled={loading}>
+              <Button className="flex-1 h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm shadow-premium" type="submit" disabled={loading || !otpSent}>
                 {loading ? "Creating Account..." : "Create Account"}
               </Button>
               <Link

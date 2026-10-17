@@ -1,10 +1,15 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { deleteAccount, forgotPassword, loginUser, registerUser, resetPassword, verifyAdminCredentials } from "../services.js";
+import { deleteAccount, forgotPassword, loginUser, registerUser, resetPassword, sendSignupOtp, verifyAdminCredentials } from "../services.js";
 
 const loginSchema = z.object({
   email:    z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" })
+});
+
+const sendOtpSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  phone: z.string().min(7).optional()
 });
 
 const registerSchema = z.object({
@@ -15,9 +20,19 @@ const registerSchema = z.object({
   stream:          z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"], { error: "Please select a valid stream" }),
   username:        z.string().min(2, { message: "Name must be at least 2 characters" }).optional(),
   role:            z.enum(["superAdmin", "admin", "teacher", "student"]).optional(),
+  otp:             z.string().min(4).optional(),
   adminEmail:      z.string().email().optional(),
   adminPassword:   z.string().min(6).optional()
 });
+
+export async function sendSignupOtpHandler(req: Request, res: Response) {
+  const parsed = sendOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Invalid request" });
+  }
+  const result = await sendSignupOtp(parsed.data.email, parsed.data.phone);
+  return res.status(result.status).json(result.body);
+}
 
 export async function login(req: Request, res: Response) {
   const parsed = loginSchema.safeParse(req.body);

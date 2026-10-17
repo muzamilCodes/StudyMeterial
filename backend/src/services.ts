@@ -1,10 +1,14 @@
 import crypto from "node:crypto";
 import { comparePassword, hashPassword, signToken } from "./auth.js";
+import { generateOtp } from "./helpers/otp.js";
+import { sendOtpEmail, sendOtpWhatsApp } from "./messaging.js";
+import { emailConfigured, whatsappConfigured } from "./config/env.js";
 import {
   AttendanceModel,
   LiveClassModel,
   NoteModel,
   NoticeModel,
+  OTPModel,
   PaperModel,
   QuizModel,
   UserModel,
@@ -103,6 +107,67 @@ export function publicUser(user: any) {
   };
 }
 
+const OTP_TTL_MS = 10 * 60 * 1000;
+
+/** Issue a signup OTP to an email (and WhatsApp if configured + phone given). */
+export async function sendSignupOtp(rawEmail: string, phone?: string) {
+  const email = rawEmail.toLowerCase();
+
+  const existing = await UserModel.findOne({ email }).lean();
+  if (existing) return { status: 409, body: { message: "An account with this email already exists" } };
+
+  const code = generateOtp();
+  await OTPModel.deleteMany({ email });
+  await OTPModel.create({ email, code, expiresAt: new Date(Date.now() + OTP_TTL_MS) });
+
+  const channels: string[] = [];
+  const failures: string[] = [];
+
+  if (emailConfigured) {
+    const r = await sendOtpEmail(email, code);
+    if (r.ok) channels.push("email");
+    else failures.push(r.error ?? "email failed");
+  }
+
+  if (phone && whatsappConfigured) {
+    const r = await sendOtpWhatsApp(phone, code);
+    if (r.ok) channels.push("whatsapp");
+    else failures.push(r.error ?? "whatsapp failed");
+  }
+
+  if (!channels.length) {
+    return {
+      status: 502,
+      body: { message: failures[0] ?? "No delivery channel is configured. Set SMTP credentials in the server .env." }
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      message: `Verification code sent via ${channels.join(" and ")}.`,
+      channels,
+      whatsappUsed: channels.includes("whatsapp")
+    }
+  };
+}
+
+async function consumeSignupOtp(email: string, code: string): Promise<boolean> {
+  const otp = await OTPModel.findOne({ email: email.toLowerCase() }).lean();
+  if (!otp) return false;
+  if ((otp as any).expiresAt.getTime() < Date.now()) {
+    await OTPModel.deleteOne({ email: email.toLowerCase() });
+    return false;
+  }
+  const expected = String(otp.code);
+  const provided = String(code);
+  if (expected.length !== provided.length) return false;
+  const match = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
+  if (!match) return false;
+  await OTPModel.deleteOne({ email: email.toLowerCase() });
+  return true;
+}
+
 export async function registerUser(payload: {
   email: string;
   password: string;
@@ -111,6 +176,7 @@ export async function registerUser(payload: {
   stream: Stream;
   role?: "superAdmin" | "admin" | "teacher" | "student";
   username?: string;
+  otp?: string;
 }) {
   const requestedRole = payload.role ?? "student";
   if (!["superAdmin", "admin", "teacher", "student"].includes(requestedRole)) {
@@ -119,6 +185,15 @@ export async function registerUser(payload: {
 
   const existing = await UserModel.findOne({ email: payload.email.toLowerCase() }).lean();
   if (existing) return { status: 409, body: { message: "User already exists" } };
+
+  // Email OTP is required for open student signups. Privileged roles (admin/teacher/
+  // superAdmin) are already gated by an existing administrator's authorization in the
+  // controller, so they don't require the email OTP.
+  if (requestedRole === "student") {
+    if (!payload.otp || !(await consumeSignupOtp(payload.email, payload.otp))) {
+      return { status: 400, body: { message: "Valid email verification code is required. Please request an OTP and enter it." } };
+    }
+  }
 
   const user = await UserModel.create({
     username:     payload.username || payload.email.split("@")[0],
