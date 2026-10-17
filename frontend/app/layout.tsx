@@ -4,14 +4,38 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StudyMaterial - Premium Smart Learning Platform",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3100"),
+  title: {
+    default: "StudyMaterial – Notes, Papers, Live Classes & MCQ Quizzes",
+    template: "%s | StudyMaterial",
+  },
   description: "Modern, interactive educational platform providing notes, previous year papers, live classes, and quizzes for 10th, 11th, and 12th grades.",
+  keywords: [
+    "class 10 notes",
+    "class 11 notes",
+    "class 12 notes",
+    "previous year papers",
+    "MCQ quizzes",
+    "live classes",
+    "study material PDF",
+  ],
+  openGraph: {
+    siteName: "StudyMaterial",
+    type: "website",
+    title: "StudyMaterial – Notes, Papers, Live Classes & MCQ Quizzes",
+    description: "Free PDF notes, previous year board papers, live classes and quizzes for Class 10, 11 and 12.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "StudyMaterial – Notes, Papers, Live Classes & MCQ Quizzes",
+    description: "Free PDF notes, previous year board papers, live classes and quizzes for Class 10, 11 and 12.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

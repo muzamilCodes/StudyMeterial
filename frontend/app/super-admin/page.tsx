@@ -1,11 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Shield, Users, Settings, BarChart3, Database, ArrowRight } from "lucide-react";
 
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 const cards = [
-  { label: "System Users", value: "4 Roles", icon: Users },
-  { label: "Backups", value: "Ready", icon: Database },
-  { label: "Audit Logs", value: "Enabled", icon: BarChart3 },
-  { label: "Settings", value: "Centralized", icon: Settings }
+  { label: "Users", value: "Role Management", icon: Users },
+  { label: "Backups", value: "Data Restore", icon: Database },
+  { label: "Analytics", value: "Platform Stats", icon: BarChart3 },
+  { label: "Settings", value: "System Policy", icon: Settings }
 ];
 
 export default function SuperAdminPage() {

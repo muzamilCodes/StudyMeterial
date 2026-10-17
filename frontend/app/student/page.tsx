@@ -1,11 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { BookOpen, ClipboardCheck, BellRing, CalendarDays, Trophy, ArrowRight } from "lucide-react";
+import { BookOpen, ClipboardCheck, CalendarDays, Trophy, ArrowRight } from "lucide-react";
 
-const stats = [
-  { label: "Assignments", value: "12 pending", icon: ClipboardCheck },
-  { label: "Quiz Score", value: "86%", icon: Trophy },
-  { label: "Notices", value: "4 new", icon: BellRing },
-  { label: "Timetable", value: "Today 3", icon: CalendarDays }
+export const metadata: Metadata = {
+  title: "Class 10-12 Notes & Quizzes Student Portal",
+  description:
+    "Log in to the StudyMaterial student portal to read PDF notes, solve previous year papers, attend live classes and take MCQ quizzes for Class 10-12.",
+  alternates: { canonical: "/student" },
+};
+
+const features = [
+  { label: "PDF Notes", value: "Subject-wise", icon: BookOpen },
+  { label: "Board Papers", value: "Previous Year", icon: ClipboardCheck },
+  { label: "Live Classes", value: "Scheduled Rooms", icon: CalendarDays },
+  { label: "MCQ Quizzes", value: "Timed Practice", icon: Trophy }
 ];
 
 export default function StudentPage() {
@@ -33,7 +41,7 @@ export default function StudentPage() {
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {stats.map((stat) => {
+          {features.map((stat) => {
             const Icon = stat.icon;
             return (
               <div key={stat.label} className="rounded-[1.75rem] border border-slate-200/80 bg-white p-6 shadow-lg">
