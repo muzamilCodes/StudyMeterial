@@ -9,6 +9,7 @@ export { AttendanceModel } from "./Attendance.js";
 export { SuperAdminModel } from "./SuperAdmin.js";
 export { AdminModel } from "./Admin.js";
 export { TeacherModel } from "./Teacher.js";
+export { InstructorApplicationModel } from "./InstructorApplication.js";
 export { StudentModel } from "./Student.js";
 export { ClassModel } from "./Class.js";
 export { SubjectModel } from "./Subject.js";

@@ -208,45 +208,10 @@ export default function TeacherDashboardPage() {
     <SiteShell
       title="Faculty Teacher Portal"
       description="Manage live lectures, curriculum study notes, student assignments, and live attendance logs."
+      activeTeacherTab={activeTab}
+      onTeacherTabChange={setActiveTab}
     >
       <div className="space-y-8 max-w-[1600px] mx-auto text-slate-900 dark:text-white">
-        
-        {/* TOP FACULTY BANNER */}
-        <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-950 p-6 md:p-8 text-white shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-blue-800/40">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-3 py-1 text-xs font-black border border-emerald-500/30 flex items-center gap-1">
-                <Award className="h-3.5 w-3.5" /> Faculty Educator Portal Active
-              </span>
-              <span className="rounded-full bg-blue-500/20 text-blue-300 px-3 py-1 text-xs font-bold border border-blue-500/30">
-                Class 11th & 12th Senior Instructor
-              </span>
-            </div>
-            <h2 className="text-2xl md:text-3xl font-black">
-              Welcome back, {session?.name || "Faculty"}!
-            </h2>
-            <p className="text-xs md:text-sm text-blue-200/90 max-w-2xl">
-              Create interactive live classes, upload chapter formula notes, assign student homework, and track live classroom attendance directly in MongoDB.
-            </p>
-          </div>
-
-          {/* QUICK TAB BUTTONS */}
-          <div className="flex flex-wrap items-center gap-2">
-            {["Overview", "Schedule Live Class", "Upload Notes", "Assignments", "Attendance Logs"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2.5 rounded-2xl font-bold text-xs transition ${
-                  activeTab === tab
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : "bg-white/10 text-slate-300 hover:bg-white/20"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* NOTIFICATION TOAST */}
         {successMsg && (
@@ -259,6 +224,26 @@ export default function TeacherDashboardPage() {
         {/* OVERVIEW TAB */}
         {activeTab === "Overview" && (
           <div className="space-y-8">
+            {/* TOP FACULTY BANNER */}
+            <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-950 p-6 md:p-8 text-white shadow-2xl border border-blue-800/40">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-3 py-1 text-xs font-black border border-emerald-500/30 flex items-center gap-1">
+                    <Award className="h-3.5 w-3.5" /> Faculty Educator Portal Active
+                  </span>
+                  <span className="rounded-full bg-blue-500/20 text-blue-300 px-3 py-1 text-xs font-bold border border-blue-500/30">
+                    Class 11th & 12th Senior Instructor
+                  </span>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-black">
+                  Welcome back, {session?.name || "Faculty"}!
+                </h2>
+                <p className="text-xs md:text-sm text-blue-200/90 max-w-2xl">
+                  Create interactive live classes, upload chapter formula notes, assign student homework, and track live classroom attendance directly in MongoDB.
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {[
                 { label: "Total Live Classes Scheduled", val: String(liveClasses.length), icon: Radio, col: "from-rose-600 to-pink-600" },
@@ -278,76 +263,112 @@ export default function TeacherDashboardPage() {
               ))}
             </div>
 
-            {/* LIVE CLASSES DIRECTORY TABLE */}
+            {/* QUICK ACTIONS */}
             <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-black">My Scheduled & Live Classes</h3>
-                  <p className="text-xs text-slate-400">Total {liveClasses.length} live classes created in MongoDB</p>
-                </div>
-                <Button onClick={() => setActiveTab("Schedule Live Class")} className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-xs font-bold gap-1">
-                  <Plus className="h-4 w-4" /> Schedule Class
-                </Button>
+              <h3 className="text-base font-black">Quick Actions</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[
+                  { tab: "Schedule Live Class", label: "Schedule a Live Class", desc: "Go live on Google Meet / Zoom", icon: Video, accent: "bg-blue-600 hover:bg-blue-700" },
+                  { tab: "My Live Classes", label: "Manage My Classes", desc: "Publish drafts, delete sessions", icon: Radio, accent: "bg-rose-600 hover:bg-rose-700" },
+                  { tab: "Upload Notes", label: "Upload Study Note", desc: "Add a PDF chapter / formula sheet", icon: Upload, accent: "bg-amber-600 hover:bg-amber-700" },
+                  { tab: "Assignments", label: "Publish Assignment", desc: "Set homework with a deadline", icon: FolderPlus, accent: "bg-emerald-600 hover:bg-emerald-700" },
+                  { tab: "Attendance Logs", label: "Attendance Logs", desc: "Review live room attendance", icon: Users, accent: "bg-indigo-600 hover:bg-indigo-700" }
+                ].map((action, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveTab(action.tab)}
+                    className="flex items-start gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
+                  >
+                    <div className={`p-2.5 rounded-xl text-white ${action.accent}`}>
+                      <action.icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black">{action.label}</p>
+                      <p className="text-xs text-slate-400">{action.desc}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
+            </div>
+          </div>
+        )}
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase font-black">
+        {/* MY LIVE CLASSES TAB */}
+        {activeTab === "My Live Classes" && (
+          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black">My Scheduled & Live Classes</h3>
+                <p className="text-xs text-slate-400">Total {liveClasses.length} live classes created in MongoDB</p>
+              </div>
+              <Button onClick={() => setActiveTab("Schedule Live Class")} className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-xs font-bold gap-1">
+                <Plus className="h-4 w-4" /> Schedule Class
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase font-black">
+                  <tr>
+                    <th className="p-3">Title</th>
+                    <th className="p-3">Subject</th>
+                    <th className="p-3">Class & Stream</th>
+                    <th className="p-3">Platform</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                  {liveClasses.length === 0 ? (
                     <tr>
-                      <th className="p-3">Title</th>
-                      <th className="p-3">Subject</th>
-                      <th className="p-3">Class & Stream</th>
-                      <th className="p-3">Platform</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Actions</th>
+                      <td colSpan={6} className="p-6 text-center text-slate-400 font-semibold">
+                        No live classes yet. Use "Schedule Live Class" to create your first session.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                    {liveClasses.map((lc) => (
-                      <tr key={lc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="p-3 font-bold">{lc.title}</td>
-                        <td className="p-3 text-blue-600 font-bold">{lc.subject}</td>
-                        <td className="p-3 text-slate-500">Class {lc.grade} ({lc.stream})</td>
-                        <td className="p-3 font-semibold">{lc.meetingPlatform}</td>
-                        <td className="p-3">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                            lc.status === "Published" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : "bg-slate-100 text-slate-700"
-                          }`}>
-                            {lc.status}
-                          </span>
-                        </td>
-                        <td className="p-3 flex items-center gap-2">
-                          {lc.status !== "Published" && (
-                            <button
-                              onClick={async () => {
-                                const ok = await publishEnterpriseLiveClass(lc.id);
-                                if (ok) {
-                                  setSuccessMsg(`Published Class "${lc.title}"!`);
-                                  refreshData();
-                                }
-                              }}
-                              className="px-2.5 py-1 rounded-xl bg-emerald-600 text-white font-bold text-[10px] flex items-center gap-1"
-                            >
-                              <Sparkles className="h-3 w-3" /> Publish
-                            </button>
-                          )}
+                  ) : liveClasses.map((lc) => (
+                    <tr key={lc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="p-3 font-bold">{lc.title}</td>
+                      <td className="p-3 text-blue-600 font-bold">{lc.subject}</td>
+                      <td className="p-3 text-slate-500">Class {lc.grade} ({lc.stream})</td>
+                      <td className="p-3 font-semibold">{lc.meetingPlatform}</td>
+                      <td className="p-3">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                          lc.status === "Published" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" : "bg-slate-100 text-slate-700"
+                        }`}>
+                          {lc.status}
+                        </span>
+                      </td>
+                      <td className="p-3 flex items-center gap-2">
+                        {lc.status !== "Published" && (
                           <button
                             onClick={async () => {
-                              if (confirm(`Delete live class "${lc.title}"?`)) {
-                                await deleteEnterpriseLiveClass(lc.id);
+                              const ok = await publishEnterpriseLiveClass(lc.id);
+                              if (ok) {
+                                setSuccessMsg(`Published Class "${lc.title}"!`);
                                 refreshData();
                               }
                             }}
-                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"
+                            className="px-2.5 py-1 rounded-xl bg-emerald-600 text-white font-bold text-[10px] flex items-center gap-1"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Sparkles className="h-3 w-3" /> Publish
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                        <button
+                          onClick={async () => {
+                            if (confirm(`Delete live class "${lc.title}"?`)) {
+                              await deleteEnterpriseLiveClass(lc.id);
+                              refreshData();
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -554,7 +575,7 @@ export default function TeacherDashboardPage() {
                   />
                 </div>
                 <div>
-                  <Label className="font-bold">Class</Label>
+                  <Label className="font-bold">Stream</Label>
                   <select
                     value={noteStream}
                     onChange={(e) => setNoteStream(e.target.value as Stream)}

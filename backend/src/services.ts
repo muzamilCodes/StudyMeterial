@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 import { comparePassword, hashPassword, signToken } from "./auth.js";
 import { generateOtp } from "./helpers/otp.js";
-import { sendOtpEmail, sendOtpWhatsApp } from "./messaging.js";
+import { sendOtpEmail, sendOtpWhatsApp, sendInstructorDecisionEmail, sendInstructorReviewRequest } from "./messaging.js";
 import { emailConfigured, whatsappConfigured } from "./config/env.js";
 import {
   AttendanceModel,
+  InstructorApplicationModel,
   LiveClassModel,
   NoteModel,
   NoticeModel,
@@ -38,6 +39,15 @@ export function normalizePhone(raw: string) {
   if (d.length > 10 && d.startsWith("91")) d = d.slice(2); // drop +91 country code
   while (d.length > 10 && d.startsWith("0")) d = d.slice(1); // drop trunk prefix 0
   return d;
+}
+
+function humanSize(bytes: number) {
+  return `${Math.max(1, Math.ceil(bytes / 1024))} KB`;
+}
+
+/** Public base URL used to build links for instructor application uploads. */
+function instructorBaseUrl() {
+  return (process.env.SERVER_URL || "http://localhost:4100").replace(/\/$/, "");
 }
 
 function buildContentQuery(filters: Partial<{ grade: Grade; stream: Stream; subject: string; search: string }>) {
@@ -112,6 +122,7 @@ export function publicUser(user: any) {
     username:  user.username,
     email:     user.email,
     role:      user.role,
+    approvalStatus: user.approvalStatus ?? "approved",
     grade:     user.grade,
     stream:    user.stream,
     createdAt: user.createdAt
@@ -251,6 +262,16 @@ export async function loginUser(payload: { email: string; password: string }) {
 
   const ok = await comparePassword(payload.password, (user as any).passwordHash);
   if (!ok)   return { status: 401, body: { message: "Invalid credentials" } };
+
+  // Instructor accounts stay inactive until an administrator approves their application.
+  if ((user as any).role === "teacher" && (user as any).approvalStatus !== "approved") {
+    return {
+      status: 403,
+      body: {
+        message: `Your instructor application is ${(user as any).approvalStatus}. You can sign in only after an administrator approves it. Check your status on the "Application status" page.`
+      }
+    };
+  }
 
   return {
     status: 200,
@@ -528,3 +549,158 @@ export const contentServices = {
     return { message: "Seed data restored" };
   }
 };
+
+// ─── Instructor applications (registration → admin approval) ─────────────────
+
+const applicationCard = (app: any) => ({
+  id:         app._id.toString(),
+  fullName:   app.personal.fullName,
+  email:      app.personal.email,
+  phone:      app.personal.phone,
+  country:    app.personal.country,
+  state:      app.personal.state,
+  profilePhotoUrl: app.personal.profilePhotoUrl ?? null,
+  headline:   app.professional.headline,
+  bio:        app.professional.bio,
+  subjects:   app.professional.subjectExpertise,
+  experience: app.professional.teachingExperience,
+  occupation: app.professional.currentOccupation,
+  education: {
+    qualification: app.education?.highestQualification ?? "",
+    degree:        app.education?.degreeName ?? "",
+    specialization: app.education?.specialization ?? "",
+    college:       app.education?.collegeUniversity ?? "",
+    passingYear:   app.education?.passingYear ?? "",
+    certificates:  app.education?.certificates ?? []
+  },
+  documents: {
+    resume:              app.documents?.resume ?? null,
+    teachingCertificate: app.documents?.teachingCertificate ?? null
+  },
+  status:     app.status,
+  submittedAt: app.createdAt,
+  reviewedAt:  app.reviewedAt,
+  reviewNote:  app.reviewNote
+});
+
+type InstructorFilesPayload = {
+  profilePhoto?:        Express.Multer.File;
+  resume:               Express.Multer.File;
+  teachingCertificate?: Express.Multer.File;
+  certificates:         Express.Multer.File[];
+};
+
+export async function submitInstructorApplication(payload: any, files: InstructorFilesPayload) {
+  const email = String(payload.personal?.email ?? "").toLowerCase();
+  const phone = normalizePhone(payload.personal?.phone ?? "");
+
+  const orFilters: any[] = [{ email }];
+  if (phone) orFilters.push({ phone });
+  const existingUser = await UserModel.findOne({ $or: orFilters }).lean();
+  if (existingUser) {
+    const role = (existingUser as any).role;
+    if (role === "teacher") {
+      const st = (existingUser as any).approvalStatus ?? "approved";
+      if (st === "approved") return { status: 409, body: { message: "This email already has an approved instructor account. Sign in from the teacher login page." } };
+      if (st === "pending")  return { status: 409, body: { message: "An application for this email is already pending review. You will be notified once it is decided." } };
+    }
+    return { status: 409, body: { message: "An account with this email or phone number already exists. Please sign in instead." } };
+  }
+
+  const prior = await InstructorApplicationModel.findOne({ "personal.email": email });
+  if (prior && prior.status !== "rejected") {
+    return { status: 409, body: { message: prior.status === "pending"
+      ? "Your application is already submitted and awaiting admin review."
+      : "Your application has already been approved. Sign in from the teacher login page." } };
+  }
+
+  const publicUrl = (f: Express.Multer.File) => `${instructorBaseUrl()}/uploads/${f.filename}`;
+
+  const doc: any = {
+    personal: {
+      ...payload.personal,
+      email,
+      phone,
+      profilePhotoUrl: files.profilePhoto ? publicUrl(files.profilePhoto) : undefined
+    },
+    professional: payload.professional,
+    education: {
+      ...payload.education,
+      certificates: files.certificates.map((f) => ({ name: f.originalname, url: publicUrl(f), size: humanSize(f.size) }))
+    },
+    documents: {
+      resume:              { name: files.resume.originalname, url: publicUrl(files.resume), size: humanSize(files.resume.size), mimeType: files.resume.mimetype },
+      teachingCertificate: files.teachingCertificate
+        ? { name: files.teachingCertificate.originalname, url: publicUrl(files.teachingCertificate), size: humanSize(files.teachingCertificate.size), mimeType: files.teachingCertificate.mimetype }
+        : undefined
+    },
+    passwordHash: await hashPassword(payload.password),
+    status: "pending"
+  };
+
+  let saved: any;
+  if (prior) {
+    prior.set({ ...doc, reviewedAt: undefined, reviewNote: undefined, reviewedBy: undefined });
+    saved = await prior.save();
+  } else {
+    saved = await InstructorApplicationModel.create(doc);
+  }
+
+  const admins = await UserModel.find({ role: { $in: ["admin", "superAdmin"] } }).select("email").lean();
+  for (const admin of admins) {
+    void sendInstructorReviewRequest((admin as any).email, saved.personal.fullName, saved.personal.email);
+  }
+
+  return { status: 201, body: { message: "Application submitted", application: applicationCard(saved) } };
+}
+
+
+export async function getInstructorApplicationStatus(email: string) {
+  const app = await InstructorApplicationModel.findOne({ "personal.email": email.toLowerCase() }).lean();
+  if (!app) return { status: 404, body: { message: "No instructor application found for this email address." } };
+  return { status: 200, body: { application: applicationCard(app) } };
+}
+
+export async function listInstructorApplications(status?: string) {
+  const filter: any = status && status !== "all" ? { status } : {};
+  const apps = await InstructorApplicationModel.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+  return { data: apps.map(applicationCard) };
+}
+
+export async function resolveInstructorApplication(id: string, decision: "approved" | "rejected", note: string, reviewerEmail: string) {
+  const app: any = await InstructorApplicationModel.findById(id);
+  if (!app) return { status: 404, body: { message: "Application not found" } };
+  if (app.status !== "pending") return { status: 409, body: { message: `This application was already ${app.status}.` } };
+
+  if (decision === "rejected") {
+    app.set({ status: "rejected", reviewNote: note || undefined, reviewedBy: reviewerEmail, reviewedAt: new Date() });
+    await app.save();
+    void sendInstructorDecisionEmail(app.personal.email, app.personal.fullName, "rejected", note);
+    return { status: 200, body: { message: `Rejected ${app.personal.email}`, application: applicationCard(app) } };
+  }
+
+  const email = app.personal.email;
+  const user = await UserModel.findOne({ email });
+  if (!user) {
+    await UserModel.create({
+      username:        app.personal.fullName,
+      email,
+      phone:           app.personal.phone || undefined,
+      passwordHash:    app.passwordHash,
+      role:            "teacher",
+      grade:           "11th",
+      stream:          "General",
+      approvalStatus:  "approved"
+    } as any);
+  } else {
+    user.set({ role: "teacher", approvalStatus: "approved" });
+    await user.save();
+  }
+
+  app.set({ status: "approved", reviewNote: note || undefined, reviewedBy: reviewerEmail, reviewedAt: new Date(), approvedUserEmail: email });
+  await app.save();
+
+  void sendInstructorDecisionEmail(email, app.personal.fullName, "approved", note);
+  return { status: 200, body: { message: `Approved ${email} — instructor account is active`, application: applicationCard(app) } };
+}
+

@@ -34,8 +34,7 @@ import {
   TrendingUp,
   Upload,
   HelpCircle,
-  Bell,
-  ArrowLeft
+  Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,18 +69,32 @@ const adminNavItems = [
   { tab: "Instructor Applications", label: "Instructor Approvals", icon: UserCheck },
 ];
 
+// TEACHER / FACULTY SIDEBAR MENU (each tab is a separate section)
+const teacherNavItems = [
+  { tab: "Overview", label: "Dashboard Overview", icon: LayoutDashboard },
+  { tab: "My Live Classes", label: "My Live Classes", icon: Video },
+  { tab: "Schedule Live Class", label: "Schedule Live Class", icon: Sparkles },
+  { tab: "Upload Notes", label: "Upload Study Notes", icon: FileText },
+  { tab: "Assignments", label: "Assignments", icon: FolderPlus },
+  { tab: "Attendance Logs", label: "Attendance Logs", icon: Users },
+];
+
 export function SiteShell({
   children,
   title,
   description,
   activeAdminTab,
-  onAdminTabChange
+  onAdminTabChange,
+  activeTeacherTab,
+  onTeacherTabChange
 }: {
   children: ReactNode;
   title?: string;
   description?: string;
   activeAdminTab?: string;
   onAdminTabChange?: (tab: string) => void;
+  activeTeacherTab?: string;
+  onTeacherTabChange?: (tab: string) => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -93,6 +106,7 @@ export function SiteShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isAdminPage = pathname?.startsWith("/admin");
+  const isTeacherPage = pathname?.startsWith("/teacher");
 
   useEffect(() => {
     const s = getStoredSession();
@@ -158,7 +172,7 @@ export function SiteShell({
             <GraduationCap className="h-5 w-5" />
           </div>
           <span className="text-sm font-black tracking-wider text-blue-600 dark:text-blue-400">
-            {isAdminPage ? "ADMIN PANEL" : "STUDYMATERIAL"}
+            {isAdminPage ? "ADMIN PANEL" : isTeacherPage ? "FACULTY PORTAL" : "STUDYMATERIAL"}
           </span>
         </Link>
 
@@ -181,11 +195,11 @@ export function SiteShell({
             </div>
             <div>
               <p className="text-sm font-bold">{session.name || "User"}</p>
-              <p className="text-xs text-slate-400">{isAdminPage ? "System Admin Mode" : `${session.grade} ${session.stream}`}</p>
+              <p className="text-xs text-slate-400">{isAdminPage ? "System Admin Mode" : isTeacherPage ? "Faculty Educator" : `${session.grade} ${session.stream}`}</p>
             </div>
           </div>
 
-          {/* Render Admin or User Items in Mobile Menu */}
+          {/* Render Admin, Teacher or User Items in Mobile Menu */}
           {isAdminPage ? (
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider px-2 mb-2">Admin Control Menu</p>
@@ -208,15 +222,29 @@ export function SiteShell({
                   </button>
                 );
               })}
-
-              <Link
-                href="/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-bold bg-blue-600/30 text-blue-300 border border-blue-500/30 mt-3"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Switch to Student View</span>
-              </Link>
+            </div>
+          ) : isTeacherPage ? (
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider px-2 mb-2">Faculty Menu</p>
+              {teacherNavItems.map((item) => {
+                const IconComp = item.icon;
+                const isActive = activeTeacherTab === item.tab;
+                return (
+                  <button
+                    key={item.tab}
+                    onClick={() => {
+                      if (onTeacherTabChange) onTeacherTabChange(item.tab);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-bold transition text-left ${
+                      isActive ? "bg-blue-600 text-white shadow" : "text-slate-300 hover:bg-white/10"
+                    }`}
+                  >
+                    <IconComp className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-1">
@@ -278,10 +306,10 @@ export function SiteShell({
                 </div>
                 <div>
                   <p className="text-xs font-black tracking-wider text-blue-600 dark:text-blue-400">
-                    {isAdminPage ? "ADMIN PANEL" : "STUDYMATERIAL"}
+                    {isAdminPage ? "ADMIN PANEL" : isTeacherPage ? "FACULTY PORTAL" : "STUDYMATERIAL"}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">
-                    {isAdminPage ? "CONSOLE" : `Class ${session.grade}`}
+                    {isAdminPage ? "CONSOLE" : isTeacherPage ? "EDUCATOR" : `Class ${session.grade}`}
                   </p>
                 </div>
               </Link>
@@ -304,13 +332,13 @@ export function SiteShell({
 
           {/* BADGE / STATUS */}
           {!isCollapsed && (
-            <div className={`rounded-2xl p-3.5 text-white shadow-sm ${isAdminPage ? "bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950" : "bg-gradient-to-br from-blue-600 to-indigo-700"}`}>
+            <div className={`rounded-2xl p-3.5 text-white shadow-sm ${isAdminPage ? "bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950" : isTeacherPage ? "bg-gradient-to-br from-indigo-700 via-blue-800 to-slate-900" : "bg-gradient-to-br from-blue-600 to-indigo-700"}`}>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
-                {isAdminPage ? "Administrator Console" : "Enrolled Student"}
+                {isAdminPage ? "Administrator Console" : isTeacherPage ? "Faculty Educator" : "Enrolled Student"}
               </p>
               <p className="text-xs font-extrabold">{session.name || "User"}</p>
               <span className="inline-block mt-1 rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-bold">
-                {isAdminPage ? "Master Controls" : `${session.grade} • ${session.stream}`}
+                {isAdminPage ? "Master Controls" : isTeacherPage ? "Classes • Notes • Attendance" : `${session.grade} • ${session.stream}`}
               </span>
             </div>
           )}
@@ -332,6 +360,29 @@ export function SiteShell({
                       isActive
                         ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
                         : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-amber-600 dark:hover:text-amber-400"
+                    }`}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <IconComp className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
+                    {!isCollapsed && <span>{item.label}</span>}
+                  </button>
+                );
+              })
+            ) : isTeacherPage ? (
+              // TEACHER / FACULTY MENU ITEMS
+              teacherNavItems.map((item) => {
+                const IconComp = item.icon;
+                const isActive = activeTeacherTab === item.tab;
+                return (
+                  <button
+                    key={item.tab}
+                    onClick={() => {
+                      if (onTeacherTabChange) onTeacherTabChange(item.tab);
+                    }}
+                    className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition text-left ${
+                      isActive
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400"
                     }`}
                     title={isCollapsed ? item.label : undefined}
                   >
@@ -363,28 +414,17 @@ export function SiteShell({
               })
             )}
 
-            {/* SWITCH MODE LINK FOR ADMIN USER */}
-            {isAdminUser && (
+            {/* SWITCH MODE LINK — only surfaces the Admin Console entry on student pages */}
+            {isAdminUser && !isAdminPage && (
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 mt-2">
-                {isAdminPage ? (
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition"
-                    title={isCollapsed ? "Student View" : undefined}
-                  >
-                    <ArrowLeft className="h-4 w-4 shrink-0" />
-                    {!isCollapsed && <span>Student View</span>}
-                  </Link>
-                ) : (
-                  <Link
-                    href="/admin"
-                    className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition"
-                    title={isCollapsed ? "Admin Console" : undefined}
-                  >
-                    <ShieldCheck className="h-4 w-4 shrink-0" />
-                    {!isCollapsed && <span>Admin Console</span>}
-                  </Link>
-                )}
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition"
+                  title={isCollapsed ? "Admin Console" : undefined}
+                >
+                  <ShieldCheck className="h-4 w-4 shrink-0" />
+                  {!isCollapsed && <span>Admin Console</span>}
+                </Link>
               </div>
             )}
           </nav>
@@ -420,7 +460,7 @@ export function SiteShell({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-                {isAdminPage ? "Admin Console Mode" : `Class ${session.grade} (${session.stream})`}
+                {isAdminPage ? "Admin Console Mode" : isTeacherPage ? "Faculty Educator Mode" : `Class ${session.grade} (${session.stream})`}
               </span>
             </div>
             <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">{title}</h1>

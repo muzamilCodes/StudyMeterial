@@ -73,3 +73,64 @@ export async function sendOtpWhatsApp(phone: string, code: string): Promise<Send
     return { ok: false, channel: "whatsapp", error: e instanceof Error ? e.message : "WhatsApp send failed" };
   }
 }
+
+function shell(heading: string, accent: string, bodyHtml: string) {
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px">` +
+    `<h2 style="margin:0 0 4px;color:#0f172a">StudyMaterial</h2>` +
+    `<p style="margin:0 0 18px;color:${accent};font-size:15px;font-weight:bold">${heading}</p>` +
+    `<div style="color:#334155;font-size:14px;line-height:1.7">${bodyHtml}</div>` +
+    `</div>`;
+}
+
+async function sendHtml(to: string, subject: string, html: string): Promise<SendResult> {
+  const t = getTransporter();
+  if (!t) return { ok: false, channel: "email", error: "Email transport not configured" };
+  try {
+    await t.sendMail({ from: `"${env.smtp.fromName}" <${env.smtp.from}>`, to, subject, html });
+    return { ok: true, channel: "email" };
+  } catch (e) {
+    return { ok: false, channel: "email", error: e instanceof Error ? e.message : "Email send failed" };
+  }
+}
+
+/** Sent to each admin when a new instructor application is submitted. */
+export function sendInstructorReviewRequest(adminEmail: string, applicantName: string, applicantEmail: string): Promise<SendResult> {
+  return sendHtml(
+    adminEmail,
+    `New instructor application: ${applicantName}`,
+    shell("A new instructor application needs your review.", "#1d4ed8",
+      `<p><strong>${applicantName}</strong> (${applicantEmail}) has applied to teach on StudyMaterial.</p>` +
+      `<p>Open the admin console and use the <strong>Instructor Applications</strong> tab to approve or reject it. The applicant cannot access the instructor dashboard until you approve.</p>` +
+      `<p style="color:#94a3b8;font-size:12px">Automated notification — do not reply to this email.</p>`)
+  );
+}
+
+/** Sent to the applicant when an admin approves or rejects their application. */
+export function sendInstructorDecisionEmail(
+  email: string,
+  name: string,
+  decision: "approved" | "rejected",
+  note?: string
+): Promise<SendResult> {
+  if (decision === "approved") {
+    return sendHtml(
+      email,
+      "Your StudyMaterial instructor account is approved",
+      shell("Congratulations — you are approved.", "#047857",
+        `<p>Hi ${name}, an administrator approved your instructor application.</p>` +
+        `<p>Your instructor account is now active. Sign in from the <strong>Teacher login</strong> page with the email and password you used in the application to open your dashboard.</p>` +
+        (note ? `<p style="margin-top:12px"><strong>Reviewer note:</strong> ${note}</p>` : "") +
+        `<p style="color:#94a3b8;font-size:12px">Automated notification — do not reply to this email.</p>`)
+    );
+  }
+  return sendHtml(
+    email,
+    "Update on your StudyMaterial instructor application",
+    shell("Your application was not approved.", "#be123c",
+      `<p>Hi ${name}, an administrator reviewed your instructor application and could not approve it.</p>` +
+      (note ? `<p style="margin-top:12px"><strong>Reason:</strong> ${note}</p>` : `<p style="margin-top:12px">No reason was provided.</p>`) +
+      `<p>You can submit a new application with updated details from the instructor registration page.</p>` +
+      `<p style="color:#94a3b8;font-size:12px">Automated notification — do not reply to this email.</p>`)
+  );
+}
+

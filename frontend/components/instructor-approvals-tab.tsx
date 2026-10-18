@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Inbox, CheckCircle2, XCircle, FileText, RefreshCw } from "lucide-react";
+import { Loader2, Inbox, CheckCircle2, XCircle, FileText, FileBadge, RefreshCw, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   fetchInstructorApplications,
   resolveInstructorApplication,
-  type InstructorApplicationSummary
+  type InstructorApplicationSummary,
+  type InstructorFileRef
 } from "@/lib/store";
 
 const FILTERS = [
@@ -29,6 +30,7 @@ export function InstructorApprovalsTab() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [flash, setFlash] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,16 +80,26 @@ export function InstructorApprovalsTab() {
         </div>
       ) : (
         <div className="space-y-4">
-          {items.map((app) => (
+          {items.map((app) => {
+            const isOpen = !!expanded[app.id];
+            const certs = app.education?.certificates ?? [];
+            return (
             <div key={app.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-base font-black text-slate-900">{app.fullName}</h4>
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${statusCls[app.status]}`}>{app.status}</span>
+                <div className="flex items-start gap-3">
+                  {app.profilePhotoUrl ? (
+                    <img src={app.profilePhotoUrl} alt={app.fullName} className="h-12 w-12 rounded-xl object-cover border border-slate-200" />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-sm font-black text-slate-500">{app.fullName[0]}</div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-base font-black text-slate-900">{app.fullName}</h4>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${statusCls[app.status]}`}>{app.status}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500">{app.email} • {app.phone}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">{app.headline}</p>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">{app.email} • {app.phone}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-700">{app.headline}</p>
                 </div>
                 <p className="text-[11px] text-slate-400">Submitted {new Date(app.submittedAt).toLocaleDateString()}</p>
               </div>
@@ -97,7 +109,47 @@ export function InstructorApprovalsTab() {
                   <span key={s} className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-600">{s}</span>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">Experience: {app.experience}</p>
+
+              <button onClick={() => setExpanded((p) => ({ ...p, [app.id]: !p[app.id] }))}
+                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-blue-600">
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {isOpen ? "Hide details" : "View full details, resume & certificates"}
+              </button>
+
+              {isOpen && (
+                <div className="mt-3 space-y-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <Field label="Bio" value={app.bio} />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Experience" value={app.experience} />
+                    <Field label="Current occupation" value={app.occupation} />
+                    <Field label="Location" value={`${app.state}, ${app.country}`} />
+                    <Field label="Highest qualification" value={app.education.qualification} />
+                    <Field label="Degree" value={`${app.education.degree}${app.education.specialization ? ` — ${app.education.specialization}` : ""}`} />
+                    <Field label="College / University" value={app.education.college} />
+                    <Field label="Passing year" value={app.education.passingYear} />
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Documents</p>
+                    <div className="space-y-1.5">
+                      <FileLink file={app.documents.resume} label="Resume / CV" />
+                      <FileLink file={app.documents.teachingCertificate} label="Teaching certificate" />
+                      {certs.map((c, i) => (
+                        <a key={i} href={c.url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-300">
+                          <FileBadge className="h-4 w-4 text-slate-400" />
+                          <span className="flex-1 truncate">{c.name}</span>
+                          <span className="text-[10px] text-slate-400">{c.size}</span>
+                          <ExternalLink className="h-3.5 w-3.5 text-blue-500" />
+                        </a>
+                      ))}
+                      {certs.length === 0 && !app.documents.teachingCertificate && (
+                        <p className="text-xs text-slate-400">No certificates uploaded.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {app.status === "pending" ? (
                 <div className="mt-4 space-y-3">
@@ -126,9 +178,33 @@ export function InstructorApprovalsTab() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-xs font-semibold text-slate-700">{value || "—"}</p>
+    </div>
+  );
+}
+
+function FileLink({ file, label }: { file: InstructorFileRef; label: string }) {
+  if (!file) return <p className="text-xs text-slate-400">{label}: not uploaded.</p>;
+  return (
+    <a href={file.url} target="_blank" rel="noopener noreferrer"
+      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-300">
+      <FileText className="h-4 w-4 text-blue-500" />
+      <span className="text-slate-400">{label}:</span>
+      <span className="flex-1 truncate">{file.name}</span>
+      <span className="text-[10px] text-slate-400">{file.size}</span>
+      <ExternalLink className="h-3.5 w-3.5 text-blue-500" />
+    </a>
   );
 }

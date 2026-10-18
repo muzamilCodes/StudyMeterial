@@ -10,6 +10,7 @@ import contentRoutes from "./routes/content.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import subjectRoutes from "./routes/subject.routes.js";
 import newsletterRoutes from "./routes/newsletter.routes.js";
+import instructorRoutes from "./routes/instructor.routes.js";
 import { authOptional } from "./auth.js";
 
 const app = express();
@@ -52,6 +53,7 @@ app.use("/api/content", contentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/newsletter", newsletterLimiter, newsletterRoutes);
+app.use("/api/instructors", instructorRoutes);
 app.use("/api/classes", (_req, res) => {
   res.json({
     data: [

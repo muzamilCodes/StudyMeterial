@@ -954,14 +954,33 @@ export type InstructorApplicationFiles = {
   certificates?:        File[];
 };
 
+export type InstructorFileRef = { name: string; url: string; size: string; mimeType?: string } | null;
+
 export type InstructorApplicationSummary = {
   id: string;
   fullName: string;
   email: string;
   phone: string;
+  country: string;
+  state: string;
+  profilePhotoUrl: string | null;
   headline: string;
+  bio: string;
   subjects: string[];
   experience: string;
+  occupation: string;
+  education: {
+    qualification: string;
+    degree: string;
+    specialization: string;
+    college: string;
+    passingYear: string;
+    certificates: Array<{ name: string; url: string; size: string }>;
+  };
+  documents: {
+    resume: InstructorFileRef;
+    teachingCertificate: InstructorFileRef;
+  };
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
   reviewedAt?: string;
