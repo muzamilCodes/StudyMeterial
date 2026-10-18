@@ -67,6 +67,7 @@ const adminNavItems = [
   { tab: "Upload Board Paper", label: "Upload Board Paper", icon: ScrollText },
   { tab: "Live Classes", label: "Live Classes Engine", icon: Video },
   { tab: "Publish Notice", label: "Publish Notice", icon: Bell },
+  { tab: "Instructor Applications", label: "Instructor Approvals", icon: UserCheck },
 ];
 
 export function SiteShell({

@@ -36,6 +36,7 @@ import {
   type RegisteredUserItem
 } from "@/lib/store";
 import { type Grade, type Stream } from "@/lib/platform-data";
+import { InstructorApprovalsTab } from "@/components/instructor-approvals-tab";
 import {
   Users,
   FileText,
@@ -1320,6 +1321,22 @@ export default function AdminPage() {
                 {uploading ? "Publishing..." : "Publish Official Notice"}
               </Button>
             </form>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* INSTRUCTOR APPLICATIONS TAB */}
+        {/* ========================================================= */}
+        {activeTab === "Instructor Applications" && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Instructor Approvals</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Review applications submitted from the instructor registration form. Approved applicants get an active
+                teacher account and can sign in to the instructor dashboard; rejected applicants are notified by email.
+              </p>
+            </div>
+            <InstructorApprovalsTab />
           </div>
         )}
 

@@ -880,3 +880,155 @@ export async function uploadBackendFile(file: File): Promise<{ url: string; file
     return null;
   }
 }
+
+// ----------------------------------------------------------------------------
+// INSTRUCTOR APPLICATIONS (multi-step registration + admin approval)
+// ----------------------------------------------------------------------------
+
+export const SUBJECT_EXPERTISE_OPTIONS = [
+  "Web Development", "Data Science", "Artificial Intelligence", "Machine Learning",
+  "Cyber Security", "Java", "Python", "DSA", "DBMS",
+  "Mathematics", "Physics", "Chemistry", "English", "Other"
+];
+
+export const TEACHING_EXPERIENCE_OPTIONS = ["Fresher", "Less than 1 year", "1-3 years", "3-5 years", "5+ years"];
+
+export const CURRENT_OCCUPATION_OPTIONS = [
+  "Student", "Teacher / Lecturer", "Software Developer", "Working Professional",
+  "Freelancer", "Self-Employed", "Other"
+];
+
+export const HIGHEST_QUALIFICATION_OPTIONS = [
+  "High School", "Higher Secondary (12th)", "Diploma",
+  "Bachelor's (BA/BSc/BCA/BTech/BCom)", "Master's (MA/MSc/MCA/MTech/MBA)", "PhD", "Other"
+];
+
+export const COUNTRY_OPTIONS = [
+  "India", "Pakistan", "Bangladesh", "Nepal", "Sri Lanka", "United States",
+  "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Saudi Arabia", "Other"
+];
+
+export const STATE_OPTIONS = [
+  "Jammu & Kashmir", "Delhi", "Uttar Pradesh", "Bihar", "Rajasthan", "Gujarat",
+  "Maharashtra", "Madhya Pradesh", "West Bengal", "Punjab", "Haryana", "Kerala",
+  "Karnataka", "Tamil Nadu", "Telangana", "Andhra Pradesh", "Odisha", "Assam",
+  "Other"
+];
+
+export function passingYearOptions() {
+  const current = new Date().getFullYear();
+  const years: string[] = [];
+  for (let y = current; y >= current - 40; y--) years.push(String(y));
+  return years;
+}
+
+export type InstructorApplicationForm = {
+  password: string;
+  personal: {
+    fullName: string;
+    email: string;
+    phone: string;
+    country: string;
+    state: string;
+  };
+  professional: {
+    headline: string;
+    bio: string;
+    subjectExpertise: string[];
+    teachingExperience: string;
+    currentOccupation: string;
+  };
+  education: {
+    highestQualification: string;
+    degreeName: string;
+    specialization?: string;
+    collegeUniversity: string;
+    passingYear: string;
+  };
+};
+
+export type InstructorApplicationFiles = {
+  profilePhoto?:        File;
+  resume:               File;
+  teachingCertificate?: File;
+  certificates?:        File[];
+};
+
+export type InstructorApplicationSummary = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  headline: string;
+  subjects: string[];
+  experience: string;
+  status: "pending" | "approved" | "rejected";
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+};
+
+export async function submitInstructorApplication(
+  form: InstructorApplicationForm,
+  files: InstructorApplicationFiles
+): Promise<{ ok: boolean; message: string }> {
+  const fd = new FormData();
+  fd.append("application", JSON.stringify(form));
+  if (files.profilePhoto) fd.append("profilePhoto", files.profilePhoto);
+  fd.append("resume", files.resume);
+  if (files.teachingCertificate) fd.append("teachingCertificate", files.teachingCertificate);
+  (files.certificates ?? []).forEach((f) => fd.append("certificates", f));
+
+  try {
+    const res = await fetch(apiUrl("/api/instructors/applications"), { method: "POST", body: fd });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, message: data?.message ?? (res.ok ? "Application submitted" : "Submission failed") };
+  } catch {
+    return { ok: false, message: "Network error while submitting your application. Please try again." };
+  }
+}
+
+export async function fetchInstructorApplicationStatus(
+  email: string
+): Promise<{ found: boolean; application?: InstructorApplicationSummary; message?: string }> {
+  try {
+    const res = await fetch(apiUrl(`/api/instructors/applications/status?email=${encodeURIComponent(email)}`));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { found: false, message: data?.message ?? "No application found." };
+    return { found: true, application: data.application as InstructorApplicationSummary };
+  } catch {
+    return { found: false, message: "Network error while checking your application status." };
+  }
+}
+
+export async function fetchInstructorApplications(status = "all"): Promise<InstructorApplicationSummary[]> {
+  try {
+    const res = await fetch(apiUrl(`/api/instructors/applications?status=${encodeURIComponent(status)}`), {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.data ?? []) as InstructorApplicationSummary[];
+  } catch {
+    return [];
+  }
+}
+
+export async function resolveInstructorApplication(
+  id: string,
+  decision: "approved" | "rejected",
+  note: string
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(apiUrl(`/api/instructors/applications/${id}/decision`), {
+      method: "PATCH",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ decision, note: note || undefined })
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, message: data?.message ?? (res.ok ? "Decision saved" : "Action failed") };
+  } catch {
+    return { ok: false, message: "Network error while saving the decision." };
+  }
+}
+
