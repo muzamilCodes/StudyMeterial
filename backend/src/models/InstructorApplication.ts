@@ -30,7 +30,8 @@ const instructorApplicationSchema = new mongoose.Schema(
 
     documents: {
       resume:               { name: String, url: String, size: String, mimeType: String },
-      teachingCertificate:  { name: String, url: String, size: String, mimeType: String }
+      teachingCertificate:  { name: String, url: String, size: String, mimeType: String },
+      introVideo:           { name: String, url: String, size: String, mimeType: String }
     },
 
     passwordHash: { type: String, required: true },

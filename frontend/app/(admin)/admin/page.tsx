@@ -13,6 +13,9 @@ import { apiUrl } from "@/lib/api";
 import {
   fetchBackendAdminDashboard,
   fetchBackendNotes,
+  fetchCourses,
+  deleteBackendCourse,
+  type CourseCard,
   createBackendNote,
   deleteBackendNote,
   fetchBackendPapers,
@@ -142,6 +145,7 @@ export default function AdminPage() {
   // Live arrays
   const [realNotes, setRealNotes] = useState<RealNoteItem[]>([]);
   const [realPapers, setRealPapers] = useState<RealPaperItem[]>([]);
+  const [adminCourses, setAdminCourses] = useState<CourseCard[]>([]);
   const [realVideos, setRealVideos] = useState<RealVideoItem[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUserItem[]>([]);
   const [adminStats, setAdminStats] = useState({
@@ -225,6 +229,7 @@ export default function AdminPage() {
     fetchBackendPapers().then(data => setRealPapers(data));
     fetchBackendVideos().then(data => setRealVideos(data));
     fetchEnterpriseLiveClasses().then(data => setEnterpriseLiveClasses(data));
+    fetchCourses({ all: true }).then(setAdminCourses);
     fetchBackendAdminDashboard().then(res => {
       setAdminStats(res.stats);
       setRegisteredUsers(res.usersList);
@@ -1337,6 +1342,109 @@ export default function AdminPage() {
               </p>
             </div>
             <InstructorApprovalsTab />
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* COURSES OVERSIGHT TAB */}
+        {/* ========================================================= */}
+        {activeTab === "Courses" && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Course Oversight</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Every course created by instructors — including unpublished drafts. Enrollment and rating data comes
+                live from MongoDB so you can monitor quality before students see a course.
+              </p>
+            </div>
+
+            {/* COURSE SUMMARY CARDS */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Total Courses", value: adminCourses.length, icon: Layers, color: "text-blue-600" },
+                { label: "Published", value: adminCourses.filter(c => c.status === "Published").length, icon: CheckCircle2, color: "text-emerald-600" },
+                { label: "Drafts", value: adminCourses.filter(c => c.status === "Draft").length, icon: BookOpen, color: "text-amber-600" },
+                { label: "Total Students Enrolled", value: adminCourses.reduce((s, c) => s + c.enrolledCount, 0), icon: Users, color: "text-indigo-600" }
+              ].map((card) => {
+                const IconComp = card.icon;
+                return (
+                  <div key={card.label} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+                    <IconComp className={`h-6 w-6 ${card.color}`} />
+                    <p className="mt-2 text-2xl font-black">{card.value}</p>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase">{card.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* COURSES DIRECTORY TABLE */}
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase font-black">
+                  <tr>
+                    <th className="p-3">Course</th>
+                    <th className="p-3">Instructor</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Category</th>
+                    <th className="p-3">Lessons</th>
+                    <th className="p-3">Enrolled</th>
+                    <th className="p-3">Price</th>
+                    <th className="p-3">Rating</th>
+                    <th className="p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {adminCourses.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-6 text-center text-slate-400 font-semibold">No courses have been created by instructors yet.</td>
+                    </tr>
+                  ) : adminCourses.map((c) => (
+                    <tr key={c.id}>
+                      <td className="p-3">
+                        <p className="font-bold">{c.title}</p>
+                        <p className="text-[10px] text-slate-400 font-semibold">{c.level} · {c.language}</p>
+                      </td>
+                      <td className="p-3 font-semibold">{c.instructorName}</td>
+                      <td className="p-3">
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${c.status === "Published" ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-600" : "bg-amber-100 dark:bg-amber-950 text-amber-600"}`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-500">{c.category}</td>
+                      <td className="p-3 font-semibold">{c.lessonCount} ({c.moduleCount} modules)</td>
+                      <td className="p-3 font-black text-indigo-600">{c.enrolledCount}</td>
+                      <td className="p-3 font-bold">{c.price > 0 ? `₹${c.price}` : "Free"}</td>
+                      <td className="p-3 font-semibold">
+                        {c.ratingCount > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-amber-500 font-black">
+                            <Award className="h-3.5 w-3.5" /> {c.ratingAvg.toFixed(1)} ({c.ratingCount})
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <Link href={`/courses/${c.id}`} className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition" title="Open student course view">
+                            <BookOpen className="h-4 w-4" />
+                          </Link>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete course "${c.title}"? This removes its enrollments and reviews too.`)) return;
+                              const res = await deleteBackendCourse(c.id);
+                              setUploadSuccess(res.ok ? `Course "${c.title}" deleted.` : res.message || "Delete failed.");
+                              refreshData();
+                            }}
+                            className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                            title="Delete course"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

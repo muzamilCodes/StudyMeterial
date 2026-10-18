@@ -34,12 +34,13 @@ const applicationSchema = z.object({
   })
 });
 
-const allowedFields = ["profilePhoto", "resume", "teachingCertificate", "certificates"] as const;
+const allowedFields = ["profilePhoto", "resume", "teachingCertificate", "introVideo", "certificates"] as const;
 
 const fieldsConfig = [
   { name: "profilePhoto",        maxCount: 1 },
   { name: "resume",              maxCount: 1 },
   { name: "teachingCertificate", maxCount: 1 },
+  { name: "introVideo",          maxCount: 1 },
   { name: "certificates",        maxCount: 4 }
 ];
 
@@ -47,7 +48,7 @@ const fieldsConfig = [
 export function parseInstructorApplication(req: Request, res: Response, next: NextFunction) {
   instructorUpload.fields(fieldsConfig)(req, res, (err: unknown) => {
     if (err instanceof MulterError && err.code === "LIMIT_FILE_SIZE") {
-      res.status(400).json({ message: "Each file must be 5 MB or smaller." });
+      res.status(400).json({ message: "File too large: documents/images must be 5 MB or smaller, intro videos 25 MB." });
       return;
     }
     if (err instanceof Error && err.message.startsWith("Unsupported file type")) {
@@ -99,6 +100,7 @@ export async function submitApplicationHandler(req: Request, res: Response) {
     profilePhoto:       collected.profilePhoto as Express.Multer.File | undefined,
     resume,
     teachingCertificate: collected.teachingCertificate as Express.Multer.File | undefined,
+    introVideo:          collected.introVideo as Express.Multer.File | undefined,
     certificates:       (collected.certificates as Express.Multer.File[] | undefined) ?? []
   };
 

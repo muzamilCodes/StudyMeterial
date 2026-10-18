@@ -575,7 +575,8 @@ const applicationCard = (app: any) => ({
   },
   documents: {
     resume:              app.documents?.resume ?? null,
-    teachingCertificate: app.documents?.teachingCertificate ?? null
+    teachingCertificate: app.documents?.teachingCertificate ?? null,
+    introVideo:          app.documents?.introVideo ?? null
   },
   status:     app.status,
   submittedAt: app.createdAt,
@@ -587,6 +588,7 @@ type InstructorFilesPayload = {
   profilePhoto?:        Express.Multer.File;
   resume:               Express.Multer.File;
   teachingCertificate?: Express.Multer.File;
+  introVideo?:          Express.Multer.File;
   certificates:         Express.Multer.File[];
 };
 
@@ -632,6 +634,9 @@ export async function submitInstructorApplication(payload: any, files: Instructo
       resume:              { name: files.resume.originalname, url: publicUrl(files.resume), size: humanSize(files.resume.size), mimeType: files.resume.mimetype },
       teachingCertificate: files.teachingCertificate
         ? { name: files.teachingCertificate.originalname, url: publicUrl(files.teachingCertificate), size: humanSize(files.teachingCertificate.size), mimeType: files.teachingCertificate.mimetype }
+        : undefined,
+      introVideo: files.introVideo
+        ? { name: files.introVideo.originalname, url: publicUrl(files.introVideo), size: humanSize(files.introVideo.size), mimeType: files.introVideo.mimetype }
         : undefined
     },
     passwordHash: await hashPassword(payload.password),

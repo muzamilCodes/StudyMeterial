@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
 
 export const upload = multer({ storage });
 
-const INSTRUCTOR_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png"];
+const INSTRUCTOR_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".mp4", ".webm"];
 
 function isAllowedInstructorFile(file: { originalname: string; mimetype: string }) {
   const ext = path.extname(file.originalname).toLowerCase();
@@ -23,13 +23,14 @@ function isAllowedInstructorFile(file: { originalname: string; mimetype: string 
 }
 
 /** Instructor application uploads are submitted before any account exists, so they are
- *  stricter than the staff uploader: whitelisted types only and a 5 MB per-file cap. */
+ *  stricter than the staff uploader: whitelisted types only, 5 MB documents and up to
+ *  25 MB for the optional intro/demo video. */
 export const instructorUpload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024, files: 6 },
+  limits: { fileSize: 25 * 1024 * 1024, files: 7 },
   fileFilter: (_req, file, cb) => {
     if (!isAllowedInstructorFile(file)) {
-      cb(new Error(`Unsupported file type "${path.extname(file.originalname) || file.mimetype}". Only PDF, DOC, DOCX, JPG and PNG are allowed.`));
+      cb(new Error(`Unsupported file type "${path.extname(file.originalname) || file.mimetype}". Only PDF, DOC, DOCX, JPG, PNG, MP4 and WebM are allowed.`));
       return;
     }
     cb(null, true);

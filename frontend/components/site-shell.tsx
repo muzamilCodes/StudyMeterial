@@ -34,7 +34,8 @@ import {
   TrendingUp,
   Upload,
   HelpCircle,
-  Bell
+  Bell,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,8 @@ const userNavItems = [
   { href: "/notes", label: "Notes", icon: FileText },
   { href: "/previous-papers", label: "Previous Papers", icon: ScrollText },
   { href: "/quizzes", label: "Quizzes", icon: Award },
+  { href: "/courses", label: "Courses", icon: GraduationCap },
+  { href: "/assignments", label: "Assignments", icon: ClipboardList },
   { href: "/videos", label: "Live Classes", icon: Video },
   { href: "/roadmap", label: "Roadmap", icon: Sparkles },
   { href: "/notices", label: "Notices", icon: Sparkles },
@@ -67,15 +70,21 @@ const adminNavItems = [
   { tab: "Live Classes", label: "Live Classes Engine", icon: Video },
   { tab: "Publish Notice", label: "Publish Notice", icon: Bell },
   { tab: "Instructor Applications", label: "Instructor Approvals", icon: UserCheck },
+  { tab: "Courses", label: "Course Oversight", icon: GraduationCap },
 ];
 
 // TEACHER / FACULTY SIDEBAR MENU (each tab is a separate section)
 const teacherNavItems = [
   { tab: "Overview", label: "Dashboard Overview", icon: LayoutDashboard },
+  { tab: "Create Course", label: "Create Course", icon: BookOpen },
+  { tab: "My Courses", label: "My Courses", icon: Layers },
   { tab: "My Live Classes", label: "My Live Classes", icon: Video },
   { tab: "Schedule Live Class", label: "Schedule Live Class", icon: Sparkles },
   { tab: "Upload Notes", label: "Upload Study Notes", icon: FileText },
   { tab: "Assignments", label: "Assignments", icon: FolderPlus },
+  { tab: "Student Progress", label: "Student Progress", icon: BarChart3 },
+  { tab: "Reviews & Ratings", label: "Reviews & Ratings", icon: Award },
+  { tab: "Earnings", label: "Earnings", icon: TrendingUp },
   { tab: "Attendance Logs", label: "Attendance Logs", icon: Users },
 ];
 

@@ -23,9 +23,11 @@ const STEPS = [
 ];
 
 const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const RESUME_TYPES  = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
 const IMAGE_TYPES   = ["image/jpeg", "image/jpg", "image/png"];
 const CERT_TYPES    = [...RESUME_TYPES, ...IMAGE_TYPES];
+const VIDEO_TYPES   = ["video/mp4", "video/webm"];
 
 function fileError(file: File, allowed: string[], label: string): string | null {
   if (!allowed.includes(file.type)) return `${label}: unsupported format. Allowed: ${allowed.includes("image/png") ? "PDF, DOC, DOCX, JPG, PNG" : "PDF, DOC, DOCX"}.`;
@@ -103,6 +105,10 @@ export default function InstructorRegisterPage() {
       const e = fileError(files.resume, RESUME_TYPES, "Resume");
       if (e) return e;
       if (files.teachingCertificate) { const te = fileError(files.teachingCertificate, CERT_TYPES, "Teaching certificate"); if (te) return te; }
+      if (files.introVideo) {
+        if (!VIDEO_TYPES.includes(files.introVideo.type)) return "Introduction video must be an MP4 or WebM file.";
+        if (files.introVideo.size > MAX_VIDEO_BYTES) return "Introduction video must be 25 MB or smaller.";
+      }
       return null;
     }
     if (index === 4) {
@@ -301,6 +307,13 @@ export default function InstructorRegisterPage() {
               <label className={labelCls}>Upload Teaching Certificate (optional, PDF/JPG/PNG)</label>
               <FileSlot file={files.teachingCertificate} onChange={(f) => setFiles((p) => ({ ...p, teachingCertificate: f }))} />
             </div>
+            <div>
+              <label className={labelCls}>Introduction / Demo Video (optional, MP4/WebM, max 25 MB)</label>
+              <p className="-mt-1 mb-1.5 text-[11px] font-semibold text-slate-400">
+                A short clip introducing yourself to students. This is separate from course lesson videos, which you upload later inside the course builder.
+              </p>
+              <FileSlot accept="video/mp4,video/webm" file={files.introVideo} onChange={(f) => setFiles((p) => ({ ...p, introVideo: f }))} />
+            </div>
           </div>
         )}
 
@@ -316,6 +329,7 @@ export default function InstructorRegisterPage() {
             <ReviewBlock label="Qualification" value={`${form.education.highestQualification} — ${form.education.degreeName}, ${form.education.collegeUniversity} (${form.education.passingYear})`} />
             <ReviewBlock label="Resume" value={files.resume ? `${files.resume.name} (${Math.ceil(files.resume.size / 1024)} KB)` : "Not uploaded"} />
             <ReviewBlock label="Certificates" value={`${(files.certificates ?? []).length + (files.teachingCertificate ? 1 : 0)} attached`} />
+            <ReviewBlock label="Intro Video" value={files.introVideo ? `${files.introVideo.name} (${Math.ceil(files.introVideo.size / 1024 / 1024)} MB)` : "Not uploaded (optional)"} />
 
             <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <Checkbox checked={agreeTerms} onChange={setAgreeTerms} label={<>I agree to the <Link href="/terms" className="font-bold text-blue-600 underline">Terms &amp; Conditions</Link>.</>} />
@@ -387,7 +401,7 @@ function PhotoInput({ file, onChange }: { file?: File; onChange: (f?: File) => v
   );
 }
 
-function FileSlot({ file, onChange }: { file?: File; onChange: (f?: File) => void }) {
+function FileSlot({ file, onChange, accept }: { file?: File; onChange: (f?: File) => void; accept?: string }) {
   return file ? (
     <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 p-3">
       <div className="flex items-center gap-2 text-xs font-bold text-blue-700">
@@ -397,7 +411,7 @@ function FileSlot({ file, onChange }: { file?: File; onChange: (f?: File) => voi
       <button type="button" onClick={() => onChange(undefined)} className="rounded-lg p-1 text-blue-500 hover:bg-blue-100"><X className="h-4 w-4" /></button>
     </div>
   ) : (
-    <input type="file" onChange={(e) => onChange(e.target.files?.[0] ?? undefined)}
+    <input type="file" accept={accept} onChange={(e) => onChange(e.target.files?.[0] ?? undefined)}
       className="block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-slate-700 hover:file:bg-slate-200" />
   );
 }

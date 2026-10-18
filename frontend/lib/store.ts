@@ -951,6 +951,7 @@ export type InstructorApplicationFiles = {
   profilePhoto?:        File;
   resume:               File;
   teachingCertificate?: File;
+  introVideo?:          File;
   certificates?:        File[];
 };
 
@@ -980,6 +981,7 @@ export type InstructorApplicationSummary = {
   documents: {
     resume: InstructorFileRef;
     teachingCertificate: InstructorFileRef;
+    introVideo?: InstructorFileRef;
   };
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
@@ -996,6 +998,7 @@ export async function submitInstructorApplication(
   if (files.profilePhoto) fd.append("profilePhoto", files.profilePhoto);
   fd.append("resume", files.resume);
   if (files.teachingCertificate) fd.append("teachingCertificate", files.teachingCertificate);
+  if (files.introVideo) fd.append("introVideo", files.introVideo);
   (files.certificates ?? []).forEach((f) => fd.append("certificates", f));
 
   try {
@@ -1051,3 +1054,247 @@ export async function resolveInstructorApplication(
   }
 }
 
+
+// ----------------------------------------------------------------------------
+// COURSES API CLIENT (instructor courses, enrollment, progress, reviews)
+// ----------------------------------------------------------------------------
+
+export type CourseLevel = "Beginner" | "Intermediate" | "Advanced";
+
+export type CourseLessonInput = {
+  title: string;
+  description: string;
+  videoUrl: string;
+  videoSource: "upload" | "url";
+  duration: string;
+  allowDownload: boolean;
+  freePreview: boolean;
+  order: number;
+  resources?: Array<{ name: string; url: string }>;
+};
+
+export type CourseModuleInput = { title: string; lessons: CourseLessonInput[] };
+
+export type CoursePayload = {
+  title: string;
+  thumbnail: string;
+  description: string;
+  category: string;
+  level: CourseLevel;
+  language: string;
+  price: number;
+  outcomes: string[];
+  requirements: string[];
+  modules: CourseModuleInput[];
+  status: "Draft" | "Published";
+};
+
+export type CourseCard = {
+  id: string;
+  instructorId: string;
+  instructorName: string;
+  instructorEmail: string;
+  instructorBio: string;
+  title: string;
+  thumbnail: string;
+  description: string;
+  category: string;
+  level: CourseLevel;
+  language: string;
+  price: number;
+  outcomes: string[];
+  requirements: string[];
+  status: "Draft" | "Published";
+  ratingAvg: number;
+  ratingCount: number;
+  moduleCount: number;
+  lessonCount: number;
+  enrolledCount: number;
+  createdAt: string;
+};
+
+export type CourseLessonView = {
+  id: string;
+  title: string;
+  description: string;
+  duration: string;
+  freePreview: boolean;
+  allowDownload: boolean;
+  videoUrl: string;
+  locked: boolean;
+  resources: Array<{ name: string; url: string }>;
+};
+
+export type CourseModuleView = { id: string; title: string; lessons: CourseLessonView[] };
+
+export type CourseDetail = CourseCard & {
+  isOwner: boolean;
+  viewer: { enrolled: boolean; completedLessons: string[]; progressPct: number };
+  modules: CourseModuleView[];
+};
+
+export type CourseReviewItem = { id: string; studentName: string; rating: number; comment: string; createdAt: string; courseTitle?: string };
+export type CourseEnrollmentRow = { id: string; courseTitle: string; courseId: string; studentName: string; email: string; completed: number; totalLessons: number; progressPct: number; enrolledAt: string };
+export type InstructorCourseStats = { courses: number; published: number; drafts: number; videoLessons: number; students: number; earnings: number; ratings: number };
+
+export async function fetchCourses(params?: { mine?: boolean; all?: boolean; category?: string; level?: string; search?: string }): Promise<CourseCard[]> {
+  try {
+    const q = new URLSearchParams();
+    if (params?.mine) q.append("mine", "1");
+    if (params?.all) q.append("all", "1");
+    if (params?.category) q.append("category", params.category);
+    if (params?.level) q.append("level", params.level);
+    if (params?.search) q.append("search", params.search);
+    const res = await fetch(apiUrl(`/api/courses?${q.toString()}`), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchCourseDetail(id: string): Promise<{ detail?: CourseDetail; message?: string }> {
+  try {
+    const res = await fetch(apiUrl(`/api/courses/${id}`), { headers: getAuthHeaders(), cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) return { message: json.message || "Failed to load course." };
+    return { detail: json.data };
+  } catch {
+    return { message: "Network error while loading the course." };
+  }
+}
+
+async function courseJsonRequest(url: string, init: RequestInit): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch(apiUrl(url), { ...init, headers: { ...getAuthHeaders(), ...(init.headers || {}) } });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, message: json.message };
+  } catch {
+    return { ok: false, message: "Network error." };
+  }
+}
+
+export async function createBackendCourse(payload: CoursePayload): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest("/api/courses", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function updateBackendCourse(id: string, payload: CoursePayload): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export async function setBackendCourseStatus(id: string, status: "Draft" | "Published"): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+}
+
+export async function deleteBackendCourse(id: string): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/${id}`, { method: "DELETE" });
+}
+
+export async function enrollInCourse(id: string): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/${id}/enroll`, { method: "POST" });
+}
+
+export async function setLessonComplete(courseId: string, lessonId: string, completed: boolean): Promise<{ ok: boolean; progressPct?: number; completedLessons?: string[]; message?: string }> {
+  try {
+    const res = await fetch(apiUrl(`/api/courses/${courseId}/lessons/${lessonId}/complete`), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ completed })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, message: json.message };
+    return { ok: true, progressPct: json.data.progressPct, completedLessons: json.data.completedLessons };
+  } catch {
+    return { ok: false, message: "Network error." };
+  }
+}
+
+export async function fetchCourseReviews(courseId: string): Promise<CourseReviewItem[]> {
+  try {
+    const res = await fetch(apiUrl(`/api/courses/${courseId}/reviews`), { cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function addCourseReview(courseId: string, rating: number, comment: string): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/${courseId}/reviews`, { method: "POST", body: JSON.stringify({ rating, comment }) });
+}
+
+export async function fetchInstructorCourseStats(): Promise<InstructorCourseStats | null> {
+  try {
+    const res = await fetch(apiUrl("/api/courses/instructor/stats"), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()).data;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchInstructorEnrollments(): Promise<CourseEnrollmentRow[]> {
+  try {
+    const res = await fetch(apiUrl("/api/courses/instructor/enrollments"), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchInstructorCourseReviews(): Promise<CourseReviewItem[]> {
+  try {
+    const res = await fetch(apiUrl("/api/courses/instructor/reviews"), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
+}
+
+export const COURSE_CATEGORY_OPTIONS = [
+  "Physics", "Chemistry", "Biology", "Mathematics", "English",
+  "History", "Geography", "Economics", "Commerce", "Computer Science", "Other"
+];
+
+export const COURSE_LANGUAGE_OPTIONS = ["English", "Hindi", "Urdu", "Hinglish", "English & Hindi"];
+
+// ─── Assignments (DB-backed) ─────────────────────────────────────────────────
+
+export type AssignmentItem = {
+  id: string;
+  title: string;
+  description: string;
+  subject: string;
+  grade: Grade;
+  stream: Stream;
+  deadline: string;
+  marks: number;
+  instructorName: string;
+  createdAt: string;
+};
+
+export async function fetchBackendAssignments(params?: { mine?: boolean; grade?: Grade; stream?: Stream }): Promise<AssignmentItem[]> {
+  try {
+    const q = new URLSearchParams();
+    if (params?.mine) q.append("mine", "1");
+    if (params?.grade) q.append("grade", params.grade);
+    if (params?.stream) q.append("stream", params.stream);
+    const res = await fetch(apiUrl(`/api/courses/assignments?${q.toString()}`), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createBackendAssignment(input: {
+  title: string; description: string; subject: string; grade: Grade; stream: Stream; deadline: string; marks: number;
+}): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest("/api/courses/assignments", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function deleteBackendAssignment(id: string): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/assignments/${id}`, { method: "DELETE" });
+}
