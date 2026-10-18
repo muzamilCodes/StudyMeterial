@@ -148,9 +148,14 @@ export default function CoursesPage() {
 
                 <div className="p-5 space-y-3 flex-1 flex flex-col">
                   <div>
-                    <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                      {c.category}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                        {c.category}
+                      </span>
+                      <span className="rounded-full bg-violet-100 dark:bg-violet-950 px-2.5 py-0.5 text-[10px] font-bold text-violet-600 dark:text-violet-400">
+                        {c.grade === "All" ? "All Classes" : c.grade}{c.stream !== "All" ? ` · ${c.stream}` : ""}
+                      </span>
+                    </div>
                     <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition leading-snug">
                       {c.title}
                     </h3>

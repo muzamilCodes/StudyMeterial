@@ -6,14 +6,19 @@ import { useParams } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import {
   addCourseReview,
+  addLessonComment,
   enrollInCourse,
   fetchCourseDetail,
   fetchCourseReviews,
+  recordLessonShare,
+  recordLessonView,
   setLessonComplete,
+  setLessonLike,
   type CourseDetail,
   type CourseLessonView,
   type CourseReviewItem
 } from "@/lib/store";
+import { getStoredSession } from "@/lib/session";
 import {
   ArrowLeft,
   Award,
@@ -24,12 +29,16 @@ import {
   ChevronRight,
   CircleCheck,
   Download,
+  Eye,
   Lock,
   Mail,
   Maximize,
+  MessageSquare,
   PlayCircle,
   Send,
+  Share2,
   Star,
+  ThumbsUp,
   UserCircle2
 } from "lucide-react";
 
@@ -61,8 +70,15 @@ export default function CoursePlayerPage() {
   const [reviews, setReviews] = useState<CourseReviewItem[]>([]);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [signedIn, setSignedIn] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const viewedLessons = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    setSignedIn(!!getStoredSession());
+  }, []);
 
   const notify = (msg: string) => {
     setNotice(msg);
@@ -139,6 +155,82 @@ export default function CoursePlayerPage() {
       notify(done ? "Lesson marked as not completed." : "Lesson marked as completed!");
     } else {
       notify(res.message || "Could not update progress.");
+    }
+  };
+
+  const patchLesson = (lessonId: string, patch: (l: CourseLessonView) => Partial<CourseLessonView>) => {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      const modules = prev.modules.map((m) => ({
+        ...m,
+        lessons: m.lessons.map((l) => (l.id === lessonId ? { ...l, ...patch(l) } : l))
+      }));
+      return { ...prev, modules };
+    });
+    setCurrentLesson((prev) => (prev && prev.id === lessonId ? { ...prev, ...patch(prev) } : prev));
+  };
+
+  const handleVideoPlay = () => {
+    if (!currentLesson || viewedLessons.current.has(currentLesson.id)) return;
+    const lesson = currentLesson;
+    viewedLessons.current.add(lesson.id);
+    recordLessonView(courseId, lesson.id).then((r) => {
+      if (r.ok) patchLesson(lesson.id, (l) => ({ views: (l.views || 0) + 1 }));
+    });
+  };
+
+  const handleLike = async () => {
+    if (!currentLesson || !signedIn) {
+      if (!signedIn) notify("Please sign in to like lessons.");
+      return;
+    }
+    const lesson = currentLesson;
+    const nextLiked = !lesson.likedByViewer;
+    const res = await setLessonLike(courseId, lesson.id, nextLiked);
+    if (res.ok) {
+      patchLesson(lesson.id, (l) => ({
+        likedByViewer: nextLiked,
+        likeCount: Math.max(0, (l.likeCount || 0) + (nextLiked ? 1 : -1))
+      }));
+    } else {
+      notify(res.message || "Could not save your like.");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!currentLesson) return;
+    const lesson = currentLesson;
+    const shareUrl = `${window.location.origin}/courses/${courseId}?lesson=${lesson.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${detail?.title} — ${lesson.title}`, url: shareUrl });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        notify("Lesson link copied to clipboard!");
+      }
+    } catch {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        notify("Lesson link copied to clipboard!");
+      } catch { return; }
+    }
+    const r = await recordLessonShare(courseId, lesson.id);
+    if (r.ok) patchLesson(lesson.id, (l) => ({ shares: (l.shares || 0) + 1 }));
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentLesson) return;
+    const text = commentText.trim();
+    if (!text) { notify("Write a comment first."); return; }
+    setBusy(true);
+    const res = await addLessonComment(courseId, currentLesson.id, text);
+    setBusy(false);
+    if (res.ok) {
+      setCommentText("");
+      load();
+    } else {
+      notify(res.message || "Only enrolled students can comment on this lesson.");
     }
   };
 
@@ -245,6 +337,7 @@ export default function CoursePlayerPage() {
                         controls
                         playsInline
                         className="w-full h-full"
+                        onPlay={handleVideoPlay}
                         onEnded={() => {
                           if (
                             isEnrolled &&
@@ -336,6 +429,74 @@ export default function CoursePlayerPage() {
                       </div>
                       {currentLesson.description && (
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">{currentLesson.description}</p>
+                      )}
+
+                      {/* ENGAGEMENT BAR: views / likes / shares / comments */}
+                      {!currentLesson.locked && (
+                        <div className="flex flex-wrap items-center gap-2 py-1">
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 px-3 h-9 text-xs font-bold text-slate-600 dark:text-slate-300">
+                            <Eye className="h-4 w-4 text-slate-400" /> {currentLesson.views} {currentLesson.views === 1 ? "view" : "views"}
+                          </span>
+                          <button
+                            onClick={handleLike}
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3 h-9 text-xs font-bold transition ${
+                              currentLesson.likedByViewer
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                            }`}
+                          >
+                            <ThumbsUp className={`h-4 w-4 ${currentLesson.likedByViewer ? "" : "text-blue-500"}`} />
+                            {currentLesson.likeCount} {currentLesson.likeCount === 1 ? "like" : "likes"}
+                          </button>
+                          <button
+                            onClick={handleShare}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 px-3 h-9 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                          >
+                            <Share2 className="h-4 w-4 text-emerald-500" />
+                            Share ({currentLesson.shares})
+                          </button>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                            <MessageSquare className="h-4 w-4" /> {currentLesson.comments.length} comments
+                          </span>
+                        </div>
+                      )}
+
+                      {/* LESSON COMMENTS */}
+                      {!currentLesson.locked && (
+                        <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4 space-y-3">
+                          <h4 className="text-xs font-black">Student Comments ({currentLesson.comments.length})</h4>
+                          {signedIn ? (
+                            <form onSubmit={handleAddComment} className="flex gap-2">
+                              <input
+                                value={commentText}
+                                onChange={(e) => setCommentText(e.target.value)}
+                                maxLength={500}
+                                placeholder={`Ask a doubt or share feedback on "${currentLesson.title}"…`}
+                                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs font-semibold"
+                              />
+                              <button type="submit" disabled={busy} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-xs font-bold px-4 transition">
+                                <Send className="h-3.5 w-3.5" /> Post
+                              </button>
+                            </form>
+                          ) : (
+                            <p className="text-[11px] text-slate-400 font-bold">Please sign in to comment on this lesson.</p>
+                          )}
+                          {currentLesson.comments.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 font-semibold py-2 text-center">No comments yet on this video.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {[...currentLesson.comments].reverse().map((c) => (
+                                <div key={c.id || c.createdAt} className="rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[11px] font-black">{c.name}</p>
+                                    <span className="text-[10px] text-slate-400 font-semibold shrink-0">{new Date(c.createdAt).toLocaleString()}</span>
+                                  </div>
+                                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 font-semibold leading-relaxed">{c.text}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* RESOURCES */}

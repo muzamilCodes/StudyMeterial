@@ -71,6 +71,7 @@ const adminNavItems = [
   { tab: "Publish Notice", label: "Publish Notice", icon: Bell },
   { tab: "Instructor Applications", label: "Instructor Approvals", icon: UserCheck },
   { tab: "Courses", label: "Course Oversight", icon: GraduationCap },
+  { tab: "Create Course", label: "Create Course", icon: BookOpen },
 ];
 
 // TEACHER / FACULTY SIDEBAR MENU (each tab is a separate section)

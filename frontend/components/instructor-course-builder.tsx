@@ -9,6 +9,8 @@ import {
   updateBackendCourse,
   uploadBackendFile,
   type CourseLevel,
+  type CourseGrade,
+  type CourseStream,
   type CoursePayload
 } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,7 @@ type LessonDraft = {
   allowDownload: boolean;
   freePreview: boolean;
   resources: ResourceDraft[];
+  existingLessonId?: string;
 };
 
 type ModuleDraft = { title: string; lessons: LessonDraft[] };
@@ -45,7 +48,7 @@ const emptyLesson = (): LessonDraft => ({
 const emptyModule = (): ModuleDraft => ({ title: "", lessons: [emptyLesson()] });
 
 const toPayload = (
-  base: { title: string; thumbnail: string; description: string; category: string; level: CourseLevel; language: string; price: number; outcomes: string[]; requirements: string[] },
+  base: { title: string; thumbnail: string; description: string; category: string; grade: CourseGrade; stream: CourseStream; level: CourseLevel; language: string; price: number; outcomes: string[]; requirements: string[] },
   modules: ModuleDraft[],
   status: "Draft" | "Published"
 ): CoursePayload => ({
@@ -66,6 +69,8 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
   const [thumbnail, setThumbnail] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Biology");
+  const [grade, setGrade] = useState<CourseGrade>("11th");
+  const [stream, setStream] = useState<CourseStream>("General");
   const [level, setLevel] = useState<CourseLevel>("Beginner");
   const [language, setLanguage] = useState("English & Hindi");
   const [price, setPrice] = useState(0);
@@ -86,6 +91,8 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
         setThumbnail(detail.thumbnail);
         setDescription(detail.description);
         setCategory(detail.category);
+        setGrade((detail.grade as CourseGrade) || "All");
+        setStream((detail.stream as CourseStream) || "All");
         setLevel(detail.level);
         setLanguage(detail.language);
         setPrice(detail.price);
@@ -101,7 +108,8 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
             duration: l.duration,
             allowDownload: l.allowDownload,
             freePreview: l.freePreview,
-            resources: l.resources
+            resources: l.resources,
+            existingLessonId: l.id
           }))
         })));
       } else if (message) {
@@ -155,6 +163,8 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
         thumbnail,
         description: description.trim(),
         category,
+        grade,
+        stream,
         level,
         language,
         price: Number(price) || 0,
@@ -205,12 +215,34 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Complete Genetics for NEET 2026" className="mt-1.5 rounded-xl h-11 text-xs" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
-            <Label className="font-bold">Category</Label>
+            <Label className="font-bold">Category / Subject</Label>
             <select value={category} onChange={(e) => setCategory(e.target.value)}
               className="w-full mt-1.5 h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 font-bold">
               {COURSE_CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label className="font-bold">Class (Grade)</Label>
+            <select value={grade} onChange={(e) => setGrade(e.target.value as CourseGrade)}
+              className="w-full mt-1.5 h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 font-bold">
+              <option value="10th">10th</option>
+              <option value="11th">11th</option>
+              <option value="12th">12th</option>
+              <option value="All">All Classes</option>
+            </select>
+          </div>
+          <div>
+            <Label className="font-bold">Stream</Label>
+            <select value={stream} onChange={(e) => setStream(e.target.value as CourseStream)}
+              className="w-full mt-1.5 h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 font-bold">
+              <option value="General">General</option>
+              <option value="Medical">Medical</option>
+              <option value="Non-Medical">Non-Medical</option>
+              <option value="Commerce">Commerce</option>
+              <option value="Arts">Arts</option>
+              <option value="All">All Streams</option>
             </select>
           </div>
           <div>

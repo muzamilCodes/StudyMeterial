@@ -22,6 +22,7 @@ import {
   ShieldCheck, 
   ChevronRight,
   Eye,
+  Lock,
   Calendar
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
@@ -32,11 +33,13 @@ import {
   fetchBackendNotices,
   fetchEnterpriseLiveClasses,
   fetchTrendingVideos,
+  fetchHomepageLessonVideos,
   logDownload,
   type RealNoteItem, 
   type RealPaperItem, 
   type RealNoticeItem,
   type RealVideoItem,
+  type HomepageLessonVideo,
   type EnterpriseLiveClassItem
 } from "@/lib/store";
 import { GlobalSearchModal } from "@/components/global-search-modal";
@@ -48,6 +51,7 @@ export default function HomePage() {
   const [notices, setNotices] = useState<RealNoticeItem[]>([]);
   const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
   const [videos, setVideos] = useState<RealVideoItem[]>([]);
+  const [lessonVideos, setLessonVideos] = useState<HomepageLessonVideo[]>([]);
   const [totals, setTotals] = useState({ notes: 0, papers: 0, quizzes: 0, notices: 0, live: 0 });
   const [allData, setAllData] = useState<{ notes: RealNoteItem[]; papers: RealPaperItem[]; quizzes: any[] }>({ notes: [], papers: [], quizzes: [] });
   const [loading, setLoading] = useState(true);
@@ -60,13 +64,14 @@ export default function HomePage() {
     async function loadHomeData() {
       setLoading(true);
       try {
-        const [nData, pData, qData, notifData, lData, vData] = await Promise.all([
+        const [nData, pData, qData, notifData, lData, vData, lvData] = await Promise.all([
           fetchBackendNotes(),
           fetchBackendPapers(),
           fetchBackendQuizzes(),
           fetchBackendNotices(),
           fetchEnterpriseLiveClasses(),
-          fetchTrendingVideos(undefined, undefined, 8)
+          fetchTrendingVideos(undefined, undefined, 8),
+          fetchHomepageLessonVideos()
         ]);
         setNotes(nData.slice(0, 4));
         setPapers(pData.slice(0, 4));
@@ -74,6 +79,7 @@ export default function HomePage() {
         setNotices(notifData.slice(0, 4));
         setLiveClasses(lData.slice(0, 4));
         setVideos(vData);
+        setLessonVideos(lvData);
         setTotals({ notes: nData.length, papers: pData.length, quizzes: qData.length, notices: notifData.length, live: lData.length });
         setAllData({ notes: nData, papers: pData, quizzes: qData });
       } catch (err) {
@@ -323,6 +329,87 @@ export default function HomePage() {
                   </div>
                 </a>
               ))}
+            </div>
+          )}
+        </section>
+
+        {/* ========================================================= */}
+        {/* COURSE VIDEO LESSONS (instructor & admin created courses) */}
+        {/* ========================================================= */}
+        <section className="max-w-[1600px] mx-auto px-6 md:px-12 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-violet-500">
+                <GraduationCap className="h-3.5 w-3.5" /> Course Videos
+              </span>
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white mt-1">
+                Latest videos from courses
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                Video lessons published inside instructor and admin courses. Free-preview lessons play instantly — the rest open after enrolling in the course.
+              </p>
+            </div>
+            <Link href="/courses" className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline">
+              <span>Browse all courses</span>
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {!loading && lessonVideos.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-10 text-center">
+              <GraduationCap className="mx-auto h-10 w-10 text-slate-400" />
+              <p className="mt-3 text-base font-bold text-slate-700 dark:text-slate-200">No course videos yet</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Videos added by instructors and admin through the course builder will appear here automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {(loading ? Array.from({ length: 4 }) : lessonVideos).map((item, i) => {
+                if (loading) {
+                  return <div key={i} className="h-56 rounded-3xl bg-slate-200 dark:bg-slate-800 animate-pulse" />;
+                }
+                const v = item as HomepageLessonVideo;
+                return (
+                  <Link
+                    key={v.lessonId}
+                    href={`/courses/${v.courseId}?lesson=${v.lessonId}`}
+                    className="group flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-xl transition"
+                  >
+                    <div className="relative aspect-video w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                      {v.thumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={v.thumbnail} alt={v.title} loading="lazy" className="h-full w-full object-cover transition group-hover:scale-105" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-violet-600 to-indigo-700">
+                          <Video className="h-10 w-10 text-white/70" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-center transition group-hover:bg-black/25">
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-full shadow-lg ${v.freePreview ? "bg-violet-500/90 opacity-0 group-hover:opacity-100" : "bg-slate-900/70"}`}>
+                          {v.freePreview ? <Play className="h-6 w-6 fill-white text-white" /> : <Lock className="h-5 w-5 text-white" />}
+                        </div>
+                      </div>
+                      <span className={`absolute top-2 left-2 rounded-md px-1.5 py-0.5 text-[10px] font-black ${v.freePreview ? "bg-emerald-500 text-white" : "bg-slate-950/70 text-white"}`}>
+                        {v.freePreview ? "FREE PREVIEW" : "ENROLL TO WATCH"}
+                      </span>
+                      <span className="absolute bottom-2 right-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">{v.duration}</span>
+                    </div>
+                    <div className="flex flex-1 flex-col gap-1.5 p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="rounded-md bg-violet-50 dark:bg-violet-950/40 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-300">{v.category}</span>
+                        <span className="text-[10px] font-bold text-slate-400">{v.grade === "All" ? "All Classes" : v.grade}{v.stream !== "All" ? ` ${v.stream}` : ""}</span>
+                      </div>
+                      <h3 className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-white leading-snug">{v.title}</h3>
+                      <p className="text-[11px] font-bold text-slate-400 truncate">{v.courseTitle}</p>
+                      <div className="mt-auto flex items-center justify-between pt-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{v.instructorName}</span>
+                        <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> {v.views}</span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>

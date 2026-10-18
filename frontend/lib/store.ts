@@ -1060,6 +1060,8 @@ export async function resolveInstructorApplication(
 // ----------------------------------------------------------------------------
 
 export type CourseLevel = "Beginner" | "Intermediate" | "Advanced";
+export type CourseGrade = "10th" | "11th" | "12th" | "All";
+export type CourseStream = "General" | "Medical" | "Non-Medical" | "Commerce" | "Arts" | "All";
 
 export type CourseLessonInput = {
   title: string;
@@ -1071,6 +1073,7 @@ export type CourseLessonInput = {
   freePreview: boolean;
   order: number;
   resources?: Array<{ name: string; url: string }>;
+  existingLessonId?: string;
 };
 
 export type CourseModuleInput = { title: string; lessons: CourseLessonInput[] };
@@ -1080,6 +1083,8 @@ export type CoursePayload = {
   thumbnail: string;
   description: string;
   category: string;
+  grade: CourseGrade;
+  stream: CourseStream;
   level: CourseLevel;
   language: string;
   price: number;
@@ -1099,6 +1104,8 @@ export type CourseCard = {
   thumbnail: string;
   description: string;
   category: string;
+  grade: CourseGrade;
+  stream: CourseStream;
   level: CourseLevel;
   language: string;
   price: number;
@@ -1123,7 +1130,15 @@ export type CourseLessonView = {
   videoUrl: string;
   locked: boolean;
   resources: Array<{ name: string; url: string }>;
+  views: number;
+  shares: number;
+  likeCount: number;
+  likedByViewer: boolean;
+  comments: LessonCommentItem[];
 };
+
+export type LessonCommentItem = { id: string; name: string; text: string; createdAt: string };
+export type LessonAnalyticsRow = { lessonId: string; moduleTitle: string; title: string; views: number; likes: number; shares: number; comments: number };
 
 export type CourseModuleView = { id: string; title: string; lessons: CourseLessonView[] };
 
@@ -1146,6 +1161,35 @@ export async function fetchCourses(params?: { mine?: boolean; all?: boolean; cat
     if (params?.level) q.append("level", params.level);
     if (params?.search) q.append("search", params.search);
     const res = await fetch(apiUrl(`/api/courses?${q.toString()}`), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
+}
+
+export type HomepageLessonVideo = {
+  lessonId: string;
+  courseId: string;
+  courseTitle: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  videoUrl: string;
+  freePreview: boolean;
+  duration: string;
+  views: number;
+  likeCount: number;
+  instructorName: string;
+  category: string;
+  level: string;
+  grade: string;
+  stream: string;
+};
+
+export async function fetchHomepageLessonVideos(): Promise<HomepageLessonVideo[]> {
+  try {
+    const res = await fetch(apiUrl("/api/courses/lessons/feed"), { cache: "no-store" });
     if (!res.ok) return [];
     return (await res.json()).data || [];
   } catch {
@@ -1221,6 +1265,34 @@ export async function fetchCourseReviews(courseId: string): Promise<CourseReview
 
 export async function addCourseReview(courseId: string, rating: number, comment: string): Promise<{ ok: boolean; message?: string }> {
   return courseJsonRequest(`/api/courses/${courseId}/reviews`, { method: "POST", body: JSON.stringify({ rating, comment }) });
+}
+
+export async function recordLessonView(courseId: string, lessonId: string): Promise<{ ok: boolean; views?: number }> {
+  const res = await courseJsonRequest(`/api/courses/${courseId}/lessons/${lessonId}/view`, { method: "POST" });
+  return { ok: res.ok };
+}
+
+export async function recordLessonShare(courseId: string, lessonId: string): Promise<{ ok: boolean; shares?: number }> {
+  const res = await courseJsonRequest(`/api/courses/${courseId}/lessons/${lessonId}/share`, { method: "POST" });
+  return { ok: res.ok };
+}
+
+export async function setLessonLike(courseId: string, lessonId: string, liked: boolean): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/${courseId}/lessons/${lessonId}/like`, { method: "POST", body: JSON.stringify({ liked }) });
+}
+
+export async function addLessonComment(courseId: string, lessonId: string, text: string): Promise<{ ok: boolean; message?: string }> {
+  return courseJsonRequest(`/api/courses/${courseId}/lessons/${lessonId}/comments`, { method: "POST", body: JSON.stringify({ text }) });
+}
+
+export async function fetchLessonAnalytics(courseId: string): Promise<LessonAnalyticsRow[]> {
+  try {
+    const res = await fetch(apiUrl(`/api/courses/${courseId}/analytics`), { headers: getAuthHeaders(), cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchInstructorCourseStats(): Promise<InstructorCourseStats | null> {

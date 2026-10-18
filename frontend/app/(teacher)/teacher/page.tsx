@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { SiteShell } from "@/components/site-shell";
 import { getStoredSession, type StudentSession } from "@/lib/session";
 import { 
@@ -35,6 +35,7 @@ import {
   type Stream
 } from "@/lib/store";
 import { InstructorCourseBuilder } from "@/components/instructor-course-builder";
+import { LessonAnalytics } from "@/components/lesson-analytics";
 import { 
   Video, 
   FileText, 
@@ -120,6 +121,7 @@ export default function TeacherDashboardPage() {
   const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollmentRow[]>([]);
   const [courseReviews, setCourseReviews] = useState<CourseReviewItem[]>([]);
   const [editCourseId, setEditCourseId] = useState<string | null>(null);
+  const [analyticsCourseId, setAnalyticsCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getStoredSession();
@@ -446,8 +448,12 @@ export default function TeacherDashboardPage() {
                       </td>
                     </tr>
                   ) : myCourses.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="p-3 font-bold max-w-[240px]">{c.title}</td>
+                    <Fragment key={c.id}>
+                    <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="p-3 font-bold max-w-[240px]">
+                        {c.title}
+                        <p className="text-[10px] font-semibold text-violet-500">{c.grade === "All" ? "All Classes" : c.grade}{c.stream !== "All" ? ` · ${c.stream}` : ""}</p>
+                      </td>
                       <td className="p-3 text-blue-600 font-bold">{c.category}</td>
                       <td className="p-3 text-slate-500">{c.level}</td>
                       <td className="p-3 font-black">{c.price > 0 ? `₹${c.price}` : "Free"}</td>
@@ -480,6 +486,13 @@ export default function TeacherDashboardPage() {
                             <Sparkles className="h-3 w-3" /> {c.status === "Published" ? "Unpublish" : "Publish"}
                           </button>
                           <button
+                            onClick={() => setAnalyticsCourseId(analyticsCourseId === c.id ? null : c.id)}
+                            className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950"
+                            title="Views, likes, shares & comments per video"
+                          >
+                            <BarChart3 className="h-4 w-4" />
+                          </button>
+                          <button
                             onClick={() => { setEditCourseId(c.id); setActiveTab("Create Course"); }}
                             className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950" title="Edit course"
                           >
@@ -500,6 +513,14 @@ export default function TeacherDashboardPage() {
                         </div>
                       </td>
                     </tr>
+                    {analyticsCourseId === c.id && (
+                      <tr>
+                        <td colSpan={9} className="bg-slate-50/60 dark:bg-slate-950/40 p-0">
+                          <LessonAnalytics courseId={c.id} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

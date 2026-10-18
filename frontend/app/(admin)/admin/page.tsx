@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   fetchBackendNotes,
   fetchCourses,
   deleteBackendCourse,
+  setBackendCourseStatus,
   type CourseCard,
   createBackendNote,
   deleteBackendNote,
@@ -40,6 +41,8 @@ import {
 } from "@/lib/store";
 import { type Grade, type Stream } from "@/lib/platform-data";
 import { InstructorApprovalsTab } from "@/components/instructor-approvals-tab";
+import { InstructorCourseBuilder } from "@/components/instructor-course-builder";
+import { LessonAnalytics } from "@/components/lesson-analytics";
 import {
   Users,
   FileText,
@@ -64,6 +67,7 @@ import {
   HelpCircle,
   Bell,
   Settings,
+  Pencil,
   LogOut
 } from "lucide-react";
 import { SiteShell } from "@/components/site-shell";
@@ -146,6 +150,8 @@ export default function AdminPage() {
   const [realNotes, setRealNotes] = useState<RealNoteItem[]>([]);
   const [realPapers, setRealPapers] = useState<RealPaperItem[]>([]);
   const [adminCourses, setAdminCourses] = useState<CourseCard[]>([]);
+  const [adminEditCourseId, setAdminEditCourseId] = useState<string | null>(null);
+  const [adminAnalyticsCourseId, setAdminAnalyticsCourseId] = useState<string | null>(null);
   const [realVideos, setRealVideos] = useState<RealVideoItem[]>([]);
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUserItem[]>([]);
   const [adminStats, setAdminStats] = useState({
@@ -1399,10 +1405,12 @@ export default function AdminPage() {
                       <td colSpan={9} className="p-6 text-center text-slate-400 font-semibold">No courses have been created by instructors yet.</td>
                     </tr>
                   ) : adminCourses.map((c) => (
-                    <tr key={c.id}>
+                    <Fragment key={c.id}>
+                    <tr>
                       <td className="p-3">
                         <p className="font-bold">{c.title}</p>
                         <p className="text-[10px] text-slate-400 font-semibold">{c.level} · {c.language}</p>
+                        <p className="text-[10px] text-violet-500 font-bold">{c.grade === "All" ? "All Classes" : c.grade}{c.stream !== "All" ? ` · ${c.stream}` : ""}</p>
                       </td>
                       <td className="p-3 font-semibold">{c.instructorName}</td>
                       <td className="p-3">
@@ -1423,6 +1431,31 @@ export default function AdminPage() {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              const res = await setBackendCourseStatus(c.id, c.status === "Published" ? "Draft" : "Published");
+                              setUploadSuccess(res.ok ? `Course "${c.title}" is now ${c.status === "Published" ? "draft" : "published"}.` : res.message || "Action failed.");
+                              refreshData();
+                            }}
+                            className="px-2 py-1 rounded-xl bg-emerald-600 text-white font-bold text-[10px] flex items-center gap-1"
+                            title="Publish or unpublish course"
+                          >
+                            <Sparkles className="h-3 w-3" /> {c.status === "Published" ? "Unpublish" : "Publish"}
+                          </button>
+                          <button
+                            onClick={() => setAdminAnalyticsCourseId(adminAnalyticsCourseId === c.id ? null : c.id)}
+                            className="p-2 rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-100 transition"
+                            title="Views, likes, shares & comments per video"
+                          >
+                            <BarChart3 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => { setAdminEditCourseId(c.id); setActiveTab("Create Course"); }}
+                            className="p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition"
+                            title="Edit course (same builder as instructors)"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
                           <Link href={`/courses/${c.id}`} className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition" title="Open student course view">
                             <BookOpen className="h-4 w-4" />
                           </Link>
@@ -1441,11 +1474,36 @@ export default function AdminPage() {
                         </div>
                       </td>
                     </tr>
+                    {adminAnalyticsCourseId === c.id && (
+                      <tr>
+                        <td colSpan={9} className="bg-slate-50/60 dark:bg-slate-950/40 p-0">
+                          <LessonAnalytics courseId={c.id} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* CREATE / EDIT COURSE TAB (same builder as instructors)     */}
+        {/* ========================================================= */}
+        {activeTab === "Create Course" && (
+          <InstructorCourseBuilder
+            editCourseId={adminEditCourseId}
+            onMessage={(m) => { setUploadSuccess(m); setTimeout(() => setUploadSuccess(null), 4000); }}
+            onSaved={() => {
+              refreshData();
+              if (adminEditCourseId) {
+                setAdminEditCourseId(null);
+                setActiveTab("Courses");
+              }
+            }}
+          />
         )}
 
       </div>
