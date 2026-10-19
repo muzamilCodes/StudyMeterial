@@ -2,19 +2,25 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import {
   addCourseReview,
+  addLessonComment,
   createAssignment,
   createCourse,
   deleteAssignment,
   deleteCourse,
   enrollCourse,
   getCourseDetail,
+  homepageLessonVideos,
   instructorCourseReviews,
   instructorCourseStats,
   instructorEnrollments,
+  lessonAnalytics,
   listAssignments,
   listCourseReviews,
   listCourses,
+  recordLessonShare,
+  recordLessonView,
   setCourseStatus,
+  setLessonLike,
   toggleLessonComplete,
   updateCourse,
   type CourseActor
@@ -22,7 +28,7 @@ import {
 
 const actorOf = (req: Request): CourseActor => {
   const u = (req as any).user;
-  return { id: u.id, email: u.email, role: u.role, username: u.username };
+  return { id: u.id, email: u.email, role: u.role, username: u.username, grade: u.grade, stream: u.stream };
 };
 
 const lessonSchema = z.object({
@@ -34,6 +40,7 @@ const lessonSchema = z.object({
   allowDownload: z.boolean().default(true),
   freePreview:   z.boolean().default(false),
   resources:     z.array(z.object({ name: z.string().default("Notes"), url: z.string().min(1) })).default([]),
+  existingLessonId: z.string().optional(),
   order:         z.number().int().min(0).optional()
 });
 
@@ -47,6 +54,8 @@ const courseInputSchema = z.object({
   thumbnail:    z.string().default(""),
   description:  z.string().min(10),
   category:     z.string().min(2),
+  grade:        z.enum(["10th", "11th", "12th", "All"]).default("All"),
+  stream:       z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts", "All"]).default("All"),
   level:        z.enum(["Beginner", "Intermediate", "Advanced"]),
   language:     z.string().min(1),
   price:        z.number().min(0),
@@ -75,6 +84,10 @@ export async function courseDetailHandler(req: Request, res: Response) {
   const actor = (req as any).user as CourseActor | undefined;
   const result = await getCourseDetail(param(req.params.id), actor);
   return res.status(result.status).json(result.body);
+}
+
+export async function homepageLessonVideosHandler(_req: Request, res: Response) {
+  return res.json(await homepageLessonVideos());
 }
 
 export async function createCourseHandler(req: Request, res: Response) {
@@ -175,5 +188,37 @@ export async function createAssignmentHandler(req: Request, res: Response) {
 
 export async function deleteAssignmentHandler(req: Request, res: Response) {
   const result = await deleteAssignment(param(req.params.id), actorOf(req));
+  return res.status(result.status).json(result.body);
+}
+
+// ─── Lesson engagement ───────────────────────────────────────────────────────
+
+export async function lessonViewHandler(req: Request, res: Response) {
+  const result = await recordLessonView(param(req.params.id), param(req.params.lessonId), actorOf(req));
+  return res.status(result.status).json(result.body);
+}
+
+export async function lessonShareHandler(req: Request, res: Response) {
+  const result = await recordLessonShare(param(req.params.id), param(req.params.lessonId), actorOf(req));
+  return res.status(result.status).json(result.body);
+}
+
+export async function lessonLikeHandler(req: Request, res: Response) {
+  const liked = req.body?.liked !== false;
+  const result = await setLessonLike(param(req.params.id), param(req.params.lessonId), actorOf(req), liked);
+  return res.status(result.status).json(result.body);
+}
+
+export async function lessonCommentHandler(req: Request, res: Response) {
+  const parsed = z.object({ text: z.string().trim().min(1, { message: "Comment cannot be empty." }).max(500) }).safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid comment." });
+  }
+  const result = await addLessonComment(param(req.params.id), param(req.params.lessonId), actorOf(req), parsed.data.text);
+  return res.status(result.status).json(result.body);
+}
+
+export async function lessonAnalyticsHandler(req: Request, res: Response) {
+  const result = await lessonAnalytics(param(req.params.id), actorOf(req));
   return res.status(result.status).json(result.body);
 }

@@ -10,7 +10,12 @@ const lessonSchema = new mongoose.Schema(
     allowDownload: { type: Boolean, default: true },
     freePreview:   { type: Boolean, default: false },
     order:         { type: Number, default: 0 },
-    resources:     { type: [{ name: { type: String, default: "" }, url: { type: String, required: true } }], default: [] }
+    resources:     { type: [{ name: { type: String, default: "" }, url: { type: String, required: true } }], default: [] },
+
+    views:    { type: Number, default: 0 },
+    shares:   { type: Number, default: 0 },
+    likes:    { type: [{ studentId: { type: mongoose.Schema.Types.ObjectId }, name: { type: String, default: "" } }], default: [] },
+    comments: { type: [{ studentId: { type: mongoose.Schema.Types.ObjectId }, name: { type: String, default: "" }, text: { type: String, required: true }, createdAt: { type: Date, default: Date.now } }], default: [] }
   },
   { _id: true }
 );
@@ -34,6 +39,8 @@ const courseSchema = new mongoose.Schema(
     thumbnail:    { type: String, default: "", trim: true },
     description:  { type: String, required: true, trim: true },
     category:     { type: String, required: true, trim: true, index: true },
+    grade:        { type: String, enum: ["10th", "11th", "12th", "All"], default: "All", index: true },
+    stream:       { type: String, enum: ["General", "Medical", "Non-Medical", "Commerce", "Arts", "All"], default: "All" },
     level:        { type: String, enum: ["Beginner", "Intermediate", "Advanced"], default: "Beginner" },
     language:     { type: String, default: "English", trim: true },
     price:        { type: Number, min: 0, default: 0 },

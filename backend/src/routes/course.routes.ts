@@ -8,9 +8,15 @@ import {
   deleteAssignmentHandler,
   deleteCourseHandler,
   enrollCourseHandler,
+  homepageLessonVideosHandler,
   instructorEnrollmentsHandler,
   instructorReviewsHandler,
   instructorStatsHandler,
+  lessonAnalyticsHandler,
+  lessonCommentHandler,
+  lessonLikeHandler,
+  lessonShareHandler,
+  lessonViewHandler,
   listAssignmentsHandler,
   listCoursesHandler,
   listReviewsHandler,
@@ -34,12 +40,19 @@ router.delete("/assignments/:id", staffOnly, deleteAssignmentHandler);
 router.get("/", listCoursesHandler);
 router.post("/", staffOnly, createCourseHandler);
 
+router.get("/lessons/feed", homepageLessonVideosHandler);
+
 router.get("/:id", courseDetailHandler);
 router.put("/:id", staffOnly, updateCourseHandler);
 router.delete("/:id", staffOnly, deleteCourseHandler);
 router.post("/:id/status", staffOnly, setCourseStatusHandler);
 router.post("/:id/enroll", requireAuth, enrollCourseHandler);
 router.post("/:id/lessons/:lessonId/complete", requireAuth, completeLessonHandler);
+router.post("/:id/lessons/:lessonId/view", requireAuth, lessonViewHandler);
+router.post("/:id/lessons/:lessonId/share", requireAuth, lessonShareHandler);
+router.post("/:id/lessons/:lessonId/like", requireAuth, lessonLikeHandler);
+router.post("/:id/lessons/:lessonId/comments", requireAuth, lessonCommentHandler);
+router.get("/:id/analytics", requireAuth, staffOnly, lessonAnalyticsHandler);
 router.get("/:id/reviews", listReviewsHandler);
 router.post("/:id/reviews", requireAuth, addReviewHandler);
 

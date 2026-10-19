@@ -9,6 +9,8 @@ export type CourseActor = {
   role: string;
   name?: string;
   username?: string;
+  grade?: string;
+  stream?: string;
 };
 
 const isAdminRole  = (role: string) => role === "superAdmin" || role === "admin";
@@ -42,6 +44,8 @@ const courseCard = (course: any, enrolledCount: number) => ({
   thumbnail:     course.thumbnail,
   description:   course.description,
   category:      course.category,
+  grade:         course.grade || "All",
+  stream:        course.stream || "All",
   level:         course.level,
   language:      course.language,
   price:         course.price,
@@ -80,9 +84,53 @@ export async function listCourses(filters: {
     filter.$or = [{ title: rx }, { description: rx }, { category: rx }];
   }
 
+  // Students only see courses of their own class (grade + stream).
+  // Courses marked "All" (or legacy ones without a class) stay visible to everyone.
+  if (actor?.role === "student" && actor.grade) {
+    filter.$and = [
+      { $or: [{ grade: actor.grade }, { grade: "All" }, { grade: null }] },
+      { $or: [{ stream: actor.stream }, { stream: "All" }, { stream: null }] }
+    ];
+  }
+
   const courses = await CourseModel.find(filter).sort({ createdAt: -1 }).lean();
   const counts  = await enrollmentCounts(courses.map((c: any) => c._id.toString()));
   return { data: courses.map((c: any) => courseCard(c, counts.get(c._id.toString()) || 0)) };
+}
+
+// Public feed of video lessons from Published courses for the homepage.
+// Free-preview lessons expose their real video URL; locked lessons are shown
+// with an empty URL so the homepage can display them without leaking content.
+export async function homepageLessonVideos(limit = 12) {
+  const courses: any[] = await CourseModel.find({ status: "Published" }).sort({ createdAt: -1 }).lean();
+  const out: any[] = [];
+  for (const c of courses) {
+    for (const m of (c.modules || [])) {
+      for (const l of (m.lessons || [])) {
+        if (!l.videoUrl) continue;
+        out.push({
+          lessonId:      l._id.toString(),
+          courseId:      c._id.toString(),
+          courseTitle:   c.title,
+          title:         l.title,
+          description:   l.description || "",
+          thumbnail:     c.thumbnail || "",
+          videoUrl:      l.freePreview ? l.videoUrl : "",
+          freePreview:   !!l.freePreview,
+          duration:      l.duration || "0:00",
+          views:         l.views || 0,
+          likeCount:     (l.likes || []).length,
+          instructorName: c.instructorName,
+          category:      c.category,
+          level:         c.level,
+          grade:         c.grade || "All",
+          stream:        c.stream || "All"
+        });
+      }
+    }
+  }
+  out.sort((a, b) => (Number(b.freePreview) - Number(a.freePreview)) || (b.views - a.views));
+  return { data: out.slice(0, limit) };
 }
 
 export async function getCourseDetail(id: string, actor?: CourseActor) {
@@ -117,7 +165,17 @@ export async function getCourseDetail(id: string, actor?: CourseActor) {
         allowDownload: !!l.allowDownload,
         resources: unlocked ? (l.resources || []).map((r: any) => ({ name: r.name || "Notes", url: r.url })) : [],
         videoUrl: unlocked ? l.videoUrl : "",
-        locked: !unlocked
+        locked: !unlocked,
+        views: l.views || 0,
+        shares: l.shares || 0,
+        likeCount: (l.likes || []).length,
+        likedByViewer: !!(actor && (l.likes || []).some((k: any) => k.studentId?.toString() === actor.id)),
+        comments: (l.comments || []).slice(-50).map((c: any) => ({
+          id: c._id?.toString() || "",
+          name: c.name || "Student",
+          text: c.text,
+          createdAt: c.createdAt
+        }))
       };
     })
   }));
@@ -153,6 +211,8 @@ export async function createCourse(actor: CourseActor, input: any) {
     thumbnail:       input.thumbnail || "",
     description:     input.description,
     category:        input.category,
+    grade:           input.grade || "All",
+    stream:          input.stream || "All",
     level:           input.level,
     language:        input.language,
     price:           input.price,
@@ -182,11 +242,26 @@ export async function updateCourse(id: string, actor: CourseActor, input: any) {
   if (!course) return { status: 404, body: { message: "Course not found." } };
   if (!canManage(course, actor)) return { status: 403, body: { message: "You can only manage your own courses." } };
 
+  // Preserve engagement data (views/likes/shares/comments) for lessons carried over by id.
+  const legacyEngagement = new Map<string, any>();
+  for (const m of course.modules || []) {
+    for (const l of m.lessons || []) {
+      legacyEngagement.set(l._id.toString(), {
+        views: l.views || 0,
+        shares: l.shares || 0,
+        likes: (l.likes || []).map((k: any) => ({ studentId: k.studentId, name: k.name })),
+        comments: (l.comments || []).map((c: any) => ({ studentId: c.studentId, name: c.name, text: c.text, createdAt: c.createdAt }))
+      });
+    }
+  }
+
   course.set({
     title:        input.title,
     thumbnail:    input.thumbnail ?? course.thumbnail,
     description:  input.description,
     category:     input.category,
+    grade:        input.grade || course.grade || "All",
+    stream:       input.stream || course.stream || "All",
     level:        input.level,
     language:     input.language,
     price:        input.price,
@@ -204,7 +279,10 @@ export async function updateCourse(id: string, actor: CourseActor, input: any) {
         allowDownload: l.allowDownload !== false,
         freePreview: !!l.freePreview,
         order: typeof l.order === "number" ? l.order : idx,
-        resources: (l.resources || []).map((r: any) => ({ name: r.name || "Notes", url: r.url }))
+        resources: (l.resources || []).map((r: any) => ({ name: r.name || "Notes", url: r.url })),
+        ...(l.existingLessonId && legacyEngagement.has(l.existingLessonId)
+          ? legacyEngagement.get(l.existingLessonId)
+          : { views: 0, shares: 0, likes: [], comments: [] })
       }))
     }))
   });
@@ -240,6 +318,17 @@ export async function enrollCourse(id: string, actor: CourseActor) {
   const course: any = await CourseModel.findById(id).lean();
   if (!course) return { status: 404, body: { message: "Course not found." } };
   if (course.status !== "Published") return { status: 400, body: { message: "This course is not published yet." } };
+
+  // A course belongs to one class — only students of that class may enroll
+  // (courses marked "All" are open to every class).
+  if (actor.role === "student" && actor.grade) {
+    const gradeOk  = !course.grade || course.grade === "All" || course.grade === actor.grade;
+    const streamOk = !course.stream || course.stream === "All" || course.stream === actor.stream;
+    if (!gradeOk || !streamOk) {
+      const cls = [course.grade !== "All" ? course.grade : null, course.stream !== "All" ? course.stream : null].filter(Boolean).join(" · ") || "another class";
+      return { status: 403, body: { message: `This course is for class ${cls}. It is not available for your class.` } };
+    }
+  }
 
   const existing = await CourseEnrollmentModel.findOne({
     courseId: oid(id),
@@ -440,4 +529,103 @@ export async function deleteAssignment(id: string, actor: CourseActor) {
   }
   await AssignmentModel.findByIdAndDelete(row._id);
   return { status: 200, body: { message: "Assignment deleted." } };
+}
+
+// ─── Lesson engagement: views, likes, shares, comments ───────────────────────
+
+type LessonRef = { course: any; lesson: any };
+
+async function findLesson(courseId: string, lessonId: string): Promise<LessonRef | null> {
+  const course = await CourseModel.findById(courseId);
+  if (!course) return null;
+  for (const m of course.modules || []) {
+    const lesson = (m.lessons as any[]).find((l) => l._id.toString() === lessonId);
+    if (lesson) return { course, lesson };
+  }
+  return null;
+}
+
+function courseAccessibleNow(ref: LessonRef, actor: CourseActor) {
+  return canManage(ref.course, actor) || !!ref.lesson.freePreview;
+}
+
+type LessonAccess =
+  | { kind: "error"; status: number; body: { message: string } }
+  | { kind: "ok"; ref: LessonRef };
+
+async function requireLessonAccess(courseId: string, lessonId: string, actor: CourseActor): Promise<LessonAccess> {
+  const ref = await findLesson(courseId, lessonId);
+  if (!ref) return { kind: "error", status: 404, body: { message: "Lesson not found in this course." } };
+  const open = courseAccessibleNow(ref, actor) ||
+    !!(await CourseEnrollmentModel.exists({ courseId: ref.course._id, studentId: oid(actor.id) }));
+  if (!open) return { kind: "error", status: 403, body: { message: "Enroll in the course to interact with this lesson." } };
+  return { kind: "ok", ref };
+}
+
+export async function recordLessonView(courseId: string, lessonId: string, actor: CourseActor) {
+  const check = await requireLessonAccess(courseId, lessonId, actor);
+  if (check.kind === "error") return { status: check.status, body: check.body };
+  check.ref.lesson.views = (check.ref.lesson.views || 0) + 1;
+  await check.ref.course.save();
+  return { status: 200, body: { data: { views: check.ref.lesson.views } } };
+}
+
+export async function recordLessonShare(courseId: string, lessonId: string, actor: CourseActor) {
+  const check = await requireLessonAccess(courseId, lessonId, actor);
+  if (check.kind === "error") return { status: check.status, body: check.body };
+  check.ref.lesson.shares = (check.ref.lesson.shares || 0) + 1;
+  await check.ref.course.save();
+  return { status: 200, body: { data: { shares: check.ref.lesson.shares } } };
+}
+
+export async function setLessonLike(courseId: string, lessonId: string, actor: CourseActor, liked: boolean) {
+  const check = await requireLessonAccess(courseId, lessonId, actor);
+  if (check.kind === "error") return { status: check.status, body: check.body };
+  const likes = check.ref.lesson.likes as any[];
+  const idx = likes.findIndex((k: any) => k.studentId?.toString() === actor.id);
+  if (liked && idx === -1) likes.push({ studentId: oid(actor.id), name: actorName(actor) });
+  if (!liked && idx >= 0) likes.splice(idx, 1);
+  await check.ref.course.save();
+  return { status: 200, body: { data: { liked, likeCount: likes.length } } };
+}
+
+export async function addLessonComment(courseId: string, lessonId: string, actor: CourseActor, text: string) {
+  const check = await requireLessonAccess(courseId, lessonId, actor);
+  if (check.kind === "error") return { status: check.status, body: check.body };
+  const comments = check.ref.lesson.comments as any[];
+  comments.push({ studentId: oid(actor.id), name: actorName(actor), text });
+  if (comments.length > 200) comments.splice(0, comments.length - 200);
+  await check.ref.course.save();
+  return {
+    status: 201,
+    body: {
+      data: comments.slice(-50).map((c: any) => ({
+        id: c._id?.toString() || "",
+        name: c.name || "Student",
+        text: c.text,
+        createdAt: c.createdAt
+      }))
+    }
+  };
+}
+
+export async function lessonAnalytics(courseId: string, actor: CourseActor) {
+  const course: any = await CourseModel.findById(courseId).lean();
+  if (!course) return { status: 404, body: { message: "Course not found." } };
+  if (!canManage(course, actor)) return { status: 403, body: { message: "Only the course owner or an admin can view analytics." } };
+  const rows: any[] = [];
+  for (const m of course.modules || []) {
+    for (const l of m.lessons || []) {
+      rows.push({
+        lessonId: l._id.toString(),
+        moduleTitle: m.title,
+        title: l.title,
+        views: l.views || 0,
+        likes: (l.likes || []).length,
+        shares: l.shares || 0,
+        comments: (l.comments || []).length
+      });
+    }
+  }
+  return { status: 200, body: { data: rows } };
 }
