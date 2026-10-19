@@ -930,6 +930,9 @@ export type InstructorApplicationForm = {
     phone: string;
     country: string;
     state: string;
+    city: string;
+    addressLine: string;
+    messageToAdmin: string;
   };
   professional: {
     headline: string;
@@ -964,6 +967,9 @@ export type InstructorApplicationSummary = {
   phone: string;
   country: string;
   state: string;
+  city: string;
+  addressLine: string;
+  message: string;
   profilePhotoUrl: string | null;
   headline: string;
   bio: string;

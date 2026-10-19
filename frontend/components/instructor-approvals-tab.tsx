@@ -99,6 +99,10 @@ export function InstructorApprovalsTab() {
                     </div>
                     <p className="mt-0.5 text-xs text-slate-500">{app.email} • {app.phone}</p>
                     <p className="mt-1 text-sm font-semibold text-slate-700">{app.headline}</p>
+                    <p className="mt-1 text-xs font-bold text-blue-600">
+                      {app.education?.qualification || "Qualification not provided"}
+                      <span className="font-semibold text-slate-400"> • {app.addressLine || app.city ? `${[app.addressLine, app.city].filter(Boolean).join(", ")}, ` : ""}{app.state}, {app.country}</span>
+                    </p>
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400">Submitted {new Date(app.submittedAt).toLocaleDateString()}</p>
@@ -119,11 +123,17 @@ export function InstructorApprovalsTab() {
               {isOpen && (
                 <div className="mt-3 space-y-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
                   <Field label="Bio" value={app.bio} />
+                  {app.message && (
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Message to admin</p>
+                      <p className="mt-1 whitespace-pre-wrap rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">{app.message}</p>
+                    </div>
+                  )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Experience" value={app.experience} />
                     <Field label="Current occupation" value={app.occupation} />
-                    <Field label="Location" value={`${app.state}, ${app.country}`} />
                     <Field label="Highest qualification" value={app.education.qualification} />
+                    <Field label="Complete address" value={`${[app.addressLine, app.city].filter(Boolean).join(", ")}${app.addressLine || app.city ? ", " : ""}${app.state}, ${app.country}`} />
                     <Field label="Degree" value={`${app.education.degree}${app.education.specialization ? ` — ${app.education.specialization}` : ""}`} />
                     <Field label="College / University" value={app.education.college} />
                     <Field label="Passing year" value={app.education.passingYear} />

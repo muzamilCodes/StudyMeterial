@@ -16,7 +16,10 @@ const applicationSchema = z.object({
     email:    z.string().email({ message: "Enter a valid email address" }),
     phone:    z.string().min(7, { message: "Enter a valid phone number" }),
     country:  z.string().min(2, { message: "Select your country" }),
-    state:    z.string().min(2, { message: "Select your state" })
+    state:    z.string().min(2, { message: "Select your state" }),
+    city:     z.string().min(2, { message: "Enter your city or district" }),
+    addressLine:    z.string().min(6, { message: "Enter your complete address" }),
+    messageToAdmin: z.string().max(1000).optional().default("")
   }),
   professional: z.object({
     headline:           z.string().min(4, { message: "Instructor headline is required" }),

@@ -8,7 +8,10 @@ const instructorApplicationSchema = new mongoose.Schema(
       phone:           { type: String, required: true, trim: true },
       profilePhotoUrl: { type: String },
       country:         { type: String, required: true },
-      state:           { type: String, required: true }
+      state:           { type: String, required: true },
+      city:            { type: String, trim: true },
+      addressLine:     { type: String, trim: true },
+      messageToAdmin:  { type: String, trim: true, default: "" }
     },
 
     professional: {

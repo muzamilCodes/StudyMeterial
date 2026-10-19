@@ -46,7 +46,7 @@ export default function InstructorRegisterPage() {
 
   const [form, setForm] = useState<InstructorApplicationForm>({
     password: "",
-    personal: { fullName: "", email: "", phone: "", country: "India", state: "Jammu & Kashmir" },
+    personal: { fullName: "", email: "", phone: "", country: "India", state: "Jammu & Kashmir", city: "", addressLine: "", messageToAdmin: "" },
     professional: { headline: "", bio: "", subjectExpertise: [], teachingExperience: "", currentOccupation: "" },
     education: { highestQualification: "", degreeName: "", specialization: "", collegeUniversity: "", passingYear: "" }
   });
@@ -79,6 +79,8 @@ export default function InstructorRegisterPage() {
       if (fullName.trim().length < 2) return "Enter your full name.";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
       if (phone.replace(/\D/g, "").length < 7) return "Enter a valid phone number.";
+      if (form.personal.city.trim().length < 2) return "Enter your city or district.";
+      if (form.personal.addressLine.trim().length < 6) return "Enter your complete address.";
       if (form.password.length < 6) return "Password must be at least 6 characters.";
       if (form.password !== confirmPassword) return "Passwords do not match.";
       if (files.profilePhoto) { const e = fileError(files.profilePhoto, IMAGE_TYPES, "Profile photo"); if (e) return e; }
@@ -222,6 +224,8 @@ export default function InstructorRegisterPage() {
                   {STATE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              <div><label className={labelCls}>City / District</label><input className={inputCls} value={form.personal.city} onChange={(e) => set("personal", { ...form.personal, city: e.target.value })} placeholder="e.g. Srinagar" /></div>
+              <div className="sm:col-span-2"><label className={labelCls}>Complete Address (House / Street / Area)</label><input className={inputCls} value={form.personal.addressLine} onChange={(e) => set("personal", { ...form.personal, addressLine: e.target.value })} placeholder="e.g. House #12, Rajbagh Lane, Near City Hospital" /></div>
             </div>
           </div>
         )}
@@ -323,6 +327,7 @@ export default function InstructorRegisterPage() {
             <ReviewBlock label="Name" value={form.personal.fullName} />
             <ReviewBlock label="Email" value={form.personal.email} />
             <ReviewBlock label="Phone" value={`${form.personal.phone} • ${form.personal.state}, ${form.personal.country}`} />
+            <ReviewBlock label="Address" value={`${form.personal.addressLine}, ${form.personal.city}, ${form.personal.state}, ${form.personal.country}`} />
             <ReviewBlock label="Headline" value={form.professional.headline} />
             <ReviewBlock label="Subjects" value={form.professional.subjectExpertise.join(", ")} />
             <ReviewBlock label="Experience" value={`${form.professional.teachingExperience} • ${form.professional.currentOccupation}`} />
@@ -330,6 +335,11 @@ export default function InstructorRegisterPage() {
             <ReviewBlock label="Resume" value={files.resume ? `${files.resume.name} (${Math.ceil(files.resume.size / 1024)} KB)` : "Not uploaded"} />
             <ReviewBlock label="Certificates" value={`${(files.certificates ?? []).length + (files.teachingCertificate ? 1 : 0)} attached`} />
             <ReviewBlock label="Intro Video" value={files.introVideo ? `${files.introVideo.name} (${Math.ceil(files.introVideo.size / 1024 / 1024)} MB)` : "Not uploaded (optional)"} />
+
+            <div>
+              <label className={labelCls}>Message for the Admin (optional)</label>
+              <textarea rows={3} className={inputCls} value={form.personal.messageToAdmin} onChange={(e) => set("personal", { ...form.personal, messageToAdmin: e.target.value })} placeholder="Anything the admin should know before reviewing your application?" />
+            </div>
 
             <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <Checkbox checked={agreeTerms} onChange={setAgreeTerms} label={<>I agree to the <Link href="/terms" className="font-bold text-blue-600 underline">Terms &amp; Conditions</Link>.</>} />
