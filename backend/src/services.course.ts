@@ -101,8 +101,16 @@ export async function listCourses(filters: {
 // Public feed of video lessons from Published courses for the homepage.
 // Free-preview lessons expose their real video URL; locked lessons are shown
 // with an empty URL so the homepage can display them without leaking content.
-export async function homepageLessonVideos(limit = 12) {
-  const courses: any[] = await CourseModel.find({ status: "Published" }).sort({ createdAt: -1 }).lean();
+// Students only see lessons from courses of their own class (grade + stream).
+export async function homepageLessonVideos(limit = 12, actor?: CourseActor) {
+  const filter: any = { status: "Published" };
+  if (actor?.role === "student" && actor.grade) {
+    filter.$and = [
+      { $or: [{ grade: actor.grade }, { grade: "All" }, { grade: null }] },
+      { $or: [{ stream: actor.stream }, { stream: "All" }, { stream: null }] }
+    ];
+  }
+  const courses: any[] = await CourseModel.find(filter).sort({ createdAt: -1 }).lean();
   const out: any[] = [];
   for (const c of courses) {
     for (const m of (c.modules || [])) {

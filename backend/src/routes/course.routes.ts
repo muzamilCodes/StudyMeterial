@@ -23,7 +23,7 @@ import {
   setCourseStatusHandler,
   updateCourseHandler
 } from "../controllers/course.controller.js";
-import { requireAnyRole, requireAuth } from "../auth.js";
+import { authOptional, requireAnyRole, requireAuth } from "../auth.js";
 
 const router = Router();
 
@@ -40,7 +40,7 @@ router.delete("/assignments/:id", staffOnly, deleteAssignmentHandler);
 router.get("/", listCoursesHandler);
 router.post("/", staffOnly, createCourseHandler);
 
-router.get("/lessons/feed", homepageLessonVideosHandler);
+router.get("/lessons/feed", authOptional, homepageLessonVideosHandler);
 
 router.get("/:id", courseDetailHandler);
 router.put("/:id", staffOnly, updateCourseHandler);

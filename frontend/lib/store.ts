@@ -1195,7 +1195,7 @@ export type HomepageLessonVideo = {
 
 export async function fetchHomepageLessonVideos(): Promise<HomepageLessonVideo[]> {
   try {
-    const res = await fetch(apiUrl("/api/courses/lessons/feed"), { cache: "no-store" });
+    const res = await fetch(apiUrl("/api/courses/lessons/feed"), { cache: "no-store", headers: getAuthHeaders() });
     if (!res.ok) return [];
     return (await res.json()).data || [];
   } catch {

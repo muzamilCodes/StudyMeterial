@@ -86,8 +86,9 @@ export async function courseDetailHandler(req: Request, res: Response) {
   return res.status(result.status).json(result.body);
 }
 
-export async function homepageLessonVideosHandler(_req: Request, res: Response) {
-  return res.json(await homepageLessonVideos());
+export async function homepageLessonVideosHandler(req: Request, res: Response) {
+  const actor = (req as any).user as CourseActor | undefined;
+  return res.json(await homepageLessonVideos(12, actor));
 }
 
 export async function createCourseHandler(req: Request, res: Response) {
