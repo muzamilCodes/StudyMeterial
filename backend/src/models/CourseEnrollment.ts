@@ -6,7 +6,8 @@ const enrollmentSchema = new mongoose.Schema(
     studentId:       { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     studentName:     { type: String, required: true },
     email:           { type: String, required: true, lowercase: true },
-    completedLessons: { type: [String], default: [] }
+    completedLessons: { type: [String], default: [] },
+    lastWatchedLesson: { type: String, default: "" }
   },
   { timestamps: true }
 );

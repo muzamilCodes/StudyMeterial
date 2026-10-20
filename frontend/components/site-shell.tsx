@@ -93,6 +93,7 @@ export function SiteShell({
   children,
   title,
   description,
+  public: isPublicPage,
   activeAdminTab,
   onAdminTabChange,
   activeTeacherTab,
@@ -101,6 +102,7 @@ export function SiteShell({
   children: ReactNode;
   title?: string;
   description?: string;
+  public?: boolean;
   activeAdminTab?: string;
   onAdminTabChange?: (tab: string) => void;
   activeTeacherTab?: string;
@@ -122,13 +124,17 @@ export function SiteShell({
     const s = getStoredSession();
     if (!s) {
       setIsCheckingAuth(false);
-      router.replace("/register?access_denied=true");
+      if (isPublicPage) {
+        setSession({ id: "", email: "", role: "student", name: "Guest" });
+      } else {
+        router.replace("/register?access_denied=true");
+      }
       return;
     }
 
     setSession(s);
     setIsCheckingAuth(false);
-  }, [pathname, router, isAdminPage]);
+  }, [pathname, router, isAdminPage, isPublicPage]);
 
   const handleLogout = () => {
     clearSession();
@@ -142,6 +148,7 @@ export function SiteShell({
   const isAdminUser = session?.isAdmin === true || session?.role === "admin";
 
   if (isCheckingAuth || !session) {
+    if (isPublicPage) return null;
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-white text-center">
         <div className="space-y-4 max-w-sm rounded-[2.5rem] bg-slate-900 border border-white/10 p-8 shadow-2xl backdrop-blur-xl">
@@ -205,7 +212,7 @@ export function SiteShell({
             </div>
             <div>
               <p className="text-sm font-bold">{session.name || "User"}</p>
-              <p className="text-xs text-slate-400">{isAdminPage ? "System Admin Mode" : isTeacherPage ? "Faculty Educator" : `${session.grade} ${session.stream}`}</p>
+              <p className="text-xs text-slate-400">{isAdminPage ? "System Admin Mode" : isTeacherPage ? "Faculty Educator" : session.id ? `${session.grade} ${session.stream}` : "Guest Visitor"}</p>
             </div>
           </div>
 
@@ -319,7 +326,7 @@ export function SiteShell({
                     {isAdminPage ? "ADMIN PANEL" : isTeacherPage ? "FACULTY PORTAL" : "STUDYMATERIAL"}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">
-                    {isAdminPage ? "CONSOLE" : isTeacherPage ? "EDUCATOR" : `Class ${session.grade}`}
+                    {isAdminPage ? "CONSOLE" : isTeacherPage ? "EDUCATOR" : session.id ? `Class ${session.grade}` : "Free Preview"}
                   </p>
                 </div>
               </Link>
@@ -348,7 +355,7 @@ export function SiteShell({
               </p>
               <p className="text-xs font-extrabold">{session.name || "User"}</p>
               <span className="inline-block mt-1 rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-bold">
-                {isAdminPage ? "Master Controls" : isTeacherPage ? "Classes • Notes • Attendance" : `${session.grade} • ${session.stream}`}
+                {isAdminPage ? "Master Controls" : isTeacherPage ? "Classes • Notes • Attendance" : session.id ? `${session.grade} • ${session.stream}` : "Browse free previews"}
               </span>
             </div>
           )}
@@ -451,6 +458,7 @@ export function SiteShell({
             {!isCollapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
           </button>
 
+          {session.id && (
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 rounded-xl p-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
@@ -459,6 +467,7 @@ export function SiteShell({
             <LogOut className="h-4 w-4 shrink-0" />
             {!isCollapsed && <span>Logout Account</span>}
           </button>
+          )}
         </div>
       </aside>
 
@@ -470,7 +479,7 @@ export function SiteShell({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-                {isAdminPage ? "Admin Console Mode" : isTeacherPage ? "Faculty Educator Mode" : `Class ${session.grade} (${session.stream})`}
+                {isAdminPage ? "Admin Console Mode" : isTeacherPage ? "Faculty Educator Mode" : !session.id ? "Guest Visitor" : `Class ${session.grade} (${session.stream})`}
               </span>
             </div>
             <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">{title}</h1>
@@ -478,6 +487,16 @@ export function SiteShell({
           </div>
 
           <div className="flex items-center gap-3">
+            {!session.id ? (
+              <div className="flex items-center gap-2">
+                <Link href="/login" className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                  Log In
+                </Link>
+                <Link href="/register" className="rounded-2xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition">
+                  Register Free
+                </Link>
+              </div>
+            ) : (
             <Link
               href="/edit-profile"
               className="flex items-center gap-3 p-1.5 pr-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
@@ -494,6 +513,7 @@ export function SiteShell({
                 <p className="text-[10px] text-slate-400">{session.email}</p>
               </div>
             </Link>
+            )}
           </div>
         </div>
 

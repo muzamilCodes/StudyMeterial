@@ -1084,6 +1084,8 @@ export type CourseLessonInput = {
 
 export type CourseModuleInput = { title: string; lessons: CourseLessonInput[] };
 
+export type CourseStatus = "Draft" | "Pending Approval" | "Published";
+
 export type CoursePayload = {
   title: string;
   thumbnail: string;
@@ -1097,7 +1099,7 @@ export type CoursePayload = {
   outcomes: string[];
   requirements: string[];
   modules: CourseModuleInput[];
-  status: "Draft" | "Published";
+  status: CourseStatus;
 };
 
 export type CourseCard = {
@@ -1117,7 +1119,7 @@ export type CourseCard = {
   price: number;
   outcomes: string[];
   requirements: string[];
-  status: "Draft" | "Published";
+  status: CourseStatus;
   ratingAvg: number;
   ratingCount: number;
   moduleCount: number;
@@ -1232,8 +1234,42 @@ export async function updateBackendCourse(id: string, payload: CoursePayload): P
   return courseJsonRequest(`/api/courses/${id}`, { method: "PUT", body: JSON.stringify(payload) });
 }
 
-export async function setBackendCourseStatus(id: string, status: "Draft" | "Published"): Promise<{ ok: boolean; message?: string }> {
+export async function setBackendCourseStatus(id: string, status: CourseStatus): Promise<{ ok: boolean; message?: string }> {
   return courseJsonRequest(`/api/courses/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+}
+
+export type StudentEnrollmentItem = {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  thumbnail: string;
+  instructorName: string;
+  category: string;
+  grade: string;
+  stream: string;
+  courseStatus: string;
+  completedLessons: number;
+  totalLessons: number;
+  progressPct: number;
+  lastWatchedLesson: string;
+  lastWatchedTitle: string;
+  resumeLessonId: string;
+  enrolledAt: string;
+};
+
+export async function fetchMyEnrollments(): Promise<StudentEnrollmentItem[]> {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("study-material-token") : null;
+    if (!token) return [];
+    const res = await fetch(apiUrl("/api/courses/my-enrollments"), {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!res.ok) return [];
+    return (await res.json()).data || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function deleteBackendCourse(id: string): Promise<{ ok: boolean; message?: string }> {

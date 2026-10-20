@@ -48,7 +48,7 @@ const courseSchema = new mongoose.Schema(
     requirements: { type: [String], default: [] },
     modules:      { type: [moduleSchema], default: [] },
 
-    status:      { type: String, enum: ["Draft", "Published"], default: "Draft", index: true },
+    status:      { type: String, enum: ["Draft", "Pending Approval", "Published"], default: "Draft", index: true },
     ratingAvg:   { type: Number, default: 0, min: 0, max: 5 },
     ratingCount: { type: Number, default: 0, min: 0 }
   },

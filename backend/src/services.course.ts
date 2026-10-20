@@ -299,7 +299,7 @@ export async function updateCourse(id: string, actor: CourseActor, input: any) {
   return { status: 200, body: { data: courseCard(course, counts.get(id) || 0) } };
 }
 
-export async function setCourseStatus(id: string, actor: CourseActor, status: "Draft" | "Published") {
+export async function setCourseStatus(id: string, actor: CourseActor, status: "Draft" | "Pending Approval" | "Published") {
   const course: any = await CourseModel.findById(id);
   if (!course) return { status: 404, body: { message: "Course not found." } };
   if (!canManage(course, actor)) return { status: 403, body: { message: "You can only manage your own courses." } };
@@ -352,6 +352,61 @@ export async function enrollCourse(id: string, actor: CourseActor) {
     email: actor.email
   });
   return { status: 201, body: { message: "Enrolled successfully.", data: { id: created._id.toString() } } };
+}
+
+export async function studentEnrollments(actor: CourseActor) {
+  const enrollments: any[] = await CourseEnrollmentModel.find({ studentId: oid(actor.id) })
+    .sort({ createdAt: -1 })
+    .lean();
+  if (!enrollments.length) return { data: [] };
+
+  const courses: any[] = await CourseModel.find({ _id: { $in: enrollments.map((e) => e.courseId) } }).lean();
+  const courseById = new Map(courses.map((c) => [c._id.toString(), c]));
+
+  return {
+    data: enrollments.map((e) => {
+      const course = courseById.get(e.courseId.toString());
+      const total = course ? totalLessons(course) : 0;
+      const completed: string[] = e.completedLessons || [];
+      const progressPct = total ? Math.round((completed.length / total) * 100) : 0;
+
+      let lastWatchedTitle = "";
+      if (course && e.lastWatchedLesson) {
+        for (const m of course.modules || []) {
+          const hit = (m.lessons || []).find((l: any) => l._id.toString() === e.lastWatchedLesson);
+          if (hit) { lastWatchedTitle = hit.title; break; }
+        }
+      }
+      // Resume target: last watched lesson, else first not-completed lesson.
+      let resumeLessonId = e.lastWatchedLesson || "";
+      if (!resumeLessonId && course) {
+        outer: for (const m of course.modules || []) {
+          for (const l of m.lessons || []) {
+            if (!completed.includes(l._id.toString())) { resumeLessonId = l._id.toString(); break outer; }
+          }
+        }
+      }
+
+      return {
+        id: e._id.toString(),
+        courseId: e.courseId.toString(),
+        courseTitle: course?.title || "—",
+        thumbnail: course?.thumbnail || "",
+        instructorName: course?.instructorName || "",
+        category: course?.category || "",
+        grade: course?.grade || "All",
+        stream: course?.stream || "All",
+        courseStatus: course?.status || "Published",
+        completedLessons: completed.length,
+        totalLessons: total,
+        progressPct,
+        lastWatchedLesson: e.lastWatchedLesson || "",
+        lastWatchedTitle,
+        resumeLessonId,
+        enrolledAt: e.createdAt
+      };
+    })
+  };
 }
 
 export async function toggleLessonComplete(courseId: string, lessonId: string, actor: CourseActor, completed: boolean) {
@@ -565,7 +620,7 @@ async function requireLessonAccess(courseId: string, lessonId: string, actor: Co
   const ref = await findLesson(courseId, lessonId);
   if (!ref) return { kind: "error", status: 404, body: { message: "Lesson not found in this course." } };
   const open = courseAccessibleNow(ref, actor) ||
-    !!(await CourseEnrollmentModel.exists({ courseId: ref.course._id, studentId: oid(actor.id) }));
+    !!(actor.id && (await CourseEnrollmentModel.exists({ courseId: ref.course._id, studentId: oid(actor.id) })));
   if (!open) return { kind: "error", status: 403, body: { message: "Enroll in the course to interact with this lesson." } };
   return { kind: "ok", ref };
 }
@@ -575,6 +630,15 @@ export async function recordLessonView(courseId: string, lessonId: string, actor
   if (check.kind === "error") return { status: check.status, body: check.body };
   check.ref.lesson.views = (check.ref.lesson.views || 0) + 1;
   await check.ref.course.save();
+  if (!actor.id) return { status: 200, body: { data: { views: check.ref.lesson.views } } };
+  const enrollment: any = await CourseEnrollmentModel.findOne({
+    courseId: oid(courseId),
+    studentId: oid(actor.id)
+  });
+  if (enrollment && enrollment.lastWatchedLesson !== lessonId) {
+    enrollment.lastWatchedLesson = lessonId;
+    await enrollment.save();
+  }
   return { status: 200, body: { data: { views: check.ref.lesson.views } } };
 }
 

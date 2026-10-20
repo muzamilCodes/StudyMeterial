@@ -21,6 +21,7 @@ import {
   recordLessonView,
   setCourseStatus,
   setLessonLike,
+  studentEnrollments,
   toggleLessonComplete,
   updateCourse,
   type CourseActor
@@ -62,7 +63,7 @@ const courseInputSchema = z.object({
   outcomes:     z.array(z.string()).default([]),
   requirements: z.array(z.string()).default([]),
   modules:      z.array(moduleSchema).default([]),
-  status:       z.enum(["Draft", "Published"]),
+  status:       z.enum(["Draft", "Pending Approval", "Published"]),
   instructorBio: z.string().optional()
 });
 
@@ -110,9 +111,14 @@ export async function updateCourseHandler(req: Request, res: Response) {
 }
 
 export async function setCourseStatusHandler(req: Request, res: Response) {
-  const status = req.body?.status === "Draft" ? "Draft" : "Published";
-  const result = await setCourseStatus(param(req.params.id), actorOf(req), status);
+  const raw = String(req.body?.status ?? "");
+  const status = raw === "Draft" || raw === "Pending Approval" ? raw : "Published";
+  const result = await setCourseStatus(param(req.params.id), actorOf(req), status as "Draft" | "Pending Approval" | "Published");
   return res.status(result.status).json(result.body);
+}
+
+export async function myEnrollmentsHandler(req: Request, res: Response) {
+  return res.json(await studentEnrollments(actorOf(req)));
 }
 
 export async function deleteCourseHandler(req: Request, res: Response) {
@@ -195,7 +201,9 @@ export async function deleteAssignmentHandler(req: Request, res: Response) {
 // ─── Lesson engagement ───────────────────────────────────────────────────────
 
 export async function lessonViewHandler(req: Request, res: Response) {
-  const result = await recordLessonView(param(req.params.id), param(req.params.lessonId), actorOf(req));
+  const u = (req as any).user;
+  const actor: CourseActor = u ? actorOf(req) : { id: "", email: "", role: "guest" };
+  const result = await recordLessonView(param(req.params.id), param(req.params.lessonId), actor);
   return res.status(result.status).json(result.body);
 }
 

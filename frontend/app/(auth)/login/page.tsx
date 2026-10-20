@@ -17,6 +17,12 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Only same-site paths like "/courses/…" are allowed; blocks "//host" and backslash open-redirect tricks.
+  const [nextParam] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const raw = new URLSearchParams(window.location.search).get("next");
+    return raw && /^\/(?!\/)/.test(raw) && !raw.includes("\\") ? raw : null;
+  });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,7 +87,7 @@ export default function LoginPage() {
         if (serverRole === "superAdmin") router.push("/super-admin");
         else if (serverRole === "admin") router.push("/admin");
         else if (isTeacher) router.push("/teacher");
-        else router.push("/dashboard");
+        else router.push(nextParam ?? "/dashboard");
       }, 600);
     } catch {
       setErrorMsg(`Unable to connect to the backend server at ${apiUrl("")}`);
@@ -163,7 +169,7 @@ export default function LoginPage() {
                 {loading ? "Authenticating..." : "Login to Account"}
               </Button>
               <Link
-                href="/register"
+                href={nextParam ? `/register?next=${encodeURIComponent(nextParam)}` : "/register"}
                 className="inline-flex flex-1 h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-xs sm:text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
               >
                 Register Account

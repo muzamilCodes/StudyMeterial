@@ -11,12 +11,13 @@ import {
   type CourseLevel,
   type CourseGrade,
   type CourseStream,
-  type CoursePayload
+  type CoursePayload,
+  type CourseStatus
 } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Upload, Loader2, GripVertical, Video, ImagePlus, FileText, X } from "lucide-react";
+import { Plus, Trash2, Upload, Loader2, GripVertical, Video, ImagePlus, FileText, X, ArrowUp, ArrowDown } from "lucide-react";
 
 type ResourceDraft = { name: string; url: string };
 
@@ -50,7 +51,7 @@ const emptyModule = (): ModuleDraft => ({ title: "", lessons: [emptyLesson()] })
 const toPayload = (
   base: { title: string; thumbnail: string; description: string; category: string; grade: CourseGrade; stream: CourseStream; level: CourseLevel; language: string; price: number; outcomes: string[]; requirements: string[] },
   modules: ModuleDraft[],
-  status: "Draft" | "Published"
+  status: CourseStatus
 ): CoursePayload => ({
   ...base,
   status,
@@ -126,6 +127,27 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
     }));
   };
 
+  const moveModule = (mi: number, dir: -1 | 1) => {
+    setModules((prev) => {
+      const j = mi + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[mi], copy[j]] = [copy[j], copy[mi]];
+      return copy;
+    });
+  };
+
+  const moveLesson = (mi: number, li: number, dir: -1 | 1) => {
+    setModules((prev) => prev.map((m, i) => {
+      if (i !== mi) return m;
+      const j = li + dir;
+      if (j < 0 || j >= m.lessons.length) return m;
+      const lessons = [...m.lessons];
+      [lessons[li], lessons[j]] = [lessons[j], lessons[li]];
+      return { ...m, lessons };
+    }));
+  };
+
   const uploadFor = async (file: File, apply: (url: string) => void, key: string) => {
     setUploadingField(key);
     const res = await uploadBackendFile(file);
@@ -153,7 +175,7 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
     return null;
   };
 
-  const save = async (status: "Draft" | "Published") => {
+  const save = async (status: CourseStatus) => {
     const err = validate();
     if (err) { onMessage(err); return; }
     setBusy(true);
@@ -186,7 +208,11 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
       : await createBackendCourse(payload);
     setBusy(false);
     if (res.ok) {
-      onMessage(status === "Published" ? `Course "${payload.title}" published to students!` : `Draft saved for "${payload.title}".`);
+      onMessage(
+        status === "Published" ? `Course "${payload.title}" published to students!`
+        : status === "Pending Approval" ? `Course "${payload.title}" submitted for admin approval.`
+        : `Draft saved for "${payload.title}".`
+      );
       onSaved();
     } else {
       onMessage(res.message || "Server rejected the course.");
@@ -324,6 +350,10 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
               <GripVertical className="h-4 w-4 text-slate-300" />
               <Input value={mod.title} onChange={(e) => setModules((p) => p.map((m, i) => i === mi ? { ...m, title: e.target.value } : m))}
                 placeholder={`Module ${mi + 1} title, e.g. DNA & Genetics`} className="h-10 text-xs font-bold max-w-md rounded-xl" />
+              <button type="button" onClick={() => moveModule(mi, -1)} disabled={mi === 0} title="Move module up"
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+              <button type="button" onClick={() => moveModule(mi, 1)} disabled={mi === modules.length - 1} title="Move module down"
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
               {modules.length > 1 && (
                 <button type="button" onClick={() => setModules((p) => p.filter((_, i) => i !== mi))}
                   className="p-2 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"><Trash2 className="h-4 w-4" /></button>
@@ -407,9 +437,15 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
                     Allow Notes Download
                   </label>
                   <span className="flex items-center gap-1 text-slate-400"><Video className="h-3.5 w-3.5" /> Lesson {li + 1} of {mod.lessons.length}</span>
+                  <span className="ml-auto flex items-center gap-1">
+                    <button type="button" onClick={() => moveLesson(mi, li, -1)} disabled={li === 0} title="Move lesson up"
+                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                    <button type="button" onClick={() => moveLesson(mi, li, 1)} disabled={li === mod.lessons.length - 1} title="Move lesson down"
+                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                  </span>
                   {mod.lessons.length > 1 && (
                     <button type="button" onClick={() => setModules((p) => p.map((m, i) => i === mi ? { ...m, lessons: m.lessons.filter((_, j) => j !== li) } : m))}
-                      className="ml-auto p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"><Trash2 className="h-4 w-4" /></button>
+                      className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"><Trash2 className="h-4 w-4" /></button>
                   )}
                 </div>
               </div>
@@ -426,6 +462,9 @@ export function InstructorCourseBuilder({ editCourseId, onMessage, onSaved }: {
       <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
         <Button type="button" disabled={busy} onClick={() => save("Draft")} variant="outline" className="rounded-2xl font-bold h-11 text-xs px-6">
           Save as Draft
+        </Button>
+        <Button type="button" disabled={busy} onClick={() => save("Pending Approval")} variant="outline" className="rounded-2xl font-bold h-11 text-xs px-6 border-indigo-300 text-indigo-600 hover:bg-indigo-50">
+          Submit for Approval
         </Button>
         <Button type="button" disabled={busy} onClick={() => save("Published")} className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 text-xs px-8 gap-2">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

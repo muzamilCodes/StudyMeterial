@@ -10,11 +10,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { apiUrl } from "@/lib/api";
 import { saveSession, type StudentSession } from "@/lib/session";
+import { enrollInCourse, fetchCourseDetail } from "@/lib/store";
 import { GraduationCap, CheckCircle2, AlertCircle, Mail, Loader2 } from "lucide-react";
 import { type Grade, type Stream } from "@/lib/platform-data";
 
 export default function RegisterPage() {
   const router = useRouter();
+  // Only same-site paths like "/courses/…" are allowed; blocks "//host" and backslash open-redirect tricks.
+  const [nextParam] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const raw = new URLSearchParams(window.location.search).get("next");
+    return raw && /^\/(?!\/)/.test(raw) && !raw.includes("\\") ? raw : null;
+  });
   const [grade, setGrade] = useState<Grade>("11th");
   const [stream, setStream] = useState<Stream>("Medical");
   const [loading, setLoading] = useState(false);
@@ -133,11 +140,30 @@ export default function RegisterPage() {
       };
 
       saveSession(userSession);
-      setSuccessMsg("Email verified and account created! Redirecting to your dashboard...");
+
+      let message = nextParam
+        ? "Email verified and account created! Opening your lesson..."
+        : "Email verified and account created! Redirecting to your dashboard...";
+
+      // Came from a specific course/lecture → auto-enroll when the course is free, then return there.
+      const courseMatch = nextParam?.match(/^\/courses\/([a-f0-9]{24})(?:[?/]|$)/i);
+      if (courseMatch) {
+        const { detail } = await fetchCourseDetail(courseMatch[1]);
+        if (detail && detail.price === 0) {
+          message = "Account created! Enrolling you in the course...";
+          const res = await enrollInCourse(courseMatch[1]);
+          message = res.ok
+            ? "Account created and you're enrolled! Opening your lesson..."
+            : "Email verified and account created! Opening the course...";
+        } else if (detail && detail.price > 0) {
+          message = "Account created! Complete the enrollment on the course page to continue.";
+        }
+      }
+      setSuccessMsg(message);
 
       setTimeout(() => {
         setLoading(false);
-        router.push("/dashboard");
+        router.push(nextParam ?? "/dashboard");
       }, 1000);
     } catch {
       setErrorMsg("Something went wrong. Please try again.");
@@ -321,7 +347,7 @@ export default function RegisterPage() {
                 {loading ? "Creating Account..." : "Create Account"}
               </Button>
               <Link
-                href="/login"
+                href={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : "/login"}
                 className="inline-flex flex-1 h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-xs sm:text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
               >
                 Login Page

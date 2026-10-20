@@ -20,6 +20,7 @@ import {
   listAssignmentsHandler,
   listCoursesHandler,
   listReviewsHandler,
+  myEnrollmentsHandler,
   setCourseStatusHandler,
   updateCourseHandler
 } from "../controllers/course.controller.js";
@@ -41,6 +42,7 @@ router.get("/", listCoursesHandler);
 router.post("/", staffOnly, createCourseHandler);
 
 router.get("/lessons/feed", authOptional, homepageLessonVideosHandler);
+router.get("/my-enrollments", requireAuth, myEnrollmentsHandler);
 
 router.get("/:id", courseDetailHandler);
 router.put("/:id", staffOnly, updateCourseHandler);
@@ -48,7 +50,7 @@ router.delete("/:id", staffOnly, deleteCourseHandler);
 router.post("/:id/status", staffOnly, setCourseStatusHandler);
 router.post("/:id/enroll", requireAuth, enrollCourseHandler);
 router.post("/:id/lessons/:lessonId/complete", requireAuth, completeLessonHandler);
-router.post("/:id/lessons/:lessonId/view", requireAuth, lessonViewHandler);
+router.post("/:id/lessons/:lessonId/view", authOptional, lessonViewHandler);
 router.post("/:id/lessons/:lessonId/share", requireAuth, lessonShareHandler);
 router.post("/:id/lessons/:lessonId/like", requireAuth, lessonLikeHandler);
 router.post("/:id/lessons/:lessonId/comments", requireAuth, lessonCommentHandler);

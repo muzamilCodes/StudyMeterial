@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import {
   addCourseReview,
@@ -44,20 +44,10 @@ import {
 
 const SPEED_OPTIONS = [0.5, 1, 1.5, 2];
 
-function markEnrolledLocal(courseId: string) {
-  try {
-    const raw = window.localStorage.getItem("study-material-enrolled-courses");
-    const list: string[] = raw ? (JSON.parse(raw) as string[]) : [];
-    if (!list.includes(courseId)) {
-      list.push(courseId);
-      window.localStorage.setItem("study-material-enrolled-courses", JSON.stringify(list));
-    }
-  } catch { /* ignore */ }
-}
-
 export default function CoursePlayerPage() {
   const params = useParams<{ id: string }>();
   const courseId = params?.id ?? "";
+  const router = useRouter();
 
   const [detail, setDetail] = useState<CourseDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -74,7 +64,9 @@ export default function CoursePlayerPage() {
   const [signedIn, setSignedIn] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const viewedLessons = useRef<Set<string>>(new Set());
+
+  const authReturnUrl = (lessonId: string) =>
+    `/login?next=${encodeURIComponent(`/courses/${courseId}?lesson=${lessonId}`)}`;
 
   useEffect(() => {
     setSignedIn(!!getStoredSession());
@@ -100,8 +92,18 @@ export default function CoursePlayerPage() {
         d.modules.flatMap((m) => m.lessons)[0] ??
         null;
       setCurrentLesson((prev) => {
+        const lessons = d.modules.flatMap((m) => m.lessons);
+        // Read ?lesson= live at load time: after a client-side router.push the URL at mount
+        // time may still be the previous page's, so a mount-time snapshot can miss the target.
+        const wanted = typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("lesson") || ""
+          : "";
+        if (wanted) {
+          const target = lessons.find((l) => l.id === wanted);
+          if (target) return target;
+        }
         if (prev) {
-          const refreshed = d.modules.flatMap((m) => m.lessons).find((l) => l.id === prev.id);
+          const refreshed = lessons.find((l) => l.id === prev.id);
           if (refreshed) return refreshed;
         }
         return firstPlayable;
@@ -128,11 +130,14 @@ export default function CoursePlayerPage() {
   const isEnrolled = !!detail?.viewer.enrolled || !!detail?.isOwner;
 
   const handleEnroll = async () => {
+    if (!signedIn) {
+      router.push(`/register?next=${encodeURIComponent(`/courses/${courseId}${currentLesson ? `?lesson=${currentLesson.id}` : ""}`)}`);
+      return;
+    }
     setBusy(true);
     const res = await enrollInCourse(courseId);
     setBusy(false);
     if (res.ok) {
-      markEnrolledLocal(courseId);
       notify("You are enrolled! All lessons are now unlocked.");
       load();
     } else {
@@ -171,17 +176,21 @@ export default function CoursePlayerPage() {
   };
 
   const handleVideoPlay = () => {
-    if (!currentLesson || viewedLessons.current.has(currentLesson.id)) return;
+    if (!currentLesson) return;
     const lesson = currentLesson;
-    viewedLessons.current.add(lesson.id);
+    // One view per lesson per browser session — refreshing or replaying must not inflate the count.
+    const seenKey = `study-material-viewed-${lesson.id}`;
+    if (sessionStorage.getItem(seenKey)) return;
+    sessionStorage.setItem(seenKey, "1");
     recordLessonView(courseId, lesson.id).then((r) => {
       if (r.ok) patchLesson(lesson.id, (l) => ({ views: (l.views || 0) + 1 }));
     });
   };
 
   const handleLike = async () => {
-    if (!currentLesson || !signedIn) {
-      if (!signedIn) notify("Please sign in to like lessons.");
+    if (!currentLesson) return;
+    if (!signedIn) {
+      router.push(authReturnUrl(currentLesson.id));
       return;
     }
     const lesson = currentLesson;
@@ -212,7 +221,10 @@ export default function CoursePlayerPage() {
       try {
         await navigator.clipboard.writeText(shareUrl);
         notify("Lesson link copied to clipboard!");
-      } catch { return; }
+      } catch {
+        notify(`Share this lesson link: ${shareUrl}`);
+        return;
+      }
     }
     const r = await recordLessonShare(courseId, lesson.id);
     if (r.ok) patchLesson(lesson.id, (l) => ({ shares: (l.shares || 0) + 1 }));
@@ -254,11 +266,8 @@ export default function CoursePlayerPage() {
   const nextLesson = lessonIndex >= 0 && lessonIndex < allLessons.length - 1 ? allLessons[lessonIndex + 1] : null;
 
   const goTo = (l: CourseLessonView) => {
-    if (l.locked) {
-      notify("This lesson is locked. Enroll in the course to unlock it.");
-      return;
-    }
     setCurrentLesson(l);
+    window.history.replaceState(null, "", `${window.location.pathname}?lesson=${l.id}`);
     if (videoRef.current) videoRef.current.currentTime = 0;
   };
 
@@ -271,6 +280,7 @@ export default function CoursePlayerPage() {
 
   return (
     <SiteShell
+      public
       title={detail?.title || "Course"}
       description={detail ? `Taught by ${detail.instructorName}` : "Loading course…"}
     >
@@ -353,13 +363,29 @@ export default function CoursePlayerPage() {
                     ) : currentLesson?.locked ? (
                       <div className="text-center px-6 py-8 space-y-3">
                         <Lock className="mx-auto h-12 w-12 text-slate-500" />
-                        <p className="text-sm font-black text-white">{currentLesson.title} is locked</p>
+                        <p className="text-sm font-black text-white">Unlock the Full Course</p>
                         <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                          Free Preview lessons are watchable without enrolling. Enroll to unlock every lesson in this course.
+                          <span className="font-bold">{currentLesson.title}</span> is locked.{" "}
+                          {!signedIn
+                            ? "Create your free student account and enroll in this course to continue learning."
+                            : "Enroll in this course to continue learning — Free Preview lessons are always watchable."}
                         </p>
-                        <button onClick={handleEnroll} disabled={busy} className="rounded-2xl bg-blue-600 text-white font-bold px-6 h-10 text-xs">
-                          {detail.price > 0 ? `Enroll — ₹${detail.price}` : "Enroll for Free"}
-                        </button>
+                        {!signedIn ? (
+                          <div className="flex items-center justify-center gap-3 pt-1">
+                            <Link href={`/register?next=${encodeURIComponent(`/courses/${courseId}?lesson=${currentLesson.id}`)}`}
+                              className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 h-10 text-xs inline-flex items-center transition">
+                              Register Now
+                            </Link>
+                            <Link href={authReturnUrl(currentLesson.id)}
+                              className="rounded-2xl border border-slate-500 text-white font-bold px-6 h-10 text-xs inline-flex items-center hover:bg-white/10 transition">
+                              Log In
+                            </Link>
+                          </div>
+                        ) : (
+                          <button onClick={handleEnroll} disabled={busy} className="rounded-2xl bg-blue-600 text-white font-bold px-6 h-10 text-xs">
+                            {detail.price > 0 ? `Enroll — ₹${detail.price}` : "Enroll for Free"}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center px-6 py-8 space-y-3">

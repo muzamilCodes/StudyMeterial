@@ -37,6 +37,7 @@ import {
   fetchBackendNotices, 
   fetchEnterpriseLiveClasses,
   fetchTrendingVideos,
+  fetchMyEnrollments,
   incrementVideoView,
   getDownloadedFiles, 
   getQuizResults,
@@ -47,7 +48,8 @@ import {
   type RealVideoItem,
   type EnterpriseLiveClassItem,
   type DownloadRecord,
-  type QuizResultRecord
+  type QuizResultRecord,
+  type StudentEnrollmentItem
 } from "@/lib/store";
 
 export default function DashboardPage() {
@@ -60,6 +62,7 @@ export default function DashboardPage() {
   const [notices, setNotices] = useState<RealNoticeItem[]>([]);
   const [liveClasses, setLiveClasses] = useState<EnterpriseLiveClassItem[]>([]);
   const [videos, setVideos] = useState<RealVideoItem[]>([]);
+  const [enrollments, setEnrollments] = useState<StudentEnrollmentItem[]>([]);
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
   const [quizResults, setQuizResults] = useState<QuizResultRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,13 +80,14 @@ export default function DashboardPage() {
         const grade = s?.grade ?? "11th";
         const stream = s?.stream ?? "Medical";
 
-        const [notesData, papersData, quizzesData, noticesData, liveClassesData, videosData] = await Promise.all([
+        const [notesData, papersData, quizzesData, noticesData, liveClassesData, videosData, enrollmentsData] = await Promise.all([
           fetchBackendNotes(grade, stream),
           fetchBackendPapers(grade, stream),
           fetchBackendQuizzes(grade, stream),
           fetchBackendNotices(),
           fetchEnterpriseLiveClasses(),
-          fetchTrendingVideos(grade, stream, 6)
+          fetchTrendingVideos(grade, stream, 6),
+          fetchMyEnrollments()
         ]);
 
         setNotes(notesData);
@@ -92,6 +96,7 @@ export default function DashboardPage() {
         setNotices(noticesData);
         setLiveClasses(liveClassesData);
         setVideos(videosData);
+        setEnrollments(enrollmentsData);
 
         setDownloads(getDownloadedFiles());
         setQuizResults(getQuizResults());
@@ -190,6 +195,92 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* ========================================================= */}
+        {/* MY COURSES — CONTINUE LEARNING */}
+        {/* ========================================================= */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                <Play className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                  My Courses — Continue Learning
+                </h2>
+                <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400">
+                  {enrollments.length} enrolled • {enrollments.filter((e) => e.progressPct === 100).length} completed — resume from your last watched lesson.
+                </p>
+              </div>
+            </div>
+            <Link href="/courses" className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 shrink-0">
+              Browse courses <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {enrollments.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-6 text-center">
+              <Play className="mx-auto h-8 w-8 text-slate-400" />
+              <p className="mt-2 text-sm font-bold text-slate-700 dark:text-slate-200">You have not enrolled in any course yet</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Explore published video courses for Class {grade} ({stream}) and enroll for free to start tracking your progress.
+              </p>
+              <Link href="/courses" className="mt-3 inline-flex items-center gap-1.5 rounded-2xl bg-blue-600 px-5 h-10 text-xs font-bold text-white hover:bg-blue-700 transition">
+                Browse Course Library <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {enrollments.map((e) => {
+                const done = e.progressPct === 100;
+                return (
+                  <div key={e.id} className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-lg transition">
+                    <Link href={`/courses/${e.courseId}`} className="relative block aspect-video w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                      {e.thumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={e.thumbnail} alt={e.courseTitle} loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center"><Play className="h-10 w-10 text-slate-400" /></div>
+                      )}
+                      {done && (
+                        <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black text-white">
+                          <CheckCircle2 className="h-3 w-3" /> Completed
+                        </span>
+                      )}
+                    </Link>
+                    <div className="flex flex-1 flex-col gap-2 p-4">
+                      <div>
+                        <h3 className="line-clamp-1 text-sm font-bold text-slate-900 dark:text-white">{e.courseTitle}</h3>
+                        <p className="text-[11px] text-slate-400 font-semibold">
+                          {e.instructorName} • {e.category}{e.grade !== "All" ? ` • Class ${e.grade}` : ""}
+                        </p>
+                      </div>
+                      <div className="mt-auto space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <span className="text-slate-500 dark:text-slate-400">{e.completedLessons} of {e.totalLessons} lessons</span>
+                          <span className={done ? "text-emerald-600" : "text-blue-600"}>{e.progressPct}%</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div className={`h-full rounded-full ${done ? "bg-emerald-500" : "bg-gradient-to-r from-blue-500 to-indigo-600"}`} style={{ width: `${e.progressPct}%` }} />
+                        </div>
+                        <p className="truncate text-[10px] text-slate-400 font-semibold" title={e.lastWatchedTitle}>
+                          {e.lastWatchedTitle ? `Last watched: ${e.lastWatchedTitle}` : done ? "Course finished — revise any lesson" : "Not started yet"}
+                        </p>
+                        <Link
+                          href={e.resumeLessonId ? `/courses/${e.courseId}?lesson=${e.resumeLessonId}` : `/courses/${e.courseId}`}
+                          className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold h-10 transition"
+                        >
+                          <Play className="h-3.5 w-3.5 fill-white" /> {done ? "Revisit Course" : e.lastWatchedTitle ? "Continue Learning" : "Start Learning"}
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* ========================================================= */}
         {/* TRENDING VIDEOS FOR YOUR CLASS */}

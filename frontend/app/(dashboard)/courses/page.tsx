@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
-import { fetchCourses, COURSE_CATEGORY_OPTIONS, type CourseCard } from "@/lib/store";
+import { fetchCourses, fetchMyEnrollments, COURSE_CATEGORY_OPTIONS, type CourseCard } from "@/lib/store";
 import { BookOpen, Star, Users, PlayCircle, Search, Layers, CheckCircle2 } from "lucide-react";
 
 const LEVEL_OPTIONS = ["All", "Beginner", "Intermediate", "Advanced"];
@@ -21,10 +21,7 @@ export default function CoursesPage() {
       setCourses(data);
       setLoading(false);
     });
-    try {
-      const raw = window.localStorage.getItem("study-material-enrolled-courses");
-      if (raw) setEnrolledIds(new Set(JSON.parse(raw) as string[]));
-    } catch { /* ignore */ }
+    fetchMyEnrollments().then((list) => setEnrolledIds(new Set(list.map((e) => e.courseId))));
   }, []);
 
   const filtered = useMemo(() => {
@@ -49,6 +46,7 @@ export default function CoursesPage() {
 
   return (
     <SiteShell
+      public
       title="Course Library"
       description="Enroll in structured video courses from verified faculty — lessons, notes, assignments and progress tracking in one place."
     >

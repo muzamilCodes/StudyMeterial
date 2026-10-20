@@ -1440,7 +1440,7 @@ export default function AdminPage() {
                             className="px-2 py-1 rounded-xl bg-emerald-600 text-white font-bold text-[10px] flex items-center gap-1"
                             title="Publish or unpublish course"
                           >
-                            <Sparkles className="h-3 w-3" /> {c.status === "Published" ? "Unpublish" : "Publish"}
+                            <Sparkles className="h-3 w-3" /> {c.status === "Published" ? "Unpublish" : c.status === "Pending Approval" ? "Approve & Publish" : "Publish"}
                           </button>
                           <button
                             onClick={() => setAdminAnalyticsCourseId(adminAnalyticsCourseId === c.id ? null : c.id)}
