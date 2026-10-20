@@ -1219,6 +1219,13 @@ export async function fetchCourseDetail(id: string): Promise<{ detail?: CourseDe
 async function courseJsonRequest(url: string, init: RequestInit): Promise<{ ok: boolean; message?: string }> {
   try {
     const res = await fetch(apiUrl(url), { ...init, headers: { ...getAuthHeaders(), ...(init.headers || {}) } });
+    if (res.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("study-material-token");
+        localStorage.removeItem("study-material-user");
+      }
+      return { ok: false, message: "Your session has expired. Please log in again." };
+    }
     const json = await res.json().catch(() => ({}));
     return { ok: res.ok, message: json.message };
   } catch {
