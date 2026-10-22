@@ -70,7 +70,7 @@ export default function RegisterPage() {
       setOtpChannels(data.channels ?? []);
       setResendIn(60);
     } catch {
-      setErrorMsg("Network error while sending the code. Please try again.");
+      setErrorMsg("⚠️ Server is currently offline. Please start the backend and try again.");
     } finally {
       setSendingOtp(false);
     }
@@ -166,7 +166,7 @@ export default function RegisterPage() {
         router.push(nextParam ?? "/dashboard");
       }, 1000);
     } catch {
-      setErrorMsg("Something went wrong. Please try again.");
+      setErrorMsg("⚠️ Server is currently offline. Please start the backend and try again.");
       setLoading(false);
     }
   }

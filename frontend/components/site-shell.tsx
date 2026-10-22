@@ -205,14 +205,27 @@ export function SiteShell({
 
       {/* MOBILE DRAWER MENU */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md pt-16 p-6 overflow-y-auto space-y-2">
+        <div className="md:hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md p-6 overflow-y-auto space-y-3">
+          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+            <span className="text-xs font-black tracking-widest text-slate-400 uppercase">
+              {isAdminPage ? "Admin Navigation" : isTeacherPage ? "Faculty Navigation" : "Navigation Menu"}
+            </span>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
           <div className="p-4 rounded-2xl bg-slate-900 text-white mb-4 border border-white/10 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-blue-600 font-bold flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-blue-600 font-bold flex items-center justify-center shrink-0">
               {session.name ? session.name[0] : "S"}
             </div>
-            <div>
-              <p className="text-sm font-bold">{session.name || "User"}</p>
-              <p className="text-xs text-slate-400">{isAdminPage ? "System Admin Mode" : isTeacherPage ? "Faculty Educator" : session.id ? `${session.grade} ${session.stream}` : "Guest Visitor"}</p>
+            <div className="truncate">
+              <p className="text-sm font-bold truncate">{session.name || "User"}</p>
+              <p className="text-xs text-slate-400 truncate">{isAdminPage ? "System Admin Mode" : isTeacherPage ? "Faculty Educator" : session.id ? `${session.grade} ${session.stream}` : "Guest Visitor"}</p>
             </div>
           </div>
 

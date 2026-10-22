@@ -264,8 +264,8 @@ export async function fetchEnterpriseLiveClasses(params?: {  grade?: Grade;
     }));
 
     return dbItems;
-  } catch (error) {
-    console.error("fetchEnterpriseLiveClasses error:", error);
+  } catch {
+    // Backend offline — silently return empty list
     return [];
   }
 }
@@ -360,7 +360,7 @@ export async function fetchBackendNotes(grade?: Grade, stream?: Stream, subject?
 
     return dbNotes;
   } catch (error) {
-    console.error("fetchBackendNotes failed:", error);
+    console.warn("fetchBackendNotes offline:", error);
     return [];
   }
 }
@@ -417,7 +417,7 @@ export async function fetchBackendPapers(grade?: Grade, stream?: Stream, subject
 
     return dbPapers;
   } catch (error) {
-    console.error("fetchBackendPapers failed:", error);
+    console.warn("fetchBackendPapers offline:", error);
     return [];
   }
 }
@@ -506,7 +506,7 @@ export async function fetchTrendingVideos(grade?: Grade, stream?: Stream, limit 
       views: item.views ?? 0
     }));
   } catch (error) {
-    console.error("fetchTrendingVideos failed:", error);
+    console.warn("fetchTrendingVideos offline:", error);
     return [];
   }
 }
@@ -516,7 +516,7 @@ export async function incrementVideoView(id: string): Promise<void> {
   try {
     await fetch(apiUrl(`/api/content/videos/${id}/view`), { method: "POST", headers: getAuthHeaders() });
   } catch (error) {
-    console.error("incrementVideoView failed:", error);
+    console.warn("incrementVideoView offline:", error);
   }
 }
 
@@ -594,7 +594,7 @@ export async function fetchBackendQuizzes(grade?: Grade, stream?: Stream, subjec
     // No auto-generated placeholder bank is injected.
     return dbQuizzes;
   } catch (error) {
-    console.error("fetchBackendQuizzes fallback active:", error);
+    console.warn("fetchBackendQuizzes offline:", error);
     return [];
   }
 }
@@ -656,8 +656,8 @@ export async function fetchBackendNotices(): Promise<RealNoticeItem[]> {
     }));
 
     return dbNotices;
-  } catch (error) {
-    console.error("fetchBackendNotices failed:", error);
+  } catch {
+    // Backend offline — silently return empty list
     return [];
   }
 }

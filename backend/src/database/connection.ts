@@ -1,8 +1,7 @@
 import mongoose from "mongoose";
-import { env } from "../config/env.js";
+import { connectDB } from "../db.js";
 
 export async function connectDatabase() {
-  if (mongoose.connection.readyState === 1) return mongoose.connection;
-  await mongoose.connect(env.mongoUri);
+  await connectDB();
   return mongoose.connection;
 }

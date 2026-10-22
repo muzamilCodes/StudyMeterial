@@ -90,7 +90,7 @@ export default function LoginPage() {
         else router.push(nextParam ?? "/dashboard");
       }, 600);
     } catch {
-      setErrorMsg(`Unable to connect to the backend server at ${apiUrl("")}`);
+      setErrorMsg("⚠️ Server is currently offline. Please start the backend server and try again.");
       setLoading(false);
     }
   }
