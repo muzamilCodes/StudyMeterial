@@ -293,7 +293,8 @@ export async function verifyAdminCredentials(email: string, password: string) {
   return { id: (user as any)._id.toString(), role };
 }
 
-export async function forgotPassword(email: string) {  const user = await UserModel.findOne({ email: email.toLowerCase() });
+export async function forgotPassword(email: string) {
+  const user = await UserModel.findOne({ email: email.toLowerCase() });
   if (!user) return { status: 404, body: { message: "User not found" } };
 
   const rawToken = crypto.randomBytes(24).toString("hex");

@@ -188,3 +188,40 @@ body {
 .dark .card-hover-effect:hover {
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
 }
+
+/* ─── Mobile Responsive Utilities ──────────────────────────────────────────── */
+
+/* Improve touch target sizes on mobile */
+@media (max-width: 640px) {
+  button, a, [role="button"] {
+    min-height: 40px;
+  }
+
+  /* Reduce border-radius on very small screens for better readability */
+  .rounded-\[2\.5rem\] {
+    border-radius: 1.5rem !important;
+  }
+
+  /* Make inputs more touchable */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevent iOS zoom on focus */
+  }
+}
+
+/* Safe area insets for notched phones (iPhone X+) */
+@supports (padding: max(0px)) {
+  .safe-top    { padding-top: max(0px, env(safe-area-inset-top)); }
+  .safe-bottom { padding-bottom: max(0px, env(safe-area-inset-bottom)); }
+  .safe-left   { padding-left: max(0px, env(safe-area-inset-left)); }
+  .safe-right  { padding-right: max(0px, env(safe-area-inset-right)); }
+}
+
+/* Touch-action for swipe-friendly elements */
+.touch-pan-x { touch-action: pan-x; }
+.touch-pan-y { touch-action: pan-y; }
+
+/* Prevent horizontal overflow on all pages */
+body, #__next, main {
+  overflow-x: hidden;
+  max-width: 100%;
+}
