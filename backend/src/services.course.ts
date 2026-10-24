@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { AssignmentModel, CourseModel, CourseEnrollmentModel, CourseReviewModel } from "./models/index.js";
+import { AssignmentModel, CourseModel, CourseEnrollmentModel, CourseReviewModel, UserModel } from "./models/index.js";
 
 const oid = (id: string) => new mongoose.Types.ObjectId(id);
 
@@ -43,8 +43,10 @@ const courseCard = (course: any, enrolledCount: number) => ({
   title:         course.title,
   thumbnail:     course.thumbnail,
   description:   course.description,
-  category:      course.category,
-  grade:         course.grade || "All",
+  academicLevel: course.academicLevel || course.grade || "Class 10",
+  subject:       course.subject || course.category || "Mathematics",
+  category:      course.category || course.subject || "General",
+  grade:         course.grade || course.academicLevel || "All",
   stream:        course.stream || "All",
   level:         course.level,
   language:      course.language,
@@ -66,6 +68,9 @@ export async function listCourses(filters: {
   category?: string;
   level?: string;
   search?: string;
+  academicLevel?: string;
+  subject?: string;
+  instructorId?: string;
 }, actor?: CourseActor) {
   const filter: any = {};
 
@@ -77,18 +82,38 @@ export async function listCourses(filters: {
     filter.status = "Published";
   }
 
-  if (filters.category) filter.category = filters.category;
-  if (filters.level)    filter.level = filters.level;
+  if (filters.academicLevel && filters.academicLevel !== "All") {
+    filter.$or = [{ academicLevel: filters.academicLevel }, { grade: filters.academicLevel }];
+  }
+  if (filters.subject && filters.subject !== "All") {
+    filter.subject = filters.subject;
+  }
+  if (filters.category && filters.category !== "All") {
+    filter.category = filters.category;
+  }
+  if (filters.level && filters.level !== "All") {
+    filter.level = filters.level;
+  }
+  if (filters.instructorId) {
+    filter.instructorId = oid(filters.instructorId);
+  }
   if (filters.search) {
     const rx = new RegExp(escapeRegex(filters.search), "i");
-    filter.$or = [{ title: rx }, { description: rx }, { category: rx }];
+    filter.$or = [
+      { title: rx },
+      { description: rx },
+      { category: rx },
+      { subject: rx },
+      { academicLevel: rx },
+      { instructorName: rx }
+    ];
   }
 
-  // Students only see courses of their own class (grade + stream).
-  // Courses marked "All" (or legacy ones without a class) stay visible to everyone.
-  if (actor?.role === "student" && actor.grade) {
+  // Students only see courses of their own class (grade + stream) if configured.
+  // Courses marked "All" stay visible to everyone.
+  if (actor?.role === "student" && actor.grade && !filters.academicLevel) {
     filter.$and = [
-      { $or: [{ grade: actor.grade }, { grade: "All" }, { grade: null }] },
+      { $or: [{ grade: actor.grade }, { academicLevel: actor.grade }, { grade: "All" }, { grade: null }] },
       { $or: [{ stream: actor.stream }, { stream: "All" }, { stream: null }] }
     ];
   }
@@ -209,7 +234,40 @@ export async function getCourseDetail(id: string, actor?: CourseActor) {
   };
 }
 
+async function validateInstructorTeachingPermission(instructorId: string, academicLevel: string, subject: string): Promise<string | null> {
+  const user: any = await UserModel.findById(instructorId).lean();
+  if (!user) return "Instructor account not found.";
+  if (user.approvalStatus !== "approved") {
+    return "Your instructor application is pending approval. Only approved instructors can create or publish courses.";
+  }
+
+  const perms = user.teachingPermissions || { classes: [], subjects: [], classSubjects: [] };
+  if (!perms.classes?.length && !perms.subjects?.length) {
+    return null;
+  }
+
+  if (perms.classes?.length > 0 && !perms.classes.includes(academicLevel)) {
+    return `You are not authorized to teach "${academicLevel}". Your approved classes are: ${perms.classes.join(", ")}. Please submit a request from your profile to add this class.`;
+  }
+
+  const classObj = (perms.classSubjects || []).find((cs: any) => cs.class === academicLevel);
+  const authorizedSubjects = classObj?.subjects?.length ? classObj.subjects : perms.subjects;
+  if (authorizedSubjects?.length > 0 && !authorizedSubjects.includes(subject)) {
+    return `You are not authorized to teach "${subject}" for "${academicLevel}". Your approved subjects for this class are: ${authorizedSubjects.join(", ")}. Please submit a request to add this subject.`;
+  }
+
+  return null;
+}
+
 export async function createCourse(actor: CourseActor, input: any) {
+  const targetClass = input.academicLevel || input.grade || "Class 10";
+  const targetSubject = input.subject || input.category || "Mathematics";
+
+  if (!isAdminRole(actor.role)) {
+    const err = await validateInstructorTeachingPermission(actor.id, targetClass, targetSubject);
+    if (err) return { status: 403, body: { message: err } };
+  }
+
   const created: any = await CourseModel.create({
     instructorId:    oid(actor.id),
     instructorName:  actorName(actor),
@@ -218,8 +276,10 @@ export async function createCourse(actor: CourseActor, input: any) {
     title:           input.title,
     thumbnail:       input.thumbnail || "",
     description:     input.description,
-    category:        input.category,
-    grade:           input.grade || "All",
+    academicLevel:   targetClass,
+    subject:         targetSubject,
+    category:        input.category || targetSubject,
+    grade:           targetClass,
     stream:          input.stream || "All",
     level:           input.level,
     language:        input.language,
@@ -250,6 +310,14 @@ export async function updateCourse(id: string, actor: CourseActor, input: any) {
   if (!course) return { status: 404, body: { message: "Course not found." } };
   if (!canManage(course, actor)) return { status: 403, body: { message: "You can only manage your own courses." } };
 
+  const targetClass = input.academicLevel || input.grade || course.academicLevel || course.grade || "Class 10";
+  const targetSubject = input.subject || input.category || course.subject || course.category || "Mathematics";
+
+  if (!isAdminRole(actor.role)) {
+    const err = await validateInstructorTeachingPermission(actor.id, targetClass, targetSubject);
+    if (err) return { status: 403, body: { message: err } };
+  }
+
   // Preserve engagement data (views/likes/shares/comments) for lessons carried over by id.
   const legacyEngagement = new Map<string, any>();
   for (const m of course.modules || []) {
@@ -267,8 +335,10 @@ export async function updateCourse(id: string, actor: CourseActor, input: any) {
     title:        input.title,
     thumbnail:    input.thumbnail ?? course.thumbnail,
     description:  input.description,
-    category:     input.category,
-    grade:        input.grade || course.grade || "All",
+    academicLevel: targetClass,
+    subject:       targetSubject,
+    category:     input.category || targetSubject,
+    grade:        targetClass,
     stream:       input.stream || course.stream || "All",
     level:        input.level,
     language:     input.language,
@@ -485,11 +555,16 @@ export async function instructorCourseStats(actor: CourseActor) {
   const counts = await enrollmentCounts(ids);
 
   let students = 0;
-  let earnings = 0;
+  const coursesByClass: Record<string, number> = {};
+  const coursesBySubject: Record<string, number> = {};
+
   for (const c of courses) {
     const enrolled = counts.get(c._id.toString()) || 0;
     students += enrolled;
-    earnings += enrolled * (c.price || 0);
+    const cls = c.academicLevel || c.grade || "Other";
+    const sbj = c.subject || c.category || "Other";
+    coursesByClass[cls] = (coursesByClass[cls] || 0) + 1;
+    coursesBySubject[sbj] = (coursesBySubject[sbj] || 0) + 1;
   }
 
   return {
@@ -497,10 +572,82 @@ export async function instructorCourseStats(actor: CourseActor) {
       courses: courses.length,
       published: courses.filter((c) => c.status === "Published").length,
       drafts: courses.filter((c) => c.status === "Draft").length,
+      pending: courses.filter((c) => c.status === "Pending Approval").length,
       videoLessons: courses.reduce((n, c) => n + totalLessons(c), 0),
       students,
-      earnings,
-      ratings: courses.reduce((n, c) => n + (c.ratingCount || 0), 0)
+      ratings: courses.reduce((n, c) => n + (c.ratingCount || 0), 0),
+      coursesByClass,
+      coursesBySubject
+    }
+  };
+}
+
+export async function adminFinancials() {
+  const [courses, enrollments]: [any[], any[]] = await Promise.all([
+    CourseModel.find().sort({ createdAt: -1 }).lean(),
+    CourseEnrollmentModel.find().sort({ createdAt: -1 }).lean()
+  ]);
+
+  const courseById = new Map(courses.map((c) => [c._id.toString(), c]));
+  const counts = await enrollmentCounts(courses.map((c) => c._id.toString()));
+
+  let totalPlatformRevenue = 0;
+  let paidEnrollments = 0;
+
+  const courseRevenue = courses.map((c) => {
+    const enrolled = counts.get(c._id.toString()) || 0;
+    const rev = (c.price || 0) * enrolled;
+    totalPlatformRevenue += rev;
+    if (c.price > 0) paidEnrollments += enrolled;
+    return {
+      id: c._id.toString(),
+      title: c.title,
+      instructorName: c.instructorName,
+      instructorEmail: c.instructorEmail,
+      academicLevel: c.academicLevel || c.grade || "Class 10",
+      subject: c.subject || c.category || "Mathematics",
+      price: c.price || 0,
+      enrolledCount: enrolled,
+      totalRevenue: rev,
+      status: c.status,
+      createdAt: c.createdAt
+    };
+  });
+
+  const transactions = enrollments.slice(0, 100).map((e: any) => {
+    const c = courseById.get(e.courseId.toString());
+    const amount = c?.price || 0;
+    return {
+      id: e._id.toString(),
+      courseId: e.courseId.toString(),
+      courseTitle: c?.title || "Course",
+      instructorName: c?.instructorName || "Faculty",
+      studentName: e.studentName,
+      email: e.email,
+      amount,
+      status: amount > 0 ? "Completed" : "Free Access",
+      enrolledAt: e.createdAt
+    };
+  });
+
+  const enrollmentsByClass: Record<string, number> = {};
+  for (const c of courses) {
+    const count = counts.get(c._id.toString()) || 0;
+    const cls = c.academicLevel || c.grade || "Other";
+    enrollmentsByClass[cls] = (enrollmentsByClass[cls] || 0) + count;
+  }
+
+  return {
+    data: {
+      totalPlatformRevenue,
+      totalCourses: courses.length,
+      paidCoursesCount: courses.filter((c) => (c.price || 0) > 0).length,
+      freeCoursesCount: courses.filter((c) => !c.price || c.price === 0).length,
+      totalEnrollments: enrollments.length,
+      paidEnrollments,
+      courseRevenue,
+      transactions,
+      enrollmentsByClass
     }
   };
 }

@@ -566,7 +566,12 @@ const applicationCard = (app: any) => ({
   profilePhotoUrl: app.personal.profilePhotoUrl ?? null,
   headline:   app.professional.headline,
   bio:        app.professional.bio,
-  subjects:   app.professional.subjectExpertise,
+  subjects:   app.selectedSubjects?.length ? app.selectedSubjects : app.professional.subjectExpertise,
+  selectedClasses: app.selectedClasses ?? [],
+  selectedSubjects: app.selectedSubjects ?? [],
+  classSubjects: app.classSubjects ?? [],
+  teachingCategories: app.teachingCategories ?? [],
+  preferredLanguage: app.professional?.preferredLanguage ?? "English",
   experience: app.professional.teachingExperience,
   occupation: app.professional.currentOccupation,
   education: {
@@ -580,7 +585,8 @@ const applicationCard = (app: any) => ({
   documents: {
     resume:              app.documents?.resume ?? null,
     teachingCertificate: app.documents?.teachingCertificate ?? null,
-    introVideo:          app.documents?.introVideo ?? null
+    introVideo:          app.documents?.introVideo ?? null,
+    sampleVideo:         app.documents?.sampleVideo ?? null
   },
   status:     app.status,
   submittedAt: app.createdAt,
@@ -593,6 +599,7 @@ type InstructorFilesPayload = {
   resume:               Express.Multer.File;
   teachingCertificate?: Express.Multer.File;
   introVideo?:          Express.Multer.File;
+  sampleVideo?:         Express.Multer.File;
   certificates:         Express.Multer.File[];
 };
 
@@ -622,6 +629,22 @@ export async function submitInstructorApplication(payload: any, files: Instructo
 
   const publicUrl = (f: Express.Multer.File) => `${instructorBaseUrl()}/uploads/${f.filename}`;
 
+  const selectedClasses: string[] = Array.isArray(payload.selectedClasses) ? payload.selectedClasses : [];
+  const selectedSubjects: string[] = Array.isArray(payload.selectedSubjects) ? payload.selectedSubjects : (payload.professional?.subjectExpertise || []);
+
+  // Generate classSubjects if not provided or empty
+  let classSubjects = Array.isArray(payload.classSubjects) && payload.classSubjects.length > 0
+    ? payload.classSubjects
+    : selectedClasses.map((cls) => ({ class: cls, subjects: selectedSubjects }));
+
+  // Generate teaching categories pairs
+  const teachingCategories: Array<{ class: string; subject: string }> = [];
+  for (const cs of classSubjects) {
+    for (const sub of (cs.subjects || [])) {
+      teachingCategories.push({ class: cs.class, subject: sub });
+    }
+  }
+
   const doc: any = {
     personal: {
       ...payload.personal,
@@ -629,7 +652,15 @@ export async function submitInstructorApplication(payload: any, files: Instructo
       phone,
       profilePhotoUrl: files.profilePhoto ? publicUrl(files.profilePhoto) : undefined
     },
-    professional: payload.professional,
+    professional: {
+      ...payload.professional,
+      subjectExpertise: selectedSubjects,
+      preferredLanguage: payload.professional?.preferredLanguage || payload.preferredLanguage || "English"
+    },
+    selectedClasses,
+    selectedSubjects,
+    classSubjects,
+    teachingCategories,
     education: {
       ...payload.education,
       certificates: files.certificates.map((f) => ({ name: f.originalname, url: publicUrl(f), size: humanSize(f.size) }))
@@ -641,6 +672,9 @@ export async function submitInstructorApplication(payload: any, files: Instructo
         : undefined,
       introVideo: files.introVideo
         ? { name: files.introVideo.originalname, url: publicUrl(files.introVideo), size: humanSize(files.introVideo.size), mimeType: files.introVideo.mimetype }
+        : undefined,
+      sampleVideo: files.sampleVideo
+        ? { name: files.sampleVideo.originalname, url: publicUrl(files.sampleVideo), size: humanSize(files.sampleVideo.size), mimeType: files.sampleVideo.mimetype }
         : undefined
     },
     passwordHash: await hashPassword(payload.password),
@@ -662,7 +696,6 @@ export async function submitInstructorApplication(payload: any, files: Instructo
 
   return { status: 201, body: { message: "Application submitted", application: applicationCard(saved) } };
 }
-
 
 export async function getInstructorApplicationStatus(email: string) {
   const app = await InstructorApplicationModel.findOne({ "personal.email": email.toLowerCase() }).lean();
@@ -690,6 +723,19 @@ export async function resolveInstructorApplication(id: string, decision: "approv
 
   const email = app.personal.email;
   const user = await UserModel.findOne({ email });
+
+  const selectedClasses = app.selectedClasses || [];
+  const selectedSubjects = app.selectedSubjects?.length ? app.selectedSubjects : (app.professional?.subjectExpertise || []);
+  const classSubjects = app.classSubjects && app.classSubjects.length > 0
+    ? app.classSubjects
+    : selectedClasses.map((cls: string) => ({ class: cls, subjects: selectedSubjects }));
+
+  const teachingPermissions = {
+    classes: selectedClasses,
+    subjects: selectedSubjects,
+    classSubjects
+  };
+
   if (!user) {
     await UserModel.create({
       username:        app.personal.fullName,
@@ -699,10 +745,27 @@ export async function resolveInstructorApplication(id: string, decision: "approv
       role:            "teacher",
       grade:           "11th",
       stream:          "General",
-      approvalStatus:  "approved"
+      approvalStatus:  "approved",
+      headline:        app.professional?.headline || "",
+      bio:             app.professional?.bio || "",
+      teachingExperience: app.professional?.teachingExperience || "",
+      currentOccupation: app.professional?.currentOccupation || "",
+      preferredLanguage: app.professional?.preferredLanguage || "English",
+      profilePhotoUrl: app.personal?.profilePhotoUrl || "",
+      teachingPermissions
     } as any);
   } else {
-    user.set({ role: "teacher", approvalStatus: "approved" });
+    user.set({
+      role: "teacher",
+      approvalStatus: "approved",
+      headline: app.professional?.headline || user.headline,
+      bio: app.professional?.bio || user.bio,
+      teachingExperience: app.professional?.teachingExperience || user.teachingExperience,
+      currentOccupation: app.professional?.currentOccupation || user.currentOccupation,
+      preferredLanguage: app.professional?.preferredLanguage || user.preferredLanguage,
+      profilePhotoUrl: app.personal?.profilePhotoUrl || user.profilePhotoUrl,
+      teachingPermissions
+    });
     await user.save();
   }
 
@@ -711,5 +774,170 @@ export async function resolveInstructorApplication(id: string, decision: "approv
 
   void sendInstructorDecisionEmail(email, app.personal.fullName, "approved", note);
   return { status: 200, body: { message: `Approved ${email} — instructor account is active`, application: applicationCard(app) } };
+}
+
+// ─── Instructor Profile & Permission Requests ───────────────────────────────
+
+export async function getInstructorProfile(userId: string) {
+  const user: any = await UserModel.findById(userId).lean();
+  if (!user) return { status: 404, body: { message: "User not found" } };
+
+  return {
+    status: 200,
+    body: {
+      data: {
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        phone: user.phone || "",
+        role: user.role,
+        approvalStatus: user.approvalStatus,
+        headline: user.headline || "",
+        bio: user.bio || "",
+        teachingExperience: user.teachingExperience || "",
+        currentOccupation: user.currentOccupation || "",
+        preferredLanguage: user.preferredLanguage || "English",
+        profilePhotoUrl: user.profilePhotoUrl || "",
+        teachingPermissions: user.teachingPermissions || { classes: [], subjects: [], classSubjects: [] },
+        permissionRequests: (user.permissionRequests || []).map((r: any) => ({
+          id: r._id.toString(),
+          requestedClasses: r.requestedClasses || [],
+          requestedSubjects: r.requestedSubjects || [],
+          requestedClassSubjects: r.requestedClassSubjects || [],
+          reason: r.reason || "",
+          status: r.status,
+          reviewNote: r.reviewNote || "",
+          reviewedBy: r.reviewedBy || "",
+          reviewedAt: r.reviewedAt,
+          createdAt: r.createdAt
+        }))
+      }
+    }
+  };
+}
+
+export async function updateInstructorProfile(userId: string, updates: {
+  headline?: string;
+  bio?: string;
+  teachingExperience?: string;
+  currentOccupation?: string;
+  preferredLanguage?: string;
+  profilePhotoUrl?: string;
+}) {
+  const user: any = await UserModel.findById(userId);
+  if (!user) return { status: 404, body: { message: "User not found" } };
+
+  if (typeof updates.headline === "string") user.headline = updates.headline.trim();
+  if (typeof updates.bio === "string") user.bio = updates.bio.trim();
+  if (typeof updates.teachingExperience === "string") user.teachingExperience = updates.teachingExperience.trim();
+  if (typeof updates.currentOccupation === "string") user.currentOccupation = updates.currentOccupation.trim();
+  if (typeof updates.preferredLanguage === "string") user.preferredLanguage = updates.preferredLanguage.trim();
+  if (typeof updates.profilePhotoUrl === "string") user.profilePhotoUrl = updates.profilePhotoUrl.trim();
+
+  await user.save();
+  return { status: 200, body: { message: "Profile updated successfully.", data: user.toObject() } };
+}
+
+export async function submitTeachingPermissionRequest(userId: string, data: {
+  requestedClasses: string[];
+  requestedSubjects: string[];
+  requestedClassSubjects?: Array<{ class: string; subjects: string[] }>;
+  reason?: string;
+}) {
+  const user: any = await UserModel.findById(userId);
+  if (!user) return { status: 404, body: { message: "User not found" } };
+
+  const reqObj = {
+    requestedClasses: data.requestedClasses,
+    requestedSubjects: data.requestedSubjects,
+    requestedClassSubjects: data.requestedClassSubjects || data.requestedClasses.map((cls) => ({ class: cls, subjects: data.requestedSubjects })),
+    reason: data.reason || "",
+    status: "pending",
+    createdAt: new Date()
+  };
+
+  user.permissionRequests.push(reqObj);
+  await user.save();
+
+  return { status: 201, body: { message: "Class & subject permission request submitted for admin review." } };
+}
+
+export async function listAllPermissionRequests(status = "all") {
+  const filter: any = { role: "teacher" };
+  const teachers: any[] = await UserModel.find(filter).lean();
+
+  const out: any[] = [];
+  for (const t of teachers) {
+    for (const r of (t.permissionRequests || [])) {
+      if (status !== "all" && r.status !== status) continue;
+      out.push({
+        id: r._id.toString(),
+        instructorId: t._id.toString(),
+        instructorName: t.username,
+        instructorEmail: t.email,
+        requestedClasses: r.requestedClasses || [],
+        requestedSubjects: r.requestedSubjects || [],
+        requestedClassSubjects: r.requestedClassSubjects || [],
+        reason: r.reason || "",
+        status: r.status,
+        reviewNote: r.reviewNote || "",
+        reviewedBy: r.reviewedBy || "",
+        reviewedAt: r.reviewedAt,
+        createdAt: r.createdAt
+      });
+    }
+  }
+
+  out.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return { data: out };
+}
+
+export async function resolveTeachingPermissionRequest(requestId: string, decision: "approved" | "rejected", note: string, adminEmail: string) {
+  const user: any = await UserModel.findOne({ "permissionRequests._id": requestId });
+  if (!user) return { status: 404, body: { message: "Permission request not found." } };
+
+  const reqItem = user.permissionRequests.id(requestId);
+  if (!reqItem) return { status: 404, body: { message: "Request item not found." } };
+  if (reqItem.status !== "pending") return { status: 409, body: { message: `Request is already ${reqItem.status}.` } };
+
+  reqItem.status = decision;
+  reqItem.reviewNote = note || undefined;
+  reqItem.reviewedBy = adminEmail;
+  reqItem.reviewedAt = new Date();
+
+  if (decision === "approved") {
+    const existingPerms = user.teachingPermissions || { classes: [], subjects: [], classSubjects: [] };
+    const mergedClasses = Array.from(new Set([...(existingPerms.classes || []), ...(reqItem.requestedClasses || [])]));
+    const mergedSubjects = Array.from(new Set([...(existingPerms.subjects || []), ...(reqItem.requestedSubjects || [])]));
+
+    const existingMap = new Map<string, Set<string>>();
+    for (const cs of (existingPerms.classSubjects || [])) {
+      existingMap.set(cs.class, new Set(cs.subjects || []));
+    }
+    for (const cs of (reqItem.requestedClassSubjects || [])) {
+      if (!existingMap.has(cs.class)) existingMap.set(cs.class, new Set());
+      for (const s of (cs.subjects || [])) existingMap.get(cs.class)!.add(s);
+    }
+
+    const mergedClassSubjects = Array.from(existingMap.entries()).map(([cls, subs]) => ({
+      class: cls,
+      subjects: Array.from(subs)
+    }));
+
+    user.teachingPermissions = {
+      classes: mergedClasses,
+      subjects: mergedSubjects,
+      classSubjects: mergedClassSubjects
+    };
+  }
+
+  await user.save();
+  return {
+    status: 200,
+    body: {
+      message: `Permission request ${decision}.`,
+      teachingPermissions: user.teachingPermissions
+    }
+  };
 }
 

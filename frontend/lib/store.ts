@@ -885,11 +885,135 @@ export async function uploadBackendFile(file: File): Promise<{ url: string; file
 // INSTRUCTOR APPLICATIONS (multi-step registration + admin approval)
 // ----------------------------------------------------------------------------
 
-export const SUBJECT_EXPERTISE_OPTIONS = [
-  "Web Development", "Data Science", "Artificial Intelligence", "Machine Learning",
-  "Cyber Security", "Java", "Python", "DSA", "DBMS",
-  "Mathematics", "Physics", "Chemistry", "English", "Other"
-];
+export const ALL_CLASSES_OPTIONS = [
+  "Nursery",
+  "LKG",
+  "UKG",
+  "Class 1",
+  "Class 2",
+  "Class 3",
+  "Class 4",
+  "Class 5",
+  "Class 6",
+  "Class 7",
+  "Class 8",
+  "Class 9",
+  "Class 10",
+  "Class 11",
+  "Class 12",
+  "College / University Level",
+  "Competitive Exam Preparation"
+] as const;
+
+export const ALL_SUBJECTS_OPTIONS = [
+  "Mathematics",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "English",
+  "Urdu",
+  "Hindi",
+  "Computer Science",
+  "Information Technology",
+  "Science",
+  "Social Science",
+  "History",
+  "Geography",
+  "Political Science",
+  "Economics",
+  "Accountancy",
+  "Business Studies",
+  "Computer Programming",
+  "Web Development",
+  "Data Science",
+  "Artificial Intelligence",
+  "Machine Learning",
+  "Cyber Security",
+  "Java Programming",
+  "Python Programming",
+  "Data Structures and Algorithms",
+  "Other"
+] as const;
+
+/** Dynamic subjects rule: returns relevant subjects and categories for selected classes */
+export function getSubjectOptionsForClasses(selectedClasses: string[]): {
+  availableSubjects: string[];
+  streamGroups: Array<{ title: string; subjects: string[] }>;
+} {
+  if (!selectedClasses.length) {
+    return {
+      availableSubjects: [...ALL_SUBJECTS_OPTIONS],
+      streamGroups: [{ title: "All Available Subjects", subjects: [...ALL_SUBJECTS_OPTIONS] }]
+    };
+  }
+
+  const groups: Array<{ title: string; subjects: string[] }> = [];
+  const subjectSet = new Set<string>();
+
+  const hasEarly = selectedClasses.some((c) => ["Nursery", "LKG", "UKG", "Class 1", "Class 2", "Class 3", "Class 4", "Class 5"].includes(c));
+  const hasMiddleSecondary = selectedClasses.some((c) => ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10"].includes(c));
+  const hasSeniorSecondary = selectedClasses.some((c) => ["Class 11", "Class 12"].includes(c));
+  const hasCollege = selectedClasses.includes("College / University Level");
+  const hasCompetitive = selectedClasses.includes("Competitive Exam Preparation");
+
+  if (hasEarly) {
+    const earlySubs = ["English", "Urdu", "Hindi", "Mathematics", "Science", "Social Science", "Other"];
+    groups.push({ title: "Primary School (Nursery - Class 5)", subjects: earlySubs });
+    earlySubs.forEach((s) => subjectSet.add(s));
+  }
+
+  if (hasMiddleSecondary) {
+    const secSubs = [
+      "Mathematics", "Science", "Social Science", "English", "Urdu", "Hindi",
+      "Computer Science", "Information Technology", "History", "Geography", "Political Science", "Economics", "Other"
+    ];
+    groups.push({ title: "Middle & Secondary (Classes 6–10)", subjects: secSubs });
+    secSubs.forEach((s) => subjectSet.add(s));
+  }
+
+  if (hasSeniorSecondary) {
+    const science = ["Physics", "Chemistry", "Mathematics", "Biology", "Computer Science", "Information Technology", "English"];
+    const commerce = ["Accountancy", "Business Studies", "Economics", "Mathematics", "English", "Information Technology"];
+    const humanities = ["History", "Geography", "Political Science", "Economics", "English", "Urdu", "Hindi"];
+
+    groups.push({ title: "Class 11–12: Science Stream", subjects: science });
+    groups.push({ title: "Class 11–12: Commerce Stream", subjects: commerce });
+    groups.push({ title: "Class 11–12: Humanities / Arts", subjects: humanities });
+
+    [...science, ...commerce, ...humanities].forEach((s) => subjectSet.add(s));
+  }
+
+  if (hasCollege) {
+    const collegeSubs = [
+      "Computer Programming", "Web Development", "Data Science", "Artificial Intelligence",
+      "Machine Learning", "Cyber Security", "Java Programming", "Python Programming",
+      "Data Structures and Algorithms", "Computer Science", "Information Technology",
+      "Mathematics", "Physics", "Chemistry", "Economics", "Other"
+    ];
+    groups.push({ title: "College / University Level", subjects: collegeSubs });
+    collegeSubs.forEach((s) => subjectSet.add(s));
+  }
+
+  if (hasCompetitive) {
+    const compSubs = [
+      "Mathematics", "Physics", "Chemistry", "Biology", "Science", "Social Science",
+      "History", "Geography", "Political Science", "Economics", "Computer Science",
+      "Data Structures and Algorithms", "English", "Other"
+    ];
+    groups.push({ title: "Competitive Exam Preparation", subjects: compSubs });
+    compSubs.forEach((s) => subjectSet.add(s));
+  }
+
+  // Always include Other as an option
+  subjectSet.add("Other");
+
+  return {
+    availableSubjects: Array.from(subjectSet),
+    streamGroups: groups
+  };
+}
+
+export const SUBJECT_EXPERTISE_OPTIONS = ALL_SUBJECTS_OPTIONS;
 
 export const TEACHING_EXPERIENCE_OPTIONS = ["Fresher", "Less than 1 year", "1-3 years", "3-5 years", "5+ years"];
 
@@ -915,6 +1039,10 @@ export const STATE_OPTIONS = [
   "Other"
 ];
 
+export const TEACHING_LANGUAGES_OPTIONS = [
+  "English", "Hindi", "Urdu", "English & Hindi", "English & Urdu", "Bilingual", "Regional / Other"
+];
+
 export function passingYearOptions() {
   const current = new Date().getFullYear();
   const years: string[] = [];
@@ -934,12 +1062,16 @@ export type InstructorApplicationForm = {
     addressLine: string;
     messageToAdmin: string;
   };
+  selectedClasses: string[];
+  selectedSubjects: string[];
+  classSubjects?: Array<{ class: string; subjects: string[] }>;
   professional: {
     headline: string;
     bio: string;
     subjectExpertise: string[];
     teachingExperience: string;
     currentOccupation: string;
+    preferredLanguage: string;
   };
   education: {
     highestQualification: string;
@@ -955,6 +1087,7 @@ export type InstructorApplicationFiles = {
   resume:               File;
   teachingCertificate?: File;
   introVideo?:          File;
+  sampleVideo?:         File;
   certificates?:        File[];
 };
 
@@ -974,6 +1107,11 @@ export type InstructorApplicationSummary = {
   headline: string;
   bio: string;
   subjects: string[];
+  selectedClasses: string[];
+  selectedSubjects: string[];
+  classSubjects: Array<{ class: string; subjects: string[] }>;
+  teachingCategories?: Array<{ class: string; subject: string }>;
+  preferredLanguage?: string;
   experience: string;
   occupation: string;
   education: {
@@ -988,6 +1126,7 @@ export type InstructorApplicationSummary = {
     resume: InstructorFileRef;
     teachingCertificate: InstructorFileRef;
     introVideo?: InstructorFileRef;
+    sampleVideo?: InstructorFileRef;
   };
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
@@ -1005,6 +1144,7 @@ export async function submitInstructorApplication(
   fd.append("resume", files.resume);
   if (files.teachingCertificate) fd.append("teachingCertificate", files.teachingCertificate);
   if (files.introVideo) fd.append("introVideo", files.introVideo);
+  if (files.sampleVideo) fd.append("sampleVideo", files.sampleVideo);
   (files.certificates ?? []).forEach((f) => fd.append("certificates", f));
 
   try {
@@ -1060,6 +1200,100 @@ export async function resolveInstructorApplication(
   }
 }
 
+// Instructor Profile & Permissions API
+export async function fetchInstructorProfile(): Promise<any | null> {
+  try {
+    const res = await fetch(apiUrl("/api/instructors/me/profile"), {
+      headers: getAuthHeaders(),
+      cache: "no-store"
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateInstructorProfile(updates: any): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(apiUrl("/api/instructors/me/profile"), {
+      method: "PATCH",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, message: data?.message ?? (res.ok ? "Profile updated" : "Update failed") };
+  } catch {
+    return { ok: false, message: "Network error while updating profile." };
+  }
+}
+
+export async function requestAdditionalTeachingPermissions(payload: {
+  requestedClasses: string[];
+  requestedSubjects: string[];
+  requestedClassSubjects?: Array<{ class: string; subjects: string[] }>;
+  reason?: string;
+}): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(apiUrl("/api/instructors/me/permission-requests"), {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, message: data?.message ?? (res.ok ? "Request submitted" : "Request failed") };
+  } catch {
+    return { ok: false, message: "Network error while submitting request." };
+  }
+}
+
+export async function fetchTeachingPermissionRequests(status = "all"): Promise<any[]> {
+  try {
+    const res = await fetch(apiUrl(`/api/instructors/permission-requests?status=${encodeURIComponent(status)}`), {
+      headers: getAuthHeaders(),
+      cache: "no-store"
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function resolveTeachingPermissionRequest(
+  id: string,
+  decision: "approved" | "rejected",
+  note?: string
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(apiUrl(`/api/instructors/permission-requests/${id}/decision`), {
+      method: "PATCH",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ decision, note })
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, message: data?.message ?? (res.ok ? "Updated" : "Action failed") };
+  } catch {
+    return { ok: false, message: "Network error while saving decision." };
+  }
+}
+
+export async function fetchAdminFinancials(): Promise<any | null> {
+  try {
+    const res = await fetch(apiUrl("/api/admin/financials"), {
+      headers: getAuthHeaders(),
+      cache: "no-store"
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body.data;
+  } catch {
+    return null;
+  }
+}
+
 
 // ----------------------------------------------------------------------------
 // COURSES API CLIENT (instructor courses, enrollment, progress, reviews)
@@ -1090,6 +1324,8 @@ export type CoursePayload = {
   title: string;
   thumbnail: string;
   description: string;
+  academicLevel?: string;
+  subject?: string;
   category: string;
   grade: CourseGrade;
   stream: CourseStream;
@@ -1111,6 +1347,8 @@ export type CourseCard = {
   title: string;
   thumbnail: string;
   description: string;
+  academicLevel: string;
+  subject: string;
   category: string;
   grade: CourseGrade;
   stream: CourseStream;
@@ -1158,9 +1396,30 @@ export type CourseDetail = CourseCard & {
 
 export type CourseReviewItem = { id: string; studentName: string; rating: number; comment: string; createdAt: string; courseTitle?: string };
 export type CourseEnrollmentRow = { id: string; courseTitle: string; courseId: string; studentName: string; email: string; completed: number; totalLessons: number; progressPct: number; enrolledAt: string };
-export type InstructorCourseStats = { courses: number; published: number; drafts: number; videoLessons: number; students: number; earnings: number; ratings: number };
+export type InstructorCourseStats = {
+  courses: number;
+  published: number;
+  drafts: number;
+  pending: number;
+  videoLessons: number;
+  students: number;
+  ratings: number;
+  coursesByClass: Record<string, number>;
+  coursesBySubject: Record<string, number>;
+  total?: number;
+  lessons?: number;
+};
 
-export async function fetchCourses(params?: { mine?: boolean; all?: boolean; category?: string; level?: string; search?: string }): Promise<CourseCard[]> {
+export async function fetchCourses(params?: {
+  mine?: boolean;
+  all?: boolean;
+  category?: string;
+  level?: string;
+  search?: string;
+  academicLevel?: string;
+  subject?: string;
+  instructorId?: string;
+}): Promise<CourseCard[]> {
   try {
     const q = new URLSearchParams();
     if (params?.mine) q.append("mine", "1");
@@ -1168,6 +1427,9 @@ export async function fetchCourses(params?: { mine?: boolean; all?: boolean; cat
     if (params?.category) q.append("category", params.category);
     if (params?.level) q.append("level", params.level);
     if (params?.search) q.append("search", params.search);
+    if (params?.academicLevel) q.append("academicLevel", params.academicLevel);
+    if (params?.subject) q.append("subject", params.subject);
+    if (params?.instructorId) q.append("instructorId", params.instructorId);
     const res = await fetch(apiUrl(`/api/courses?${q.toString()}`), { headers: getAuthHeaders(), cache: "no-store" });
     if (!res.ok) return [];
     return (await res.json()).data || [];

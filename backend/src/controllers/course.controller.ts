@@ -54,9 +54,11 @@ const courseInputSchema = z.object({
   title:        z.string().min(2),
   thumbnail:    z.string().default(""),
   description:  z.string().min(10),
-  category:     z.string().min(2),
-  grade:        z.enum(["10th", "11th", "12th", "All"]).default("All"),
-  stream:       z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts", "All"]).default("All"),
+  academicLevel: z.string().optional().default("Class 10"),
+  subject:      z.string().optional().default("Mathematics"),
+  category:     z.string().min(1),
+  grade:        z.string().default("All"),
+  stream:       z.string().default("All"),
   level:        z.enum(["Beginner", "Intermediate", "Advanced"]),
   language:     z.string().min(1),
   price:        z.number().min(0),
@@ -73,11 +75,14 @@ const param = (value: string | string[]) => (Array.isArray(value) ? String(value
 export async function listCoursesHandler(req: Request, res: Response) {
   const actor = (req as any).user as CourseActor | undefined;
   return res.json(await listCourses({
-    mine:     req.query.mine === "1",
-    all:      req.query.all === "1",
-    category: asString(req.query.category),
-    level:    asString(req.query.level),
-    search:   asString(req.query.search)
+    mine:          req.query.mine === "1",
+    all:           req.query.all === "1",
+    academicLevel: asString(req.query.academicLevel || req.query.class),
+    subject:       asString(req.query.subject),
+    category:      asString(req.query.category),
+    level:         asString(req.query.level),
+    instructorId:  asString(req.query.instructorId),
+    search:        asString(req.query.search)
   }, actor));
 }
 

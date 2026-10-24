@@ -24,6 +24,12 @@ import {
   fetchInstructorEnrollments,
   fetchInstructorCourseReviews,
   createBackendQuiz,
+  fetchInstructorProfile,
+  updateInstructorProfile,
+  requestAdditionalTeachingPermissions,
+  ALL_CLASSES_OPTIONS,
+  ALL_SUBJECTS_OPTIONS,
+  TEACHING_LANGUAGES_OPTIONS,
   type AssignmentItem,
   type AttendanceRecord,
   type EnterpriseLiveClassItem,
@@ -58,7 +64,14 @@ import {
   Layers,
   Pencil,
   Star,
-  Loader2
+  Loader2,
+  User,
+  GraduationCap,
+  Globe,
+  Briefcase,
+  Send,
+  AlertCircle,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,6 +136,32 @@ export default function TeacherDashboardPage() {
   const [editCourseId, setEditCourseId] = useState<string | null>(null);
   const [analyticsCourseId, setAnalyticsCourseId] = useState<string | null>(null);
 
+  // Instructor Profile & Permissions State
+  const [instructorProfile, setInstructorProfile] = useState<any>(null);
+  const [teachingPermissions, setTeachingPermissions] = useState<{
+    classes: string[];
+    subjects: string[];
+    classSubjects: Record<string, string[]>;
+  } | null>(null);
+  const [permissionRequests, setPermissionRequests] = useState<any[]>([]);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    headline: "",
+    bio: "",
+    teachingExperience: "",
+    currentOccupation: "",
+    preferredLanguage: "English & Hindi",
+    profilePhotoUrl: ""
+  });
+
+  // Request Scope State
+  const [reqClasses, setReqClasses] = useState<string[]>([]);
+  const [reqSubjects, setReqSubjects] = useState<string[]>([]);
+  const [reqReason, setReqReason] = useState("");
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+
   useEffect(() => {
     const s = getStoredSession();
     setSession(s);
@@ -138,11 +177,64 @@ export default function TeacherDashboardPage() {
     fetchInstructorCourseStats().then(setCourseStats);
     fetchInstructorEnrollments().then(setCourseEnrollments);
     fetchInstructorCourseReviews().then(setCourseReviews);
+    fetchInstructorProfile().then((res) => {
+      if (res.ok) {
+        setInstructorProfile(res.profile);
+        setTeachingPermissions(res.teachingPermissions);
+        setPermissionRequests(res.permissionRequests || []);
+        setProfileForm({
+          name: res.profile.name || "",
+          headline: res.profile.headline || "",
+          bio: res.profile.bio || "",
+          teachingExperience: res.profile.teachingExperience || "",
+          currentOccupation: res.profile.currentOccupation || "",
+          preferredLanguage: res.profile.preferredLanguage || "English & Hindi",
+          profilePhotoUrl: res.profile.profilePhotoUrl || ""
+        });
+      }
+    });
   };
 
   const notify = (msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 3500);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileSaving(true);
+    const res = await updateInstructorProfile(profileForm);
+    setProfileSaving(false);
+    if (res.ok) {
+      notify("Profile updated successfully!");
+      refreshData();
+    } else {
+      notify(res.message || "Failed to update profile");
+    }
+  };
+
+  const handleRequestPermissions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (reqClasses.length === 0 && reqSubjects.length === 0) {
+      notify("Please select at least one class or subject to request.");
+      return;
+    }
+    setRequestSubmitting(true);
+    const res = await requestAdditionalTeachingPermissions({
+      requestedClasses: reqClasses,
+      requestedSubjects: reqSubjects,
+      reason: reqReason
+    });
+    setRequestSubmitting(false);
+    if (res.ok) {
+      notify("Permission request submitted for admin review!");
+      setReqClasses([]);
+      setReqSubjects([]);
+      setReqReason("");
+      refreshData();
+    } else {
+      notify(res.message || "Failed to submit request.");
+    }
   };
 
   const handleCreateLiveClass = async (e: React.FormEvent, isDraft: boolean) => {
@@ -343,40 +435,90 @@ export default function TeacherDashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* METRICS OVERVIEW CARDS (REVENUE COMPLETELY REMOVED) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: "My Courses", val: String(courseStats?.courses ?? 0), icon: BookOpen, col: "from-violet-600 to-purple-600" },
-                { label: "Video Lessons", val: String(courseStats?.videoLessons ?? 0), icon: Video, col: "from-sky-600 to-cyan-600" },
+                { label: "Total Courses", val: String(courseStats?.courses ?? courseStats?.total ?? myCourses.length), icon: BookOpen, col: "from-violet-600 to-purple-600" },
+                { label: "Published Courses", val: String(courseStats?.published ?? myCourses.filter(c => c.status === "Published").length), icon: CheckCircle2, col: "from-emerald-600 to-teal-600" },
+                { label: "Draft Courses", val: String(courseStats?.drafts ?? myCourses.filter(c => c.status === "Draft").length), icon: Layers, col: "from-slate-600 to-slate-700" },
+                { label: "Pending Approval", val: String(courseStats?.pending ?? myCourses.filter(c => c.status === "Pending Approval").length), icon: Clock, col: "from-amber-500 to-orange-600" },
+                { label: "Total Lectures", val: String(courseStats?.videoLessons ?? courseStats?.lessons ?? 0), icon: Video, col: "from-sky-600 to-cyan-600" },
                 { label: "Enrolled Students", val: String(courseStats?.students ?? 0), icon: Users, col: "from-blue-600 to-indigo-600" },
-                { label: "Total Earnings", val: `₹${courseStats?.earnings ?? 0}`, icon: TrendingUp, col: "from-emerald-600 to-teal-600" },
-                { label: "Total Live Classes Scheduled", val: String(liveClasses.length), icon: Radio, col: "from-rose-600 to-pink-600" },
-                { label: "Published Chapter Notes", val: String(platformNotes.length), icon: FileText, col: "from-amber-500 to-orange-600" },
-                { label: "Active Student Assignments", val: String(assignments.length), icon: FolderPlus, col: "from-teal-600 to-emerald-600" },
-                { label: "Course Reviews", val: String(courseStats?.ratings ?? 0), icon: Award, col: "from-fuchsia-600 to-pink-600" }
+                { label: "Student Reviews", val: String(courseStats?.ratings ?? 0), icon: Award, col: "from-fuchsia-600 to-pink-600" },
+                { label: "Live Classes Scheduled", val: String(liveClasses.length), icon: Radio, col: "from-rose-600 to-pink-600" }
               ].map((card, idx) => (
-                <div key={idx} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
+                <div key={idx} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{card.label}</span>
-                    <div className={`p-3 rounded-2xl bg-gradient-to-r ${card.col} text-white shadow-md`}>
-                      <card.icon className="h-5 w-5" />
+                    <div className={`p-2.5 rounded-2xl bg-gradient-to-r ${card.col} text-white shadow-md`}>
+                      <card.icon className="h-4 w-4" />
                     </div>
                   </div>
-                  <h3 className="text-3xl font-black tracking-tight">{card.val}</h3>
+                  <h3 className="text-2xl font-black tracking-tight">{card.val}</h3>
                 </div>
               ))}
+            </div>
+
+            {/* CLASS & SUBJECT DISTRIBUTION BREAKDOWNS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Courses by Class */}
+              <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-violet-500" /> Courses by Academic Class
+                  </h3>
+                  <span className="text-xs text-slate-400">Distribution across levels</span>
+                </div>
+                {courseStats?.coursesByClass && Object.keys(courseStats.coursesByClass).length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                    {Object.entries(courseStats.coursesByClass).map(([cls, count]) => (
+                      <div key={cls} className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/70 dark:bg-slate-800/40">
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">{cls}</p>
+                        <p className="text-lg font-black text-violet-600 dark:text-violet-400">{count} {count === 1 ? "course" : "courses"}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 py-3">No courses mapped to academic classes yet.</p>
+                )}
+              </div>
+
+              {/* Courses by Subject */}
+              <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-blue-500" /> Courses by Subject
+                  </h3>
+                  <span className="text-xs text-slate-400">Curriculum disciplines</span>
+                </div>
+                {courseStats?.coursesBySubject && Object.keys(courseStats.coursesBySubject).length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                    {Object.entries(courseStats.coursesBySubject).map(([sub, count]) => (
+                      <div key={sub} className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3 bg-slate-50/70 dark:bg-slate-800/40">
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">{sub}</p>
+                        <p className="text-lg font-black text-blue-600 dark:text-blue-400">{count} {count === 1 ? "course" : "courses"}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 py-3">No courses created across subjects yet.</p>
+                )}
+              </div>
             </div>
 
             {/* QUICK ACTIONS */}
             <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
               <h3 className="text-base font-black">Quick Actions</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
+                  { tab: "Teaching Categories", label: "Teaching Scope", desc: "View approved class & subject categories", icon: Sparkles, accent: "bg-emerald-600 hover:bg-emerald-700" },
                   { tab: "Create Course", label: "Create a Course", desc: "Build curriculum with video lectures", icon: BookOpen, accent: "bg-violet-600 hover:bg-violet-700" },
                   { tab: "My Courses", label: "Manage My Courses", desc: "Publish drafts, edit lessons, delete", icon: Layers, accent: "bg-sky-600 hover:bg-sky-700" },
+                  { tab: "Instructor Profile", label: "Instructor Profile", desc: "Update bio & request more classes", icon: User, accent: "bg-indigo-600 hover:bg-indigo-700" },
                   { tab: "Schedule Live Class", label: "Schedule a Live Class", desc: "Go live on Google Meet / Zoom", icon: Video, accent: "bg-blue-600 hover:bg-blue-700" },
                   { tab: "Upload Notes", label: "Upload Study Note", desc: "Add a PDF chapter / formula sheet", icon: Upload, accent: "bg-amber-600 hover:bg-amber-700" },
-                  { tab: "Assignments", label: "Publish Assignment", desc: "Set homework with a deadline", icon: FolderPlus, accent: "bg-emerald-600 hover:bg-emerald-700" },
-                  { tab: "Student Progress", label: "Student Progress", desc: "Track lesson completion per student", icon: BarChart3, accent: "bg-indigo-600 hover:bg-indigo-700" }
+                  { tab: "Assignments", label: "Publish Assignment", desc: "Set homework with a deadline", icon: FolderPlus, accent: "bg-rose-600 hover:bg-rose-700" },
+                  { tab: "Student Progress", label: "Student Progress", desc: "Track lesson completion per student", icon: BarChart3, accent: "bg-cyan-600 hover:bg-cyan-700" }
                 ].map((action, idx) => (
                   <button
                     key={idx}
@@ -393,6 +535,436 @@ export default function TeacherDashboardPage() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TEACHING CATEGORIES TAB */}
+        {activeTab === "Teaching Categories" && (
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-black flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-emerald-500" /> My Teaching Categories
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    These are your dynamically generated teaching categories based on your admin-approved classes and subjects.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setActiveTab("Instructor Profile")}
+                    variant="outline"
+                    className="rounded-xl text-xs font-bold gap-1"
+                  >
+                    <Plus className="h-4 w-4" /> Request Additional Categories
+                  </Button>
+                  <Button
+                    onClick={() => { setEditCourseId(null); setActiveTab("Create Course"); }}
+                    className="rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold gap-1"
+                  >
+                    <BookOpen className="h-4 w-4" /> Create Course
+                  </Button>
+                </div>
+              </div>
+
+              {/* Dynamic Category Cards Grid */}
+              {(() => {
+                const categories: { academicLevel: string; subject: string; courses: CourseCard[] }[] = [];
+                const classSubjects = teachingPermissions?.classSubjects || {};
+                
+                // Collect authorized combinations
+                if (Object.keys(classSubjects).length > 0) {
+                  Object.entries(classSubjects).forEach(([cls, subjects]) => {
+                    (subjects as string[]).forEach((sub) => {
+                      const matchedCourses = myCourses.filter(
+                        c => (c.academicLevel === cls || c.grade === cls) && (c.subject === sub || c.category === sub)
+                      );
+                      categories.push({ academicLevel: cls, subject: sub, courses: matchedCourses });
+                    });
+                  });
+                } else if (teachingPermissions?.classes && teachingPermissions?.subjects) {
+                  teachingPermissions.classes.forEach((cls) => {
+                    teachingPermissions.subjects.forEach((sub) => {
+                      const matchedCourses = myCourses.filter(
+                        c => (c.academicLevel === cls || c.grade === cls) && (c.subject === sub || c.category === sub)
+                      );
+                      categories.push({ academicLevel: cls, subject: sub, courses: matchedCourses });
+                    });
+                  });
+                }
+
+                if (categories.length === 0) {
+                  return (
+                    <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                      <GraduationCap className="h-10 w-10 text-slate-300 mx-auto" />
+                      <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No Teaching Categories Assigned Yet</p>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        Your account does not have any approved classes or subjects. Submit an expansion request in your Instructor Profile tab to get authorized by admin.
+                      </p>
+                      <Button onClick={() => setActiveTab("Instructor Profile")} className="rounded-xl text-xs font-bold">
+                        Request Teaching Categories
+                      </Button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                    {categories.map((cat, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 p-5 space-y-4 hover:border-emerald-500/50 transition shadow-xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                              {cat.academicLevel}
+                            </span>
+                            <h4 className="text-base font-black text-slate-900 dark:text-white mt-2">
+                              {cat.academicLevel} → {cat.subject}
+                            </h4>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-lg text-[11px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            {cat.courses.length} {cat.courses.length === 1 ? "course" : "courses"}
+                          </span>
+                        </div>
+
+                        {/* List courses under this category */}
+                        <div className="space-y-1.5 text-xs">
+                          {cat.courses.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 italic">No courses created yet under this category.</p>
+                          ) : (
+                            cat.courses.slice(0, 3).map((c) => (
+                              <div key={c.id} className="flex items-center justify-between text-[11px] p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50">
+                                <span className="font-bold truncate max-w-[180px]">{c.title}</span>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                                  c.status === "Published" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                                }`}>{c.status}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
+                          <span className="text-[10px] font-bold text-slate-400">Approved Scope</span>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setEditCourseId(null);
+                              setActiveTab("Create Course");
+                            }}
+                            className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold gap-1"
+                          >
+                            <Plus className="h-3 w-3" /> Create Course
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* INSTRUCTOR PROFILE TAB */}
+        {activeTab === "Instructor Profile" && (
+          <div className="space-y-8 max-w-5xl">
+            {/* PERSONAL & PROFESSIONAL PROFILE FORM */}
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-6">
+              <div>
+                <h3 className="text-xl font-black flex items-center gap-2">
+                  <User className="h-5 w-5 text-indigo-500" /> Instructor Profile & Teaching Credentials
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Update your public educator information displayed to students across course cards.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="space-y-5 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="font-bold">Full Name</Label>
+                    <Input
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      required
+                      className="mt-1.5 rounded-xl h-11 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-bold">Profile Photo URL</Label>
+                    <Input
+                      value={profileForm.profilePhotoUrl}
+                      onChange={(e) => setProfileForm({ ...profileForm, profilePhotoUrl: e.target.value })}
+                      placeholder="https://... or uploaded image URL"
+                      className="mt-1.5 rounded-xl h-11 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="font-bold">Professional Headline</Label>
+                    <Input
+                      value={profileForm.headline}
+                      onChange={(e) => setProfileForm({ ...profileForm, headline: e.target.value })}
+                      placeholder="e.g. Senior Faculty · IIT JEE Mathematics"
+                      className="mt-1.5 rounded-xl h-11 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-bold">Current Occupation</Label>
+                    <Input
+                      value={profileForm.currentOccupation}
+                      onChange={(e) => setProfileForm({ ...profileForm, currentOccupation: e.target.value })}
+                      placeholder="e.g. Assistant Professor / Senior Lecturer"
+                      className="mt-1.5 rounded-xl h-11 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-bold">Teaching Experience</Label>
+                    <Input
+                      value={profileForm.teachingExperience}
+                      onChange={(e) => setProfileForm({ ...profileForm, teachingExperience: e.target.value })}
+                      placeholder="e.g. 8+ Years in Senior Secondary"
+                      className="mt-1.5 rounded-xl h-11 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="font-bold">Preferred Teaching Language</Label>
+                    <select
+                      value={profileForm.preferredLanguage}
+                      onChange={(e) => setProfileForm({ ...profileForm, preferredLanguage: e.target.value })}
+                      className="w-full mt-1.5 h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 font-bold"
+                    >
+                      {TEACHING_LANGUAGES_OPTIONS.map((lang) => (
+                        <option key={lang} value={lang}>{lang}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="font-bold">Educator Biography</Label>
+                  <textarea
+                    rows={4}
+                    value={profileForm.bio}
+                    onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+                    placeholder="Describe your pedagogical philosophy, academic background, and teaching experience..."
+                    className="w-full mt-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 p-3 font-semibold text-xs resize-none"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11 px-8 text-xs disabled:opacity-60"
+                >
+                  {profileSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Saving...</> : "Save Profile Changes"}
+                </Button>
+              </form>
+            </div>
+
+            {/* APPROVED TEACHING SCOPE DISPLAY */}
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-black flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" /> Admin-Approved Teaching Scope
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    You can only create courses and publish content for the classes and subjects listed below.
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  Verified Instructor
+                </span>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div>
+                  <p className="font-bold text-slate-600 dark:text-slate-300 mb-2">Approved Classes:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {teachingPermissions?.classes && teachingPermissions.classes.length > 0 ? (
+                      teachingPermissions.classes.map((cls) => (
+                        <span key={cls} className="px-3 py-1.5 rounded-xl bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 font-bold text-xs border border-violet-200 dark:border-violet-900">
+                          {cls}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-slate-400 italic">No approved classes registered yet.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="font-bold text-slate-600 dark:text-slate-300 mb-2">Approved Subjects:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {teachingPermissions?.subjects && teachingPermissions.subjects.length > 0 ? (
+                      teachingPermissions.subjects.map((sub) => (
+                        <span key={sub} className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-xs border border-blue-200 dark:border-blue-900">
+                          {sub}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-slate-400 italic">No approved subjects registered yet.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* REQUEST TO ADD CLASS / SUBJECT MECHANISM */}
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-6">
+              <div>
+                <h3 className="text-lg font-black flex items-center gap-2">
+                  <Send className="h-5 w-5 text-violet-600" /> Request to Add Class / Subject
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Want to expand your teaching domain? Submit an authorization request to the platform administrators.
+                </p>
+              </div>
+
+              <form onSubmit={handleRequestPermissions} className="space-y-5 text-xs">
+                {/* Select classes to add */}
+                <div>
+                  <Label className="font-bold">Select Classes You Want to Add</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2">
+                    {ALL_CLASSES_OPTIONS.map((cls) => {
+                      const alreadyApproved = teachingPermissions?.classes?.includes(cls);
+                      const isSelected = reqClasses.includes(cls);
+                      return (
+                        <button
+                          type="button"
+                          key={cls}
+                          disabled={alreadyApproved}
+                          onClick={() => {
+                            if (isSelected) setReqClasses(reqClasses.filter(c => c !== cls));
+                            else setReqClasses([...reqClasses, cls]);
+                          }}
+                          className={`p-2 rounded-xl text-left font-bold text-xs border transition flex items-center justify-between ${
+                            alreadyApproved
+                              ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 border-slate-200 text-slate-400"
+                              : isSelected
+                              ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                              : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-violet-400"
+                          }`}
+                        >
+                          <span className="truncate">{cls}</span>
+                          {alreadyApproved ? (
+                            <span className="text-[10px] text-emerald-600 font-black">Active</span>
+                          ) : isSelected ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Select subjects to add */}
+                <div>
+                  <Label className="font-bold">Select Subjects You Want to Add</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2 max-h-48 overflow-y-auto p-1 border rounded-2xl border-slate-200 dark:border-slate-800">
+                    {ALL_SUBJECTS_OPTIONS.map((sub) => {
+                      const alreadyApproved = teachingPermissions?.subjects?.includes(sub);
+                      const isSelected = reqSubjects.includes(sub);
+                      return (
+                        <button
+                          type="button"
+                          key={sub}
+                          disabled={alreadyApproved}
+                          onClick={() => {
+                            if (isSelected) setReqSubjects(reqSubjects.filter(s => s !== sub));
+                            else setReqSubjects([...reqSubjects, sub]);
+                          }}
+                          className={`p-2 rounded-xl text-left font-bold text-xs border transition flex items-center justify-between ${
+                            alreadyApproved
+                              ? "opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 border-slate-200 text-slate-400"
+                              : isSelected
+                              ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                              : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-blue-400"
+                          }`}
+                        >
+                          <span className="truncate">{sub}</span>
+                          {alreadyApproved ? (
+                            <span className="text-[10px] text-emerald-600 font-black">Active</span>
+                          ) : isSelected ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Reason / Statement */}
+                <div>
+                  <Label className="font-bold">Reason & Qualifications for Requested Expansion</Label>
+                  <textarea
+                    rows={3}
+                    value={reqReason}
+                    onChange={(e) => setReqReason(e.target.value)}
+                    placeholder="Briefly state your academic degree, certification, or syllabus expertise for the requested classes/subjects..."
+                    className="w-full mt-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 p-3 font-semibold text-xs resize-none"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={requestSubmitting}
+                  className="rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-bold h-11 px-8 text-xs disabled:opacity-60"
+                >
+                  {requestSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Submitting Request...</> : "Submit Expansion Request to Admin"}
+                </Button>
+              </form>
+
+              {/* REQUEST HISTORY TABLE */}
+              {permissionRequests.length > 0 && (
+                <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                  <h4 className="font-black text-sm">Past Expansion Requests</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-black uppercase">
+                        <tr>
+                          <th className="p-3">Requested Classes</th>
+                          <th className="p-3">Requested Subjects</th>
+                          <th className="p-3">Reason</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Admin Note</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {permissionRequests.map((req, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                            <td className="p-3 font-bold">{req.requestedClasses?.join(", ") || "—"}</td>
+                            <td className="p-3 text-blue-600 font-bold">{req.requestedSubjects?.join(", ") || "—"}</td>
+                            <td className="p-3 text-slate-500 max-w-xs truncate">{req.reason || "—"}</td>
+                            <td className="p-3">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                req.status === "Approved"
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : req.status === "Rejected"
+                                  ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                              }`}>
+                                {req.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-500 text-[11px]">{req.adminNote || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -605,59 +1177,7 @@ export default function TeacherDashboardPage() {
           </div>
         )}
 
-        {/* EARNINGS TAB */}
-        {activeTab === "Earnings" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              {[
-                { label: "Total Earnings", val: `₹${courseStats?.earnings ?? 0}`, icon: TrendingUp, col: "from-emerald-600 to-teal-600" },
-                { label: "Enrolled Students", val: String(courseStats?.students ?? 0), icon: Users, col: "from-blue-600 to-indigo-600" },
-                { label: "Published Courses", val: String(courseStats?.published ?? 0), icon: BookOpen, col: "from-violet-600 to-purple-600" }
-              ].map((card, idx) => (
-                <div key={idx} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{card.label}</span>
-                    <div className={`p-3 rounded-2xl bg-gradient-to-r ${card.col} text-white shadow-md`}>
-                      <card.icon className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <h3 className="text-3xl font-black tracking-tight">{card.val}</h3>
-                </div>
-              ))}
-            </div>
 
-            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
-              <div>
-                <h3 className="text-base font-black">Per-Course Earnings</h3>
-                <p className="text-xs text-slate-400">Calculated from real enrollments: course price × enrolled students</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase font-black">
-                    <tr>
-                      <th className="p-3">Course</th>
-                      <th className="p-3">Price</th>
-                      <th className="p-3">Enrollments</th>
-                      <th className="p-3">Earnings</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                    {myCourses.length === 0 ? (
-                      <tr><td colSpan={4} className="p-6 text-center text-slate-400 font-semibold">No courses yet.</td></tr>
-                    ) : myCourses.map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="p-3 font-bold">{c.title}</td>
-                        <td className="p-3">{c.price > 0 ? `₹${c.price}` : "Free"}</td>
-                        <td className="p-3">{c.enrolledCount}</td>
-                        <td className="p-3 font-black text-emerald-600">₹{c.price * c.enrolledCount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* MY LIVE CLASSES TAB */}
         {activeTab === "My Live Classes" && (

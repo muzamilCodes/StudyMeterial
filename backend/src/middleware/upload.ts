@@ -27,7 +27,7 @@ function isAllowedInstructorFile(file: { originalname: string; mimetype: string 
  *  25 MB for the optional intro/demo video. */
 export const instructorUpload = multer({
   storage,
-  limits: { fileSize: 25 * 1024 * 1024, files: 7 },
+  limits: { fileSize: 25 * 1024 * 1024, files: 12 },
   fileFilter: (_req, file, cb) => {
     if (!isAllowedInstructorFile(file)) {
       cb(new Error(`Unsupported file type "${path.extname(file.originalname) || file.mimetype}". Only PDF, DOC, DOCX, JPG, PNG, MP4 and WebM are allowed.`));

@@ -62,6 +62,7 @@ const userNavItems = [
 // ADMIN SIDEBAR MENU (modules with real working screens)
 const adminNavItems = [
   { tab: "Dashboard Overview", label: "Dashboard Overview", icon: LayoutDashboard },
+  { tab: "Financials & Revenue", label: "Platform Financials", icon: TrendingUp },
   { tab: "Users & Students", label: "Users Directory", icon: Users },
   { tab: "Notes Management", label: "Notes Management", icon: FileText },
   { tab: "Upload PDF Note", label: "Upload PDF Note", icon: Upload },
@@ -77,15 +78,16 @@ const adminNavItems = [
 // TEACHER / FACULTY SIDEBAR MENU (each tab is a separate section)
 const teacherNavItems = [
   { tab: "Overview", label: "Dashboard Overview", icon: LayoutDashboard },
+  { tab: "Teaching Categories", label: "Teaching Categories", icon: Sparkles },
   { tab: "Create Course", label: "Create Course", icon: BookOpen },
   { tab: "My Courses", label: "My Courses", icon: Layers },
+  { tab: "Instructor Profile", label: "Instructor Profile", icon: User },
   { tab: "My Live Classes", label: "My Live Classes", icon: Video },
   { tab: "Schedule Live Class", label: "Schedule Live Class", icon: Sparkles },
   { tab: "Upload Notes", label: "Upload Study Notes", icon: FileText },
   { tab: "Assignments", label: "Assignments", icon: FolderPlus },
   { tab: "Student Progress", label: "Student Progress", icon: BarChart3 },
   { tab: "Reviews & Ratings", label: "Reviews & Ratings", icon: Award },
-  { tab: "Earnings", label: "Earnings", icon: TrendingUp },
   { tab: "Attendance Logs", label: "Attendance Logs", icon: Users },
 ];
 

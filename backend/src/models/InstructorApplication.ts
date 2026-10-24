@@ -19,7 +19,26 @@ const instructorApplicationSchema = new mongoose.Schema(
       bio:                 { type: String, required: true, trim: true },
       subjectExpertise:    { type: [String], default: [] },
       teachingExperience:  { type: String, required: true },
-      currentOccupation:   { type: String, required: true }
+      currentOccupation:   { type: String, required: true },
+      preferredLanguage:   { type: String, default: "English" }
+    },
+
+    // Class and Subject Selections
+    selectedClasses:    { type: [String], default: [] },
+    selectedSubjects:   { type: [String], default: [] },
+    classSubjects:      {
+      type: [{
+        class:    { type: String, required: true },
+        subjects: { type: [String], default: [] }
+      }],
+      default: []
+    },
+    teachingCategories: {
+      type: [{
+        class:   { type: String, required: true },
+        subject: { type: String, required: true }
+      }],
+      default: []
     },
 
     education: {
@@ -34,7 +53,8 @@ const instructorApplicationSchema = new mongoose.Schema(
     documents: {
       resume:               { name: String, url: String, size: String, mimeType: String },
       teachingCertificate:  { name: String, url: String, size: String, mimeType: String },
-      introVideo:           { name: String, url: String, size: String, mimeType: String }
+      introVideo:           { name: String, url: String, size: String, mimeType: String },
+      sampleVideo:          { name: String, url: String, size: String, mimeType: String }
     },
 
     passwordHash: { type: String, required: true },

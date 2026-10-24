@@ -38,9 +38,11 @@ const courseSchema = new mongoose.Schema(
     title:        { type: String, required: true, trim: true },
     thumbnail:    { type: String, default: "", trim: true },
     description:  { type: String, required: true, trim: true },
+    academicLevel: { type: String, default: "Class 10", trim: true, index: true },
+    subject:       { type: String, default: "Mathematics", trim: true, index: true },
     category:     { type: String, required: true, trim: true, index: true },
-    grade:        { type: String, enum: ["10th", "11th", "12th", "All"], default: "All", index: true },
-    stream:       { type: String, enum: ["General", "Medical", "Non-Medical", "Commerce", "Arts", "All"], default: "All" },
+    grade:        { type: String, default: "All", index: true },
+    stream:       { type: String, default: "All" },
     level:        { type: String, enum: ["Beginner", "Intermediate", "Advanced"], default: "Beginner" },
     language:     { type: String, default: "English", trim: true },
     price:        { type: Number, min: 0, default: 0 },
@@ -56,5 +58,7 @@ const courseSchema = new mongoose.Schema(
 );
 
 courseSchema.index({ status: 1, category: 1, createdAt: -1 });
+courseSchema.index({ status: 1, academicLevel: 1, subject: 1, createdAt: -1 });
+courseSchema.index({ instructorId: 1, status: 1, createdAt: -1 });
 
 export const CourseModel = mongoose.model("Course", courseSchema);

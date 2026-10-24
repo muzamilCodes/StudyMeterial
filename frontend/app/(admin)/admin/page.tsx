@@ -14,6 +14,7 @@ import {
   fetchBackendAdminDashboard,
   fetchBackendNotes,
   fetchCourses,
+  fetchAdminFinancials,
   deleteBackendCourse,
   setBackendCourseStatus,
   type CourseCard,
@@ -168,6 +169,8 @@ export default function AdminPage() {
     totalDownloads: 0
   });
   const [streamDist, setStreamDist] = useState({ medical: 0, nonMedical: 0, commerce: 0, arts: 0, general: 0 });
+  const [financials, setFinancials] = useState<any>(null);
+  const [financialsLoading, setFinancialsLoading] = useState(false);
 
   useEffect(() => {
     const s = getStoredSession();
@@ -241,6 +244,7 @@ export default function AdminPage() {
       setRegisteredUsers(res.usersList);
       setStreamDist(res.distributions);
     });
+    fetchAdminFinancials().then(setFinancials);
   };
 
   if (!authorized) {
@@ -1332,6 +1336,159 @@ export default function AdminPage() {
                 {uploading ? "Publishing..." : "Publish Official Notice"}
               </Button>
             </form>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* FINANCIALS & REVENUE TAB (RESTRICTED TO ADMIN ONLY) */}
+        {/* ========================================================= */}
+        {activeTab === "Financials & Revenue" && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-emerald-500" /> Platform Financials & Revenue Intelligence
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Master financial audit overview. All monetization, tuition payouts, and transaction ledgers are strictly restricted to system administrators.
+                </p>
+              </div>
+              <Button onClick={() => fetchAdminFinancials().then(setFinancials)} variant="outline" className="rounded-xl text-xs font-bold gap-1">
+                Refresh Financials
+              </Button>
+            </div>
+
+            {/* FINANCIAL STAT CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { label: "Total Platform Revenue", value: `₹${financials?.totalPlatformRevenue?.toLocaleString() ?? 0}`, icon: TrendingUp, col: "from-emerald-600 to-teal-600" },
+                { label: "Paid Enrollments", value: String(financials?.paidEnrollments ?? 0), icon: Users, col: "from-blue-600 to-indigo-600" },
+                { label: "Total Enrollments", value: String(financials?.totalEnrollments ?? 0), icon: Award, col: "from-purple-600 to-pink-600" },
+                { label: "Paid Courses", value: String(financials?.paidCoursesCount ?? 0), icon: BookOpen, col: "from-violet-600 to-purple-600" },
+                { label: "Free Courses", value: String(financials?.freeCoursesCount ?? 0), icon: Layers, col: "from-slate-600 to-slate-700" }
+              ].map((card, idx) => (
+                <div key={idx} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{card.label}</span>
+                    <div className={`p-2.5 rounded-2xl bg-gradient-to-r ${card.col} text-white shadow-md`}>
+                      <card.icon className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <h4 className="text-2xl font-black tracking-tight">{card.value}</h4>
+                  <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> Live MongoDB aggregate
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* CLASS DISTRIBUTION BREAKDOWN */}
+            {financials?.classDistribution && Object.keys(financials.classDistribution).length > 0 && (
+              <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
+                <h4 className="text-sm font-black text-slate-900 dark:text-white">Revenue & Enrollments by Academic Class</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {Object.entries(financials.classDistribution).map(([cls, data]: [string, any]) => (
+                    <div key={cls} className="rounded-2xl border border-slate-100 dark:border-slate-800 p-3 bg-slate-50 dark:bg-slate-800/40 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 truncate block">{cls}</span>
+                      <p className="text-base font-black text-emerald-600">₹{data.revenue?.toLocaleString() ?? 0}</p>
+                      <p className="text-[11px] font-semibold text-slate-500">{data.enrollments} enrollments</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* COURSE MONETIZATION BREAKDOWN TABLE */}
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 dark:text-white">Course Revenue Ledger</h4>
+                  <p className="text-xs text-slate-400">Financial distribution across published and draft courses</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase font-black">
+                    <tr>
+                      <th className="p-3">Course</th>
+                      <th className="p-3">Instructor</th>
+                      <th className="p-3">Class / Subject</th>
+                      <th className="p-3">Course Price</th>
+                      <th className="p-3">Enrollments</th>
+                      <th className="p-3">Total Gross Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                    {(!financials?.coursesBreakdown || financials.coursesBreakdown.length === 0) ? (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-400 font-semibold">
+                          No course financial records found yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      financials.coursesBreakdown.map((row: any) => (
+                        <tr key={row.courseId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="p-3 font-bold text-slate-900 dark:text-white max-w-[220px] truncate">{row.title}</td>
+                          <td className="p-3 text-slate-600 dark:text-slate-300 font-semibold">{row.instructorName}</td>
+                          <td className="p-3">
+                            <span className="font-bold text-violet-600">{row.academicLevel || row.grade}</span>
+                            <span className="text-slate-400"> · </span>
+                            <span className="font-bold text-blue-600">{row.subject || row.category}</span>
+                          </td>
+                          <td className="p-3 font-bold">{row.price > 0 ? `₹${row.price}` : "Free"}</td>
+                          <td className="p-3 font-semibold">{row.enrollments}</td>
+                          <td className="p-3 font-black text-emerald-600">₹{row.revenue?.toLocaleString() ?? 0}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* RECENT TRANSACTIONS LOG */}
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
+              <h4 className="text-sm font-black text-slate-900 dark:text-white">Recent Student Payment Transactions</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase font-black">
+                    <tr>
+                      <th className="p-3">Student Name</th>
+                      <th className="p-3">Student Email</th>
+                      <th className="p-3">Course Purchased</th>
+                      <th className="p-3">Amount Paid</th>
+                      <th className="p-3">Enrolled At</th>
+                      <th className="p-3">Payment Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                    {(!financials?.recentTransactions || financials.recentTransactions.length === 0) ? (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-400 font-semibold">
+                          No student transaction logs recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      financials.recentTransactions.map((tx: any) => (
+                        <tr key={tx.enrollmentId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="p-3 font-bold text-slate-900 dark:text-white">{tx.studentName}</td>
+                          <td className="p-3 text-slate-500">{tx.studentEmail}</td>
+                          <td className="p-3 text-blue-600 font-bold">{tx.courseTitle}</td>
+                          <td className="p-3 font-black text-emerald-600">₹{tx.amount}</td>
+                          <td className="p-3 text-slate-400">{tx.enrolledAt ? String(tx.enrolledAt).slice(0, 10) : "—"}</td>
+                          <td className="p-3">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                              {tx.paymentStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
