@@ -40,7 +40,7 @@ export default function EditProfilePage() {
     setSession(s);
     if (s) {
       setName(s.name ?? "Student");
-      setEmail(s.email ?? "student@studymaterial.com");
+      setEmail(s.email ?? "");
       setGrade(s.grade ?? "11th");
       setStream(s.stream ?? "Medical");
       setBio(s.bio ?? "Class 11th Medical Student");

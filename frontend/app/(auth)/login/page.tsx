@@ -136,7 +136,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="email" className="font-bold text-slate-800 text-xs sm:text-sm">Email Address</Label>
-              <Input id="email" name="email" type="email" placeholder="student@studymaterial.com" required className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
+              <Input id="email" name="email" type="email" placeholder="Enter your email address" required className="rounded-xl border-slate-200 h-11 text-xs sm:text-sm" />
             </div>
 
             <div className="grid gap-2">

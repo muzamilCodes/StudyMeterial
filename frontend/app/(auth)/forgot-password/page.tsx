@@ -89,7 +89,7 @@ export default function ForgotPasswordPage() {
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="student@studymaterial.com"
+                  placeholder="Enter your registered email"
                   required
                   className="h-11 rounded-xl border-slate-200 text-xs sm:text-sm"
                 />

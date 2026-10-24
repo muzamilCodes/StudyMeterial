@@ -151,7 +151,7 @@ export default function VideosPage() {
   // Log attendance automatically on entering live room
   useEffect(() => {
     if (activeRoomClass && session && !attendanceLogged) {
-      logLiveClassAttendance(activeRoomClass.id, session.name || "Student", session.email || "student@studymaterial.com");
+      logLiveClassAttendance(activeRoomClass.id, session.name || "Student", session.email || "");
       setAttendanceLogged(true);
     }
   }, [activeRoomClass, session, attendanceLogged]);
