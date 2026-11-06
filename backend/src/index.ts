@@ -12,14 +12,21 @@ for (const seedUser of seedState.users) {
   const exists = await UserModel.findOne({ email: seedUser.email }).lean();
   if (!exists) {
     await UserModel.create({
-      username:     seedUser.username,
-      email:        seedUser.email,
-      passwordHash: seedUser.passwordHash,
-      role:         seedUser.role,
-      grade:        seedUser.grade,
-      stream:       seedUser.stream
+      username:       seedUser.username,
+      email:          seedUser.email,
+      passwordHash:   seedUser.passwordHash,
+      role:           seedUser.role,
+      grade:          seedUser.grade,
+      stream:         seedUser.stream,
+      approvalStatus: "approved"
     });
     console.log(`👤 Seeded ${seedUser.role} account: ${seedUser.email}`);
+  } else {
+    // Always keep seed credentials in sync so a re-deploy never breaks login
+    await UserModel.updateOne(
+      { email: seedUser.email },
+      { $set: { passwordHash: seedUser.passwordHash, approvalStatus: "approved" } }
+    );
   }
 }
 

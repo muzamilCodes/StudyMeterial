@@ -5,6 +5,7 @@ const now = () => new Date().toISOString();
 
 const adminHash = await bcrypt.hash("Admin@12345", 10);
 const studentHash = await bcrypt.hash("Student@12345", 10);
+const teacherHash = await bcrypt.hash("Teacher@12345", 10);
 
 export const seedState: AppState = {
   users: [
@@ -24,6 +25,16 @@ export const seedState: AppState = {
       email: "student@studymaterial.com",
       passwordHash: studentHash,
       role: "student",
+      grade: "11th",
+      stream: "Medical",
+      createdAt: now()
+    },
+    {
+      id: "user-teacher-1",
+      username: "Demo Instructor",
+      email: "instructor@studymaterial.com",
+      passwordHash: teacherHash,
+      role: "teacher",
       grade: "11th",
       stream: "Medical",
       createdAt: now()

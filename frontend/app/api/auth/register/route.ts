@@ -7,7 +7,7 @@ const schema = z.object({
   password: z.string().min(6),
   confirmPassword: z.string().min(6),
   grade: z.enum(["10th", "11th", "12th"]),
-  stream: z.enum(["Medical", "Non-Medical", "Commerce", "Arts"])
+  stream: z.enum(["General", "Medical", "Non-Medical", "Commerce", "Arts"])
 });
 
 export async function POST(request: Request) {
