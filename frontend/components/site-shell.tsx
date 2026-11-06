@@ -125,22 +125,28 @@ export function SiteShell({
   useEffect(() => {
     const s = getStoredSession();
     if (!s) {
+      // Provide a default guest session so all pages (Dashboard, Notes, Papers, Quizzes, Videos, Subjects, Courses, etc.) are viewable
+      const guestRole = isAdminPage ? "admin" : isTeacherPage ? "teacher" : "student";
+      setSession({
+        id: "",
+        email: "",
+        username: isAdminPage ? "Admin Guest" : isTeacherPage ? "Faculty Guest" : "Guest Student",
+        name: isAdminPage ? "Admin Guest" : isTeacherPage ? "Faculty Guest" : "Guest Student",
+        role: guestRole as StudentSession["role"],
+        grade: "11th",
+        stream: "Medical"
+      });
       setIsCheckingAuth(false);
-      if (isPublicPage) {
-        setSession({ id: "", email: "", role: "student", name: "Guest" });
-      } else {
-        router.replace("/register?access_denied=true");
-      }
       return;
     }
 
     setSession(s);
     setIsCheckingAuth(false);
-  }, [pathname, router, isAdminPage, isPublicPage]);
+  }, [pathname, router, isAdminPage, isTeacherPage, isPublicPage]);
 
   const handleLogout = () => {
     clearSession();
-    router.push("/register");
+    router.push("/login");
   };
 
   const toggleTheme = () => {
@@ -152,30 +158,12 @@ export function SiteShell({
   if (isCheckingAuth || !session) {
     if (isPublicPage) return null;
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-white text-center">
-        <div className="space-y-4 max-w-sm rounded-[2.5rem] bg-slate-900 border border-white/10 p-8 shadow-2xl backdrop-blur-xl">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 animate-pulse text-white shadow-lg">
-            <Lock className="h-8 w-8" />
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 text-center">
+        <div className="space-y-4 max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 shadow-xl">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 animate-pulse text-white shadow-lg">
+            <GraduationCap className="h-7 w-7" />
           </div>
-          <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs font-extrabold uppercase">
-            Authentication Required
-          </Badge>
-          <h3 className="text-2xl font-black text-white">Registration Required</h3>
-          <p className="text-xs text-slate-300 font-medium leading-relaxed">
-            Please register or sign in to access your personal dashboard, class notes, and learning history.
-          </p>
-          <div className="pt-2 space-y-2">
-            <Link href="/register">
-              <Button className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2">
-                <UserPlus className="h-4 w-4" /> Go to Register Page
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button variant="outline" className="w-full h-12 rounded-2xl border-white/20 text-slate-200 hover:bg-white/10 font-bold text-xs">
-                Already Have Account? Login
-              </Button>
-            </Link>
-          </div>
+          <p className="text-xs font-bold text-slate-500">Loading StudyMaterial...</p>
         </div>
       </div>
     );
@@ -298,16 +286,28 @@ export function SiteShell({
                 );
               })}
 
-              {isAdminUser && (
-                <Link
-                  href="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 mt-3"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  <span>Admin Console</span>
-                </Link>
-              )}
+              <div className="pt-2 border-t border-white/10 mt-2 space-y-1">
+                {!isAdminPage && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>Admin Console</span>
+                  </Link>
+                )}
+                {!isTeacherPage && (
+                  <Link
+                    href="/teacher"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                  >
+                    <GraduationCap className="h-4 w-4" />
+                    <span>Faculty Portal</span>
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 
@@ -446,9 +446,9 @@ export function SiteShell({
               })
             )}
 
-            {/* SWITCH MODE LINK — only surfaces the Admin Console entry on student pages */}
-            {isAdminUser && !isAdminPage && (
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 mt-2">
+            {/* SWITCH MODE LINK — surfaces Admin Console & Faculty Portal */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 mt-2 space-y-1">
+              {!isAdminPage && (
                 <Link
                   href="/admin"
                   className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition"
@@ -457,8 +457,18 @@ export function SiteShell({
                   <ShieldCheck className="h-4 w-4 shrink-0" />
                   {!isCollapsed && <span>Admin Console</span>}
                 </Link>
-              </div>
-            )}
+              )}
+              {!isTeacherPage && (
+                <Link
+                  href="/teacher"
+                  className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition"
+                  title={isCollapsed ? "Faculty Portal" : undefined}
+                >
+                  <GraduationCap className="h-4 w-4 shrink-0" />
+                  {!isCollapsed && <span>Faculty Portal</span>}
+                </Link>
+              )}
+            </div>
           </nav>
         </div>
 

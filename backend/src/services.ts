@@ -149,6 +149,7 @@ export async function sendSignupOtp(rawEmail: string, phone?: string) {
   const code = generateOtp();
   await OTPModel.deleteMany({ email });
   await OTPModel.create({ email, code, expiresAt: new Date(Date.now() + OTP_TTL_MS) });
+  console.log(`🔑 [OTP] Verification code for ${email}: ${code}`);
 
   const channels: string[] = [];
   const failures: string[] = [];
